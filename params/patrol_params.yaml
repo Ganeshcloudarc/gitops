@@ -1,0 +1,7 @@
+patrol:
+  max_speed           : 1.5 # meter/sec
+  wheel_base          : 2 # dist
+  look_ahead_distance : 3
+  speed_gain          : 0.5
+map:
+ to_center: true
