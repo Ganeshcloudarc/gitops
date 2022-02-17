@@ -18,7 +18,6 @@ except Exception as e:
     exit(e)
 
 
-
 class StanlyControl:
     def __init__(self):
         

@@ -8,7 +8,7 @@ installation:
 
 
 
-launch mavros 
+launch mavros node
 ```
 roslaunch mavros px4.launch
 ```
@@ -25,7 +25,7 @@ roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json
 roslaunch pilot all_pilot.launch
 ```
 
-to visualize live tracking of vehicle on google maps.
+to visualize live tracking of vehicle on Google Maps.
 ```
 roslaunch rosbridge_server rosbridge_websocket.launch
 roscd autopilot_boson

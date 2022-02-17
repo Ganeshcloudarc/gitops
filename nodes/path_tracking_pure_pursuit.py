@@ -22,9 +22,6 @@ except Exception as e:
 
 class PurePursuit:
     def __init__(self):
-        self.revived_path = None
-        self.present_look_ahead = None
-        self.target_id = None
         self.load_params()
         self.robot_state = {
             'x': 0.0,
@@ -56,6 +53,9 @@ class PurePursuit:
         self.index_old = None
         self.time_when_odom = None
         self.odom_data = None
+        self.revived_path = None
+        self.present_look_ahead = None
+        self.target_id = None
         self.close_idx, self.cross_track_dis = 0.0, 0.0
 
         data1, data2, data3 = None, None, None
@@ -93,7 +93,7 @@ class PurePursuit:
             self.ack_pub_topic = '/vehicle/cmd_drive_safe'
         # IMP PARAMS
         self.path_topic = rospy.get_param('/patrol/path_topic', 'odom_path')  # gps_path or odom_path(good one)
-        self.start_from_first_point = rospy.get_param('/patrol/from_start', False)
+        self.start_from_first_point = rospy.get_param('/patrol/from_start', False)  # TODO
         self.throttle_speed = rospy.get_param('/patrol/max_speed', 1.5)
         self.wheel_base = rospy.get_param('/patrol/wheel_base', 2)
         self.given_look_ahead_dis = rospy.get_param('/patrol/look_ahead_distance', 3)
@@ -114,8 +114,8 @@ class PurePursuit:
         }
 
     def path_callback(self, data):
-        data.poses.reverse()
-        self.revived_path =  data.poses
+        # data.poses.reverse() 
+        self.revived_path = data.poses
         for pose in data.poses:
             _, _, heading = euler_from_quaternion(
                 [pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w])
@@ -142,14 +142,14 @@ class PurePursuit:
     def find_close_point(self, robot, index_old):
         # present_dis = self.calc_distance(robot, index_old)
         # next_dis = self.calc_distance(robot, index_old + 1)
-        print("index_old",index_old)
-        n = min( 50, len(range(index_old, self.ind_end)))
-        print("n,",n)
-        distance_list = [self.calc_distance(robot, ind) for ind in range(index_old, index_old+n)]
+        print("index_old", index_old)
+        n = min(50, len(range(index_old, self.ind_end)))
+        print("n,", n)
+        distance_list = [self.calc_distance(robot, ind) for ind in range(index_old, index_old + n)]
         ind = np.argmin(distance_list)
         # print("----------------")
         print(" ind", ind)
-        final = ind+index_old
+        final = ind + index_old
         print("final ", final)
         # self.index_old = ind
         dis = distance_list[ind]
@@ -157,7 +157,7 @@ class PurePursuit:
 
         #
         # if next_dis > present_dis:
-        #     print("returned prasent point")
+        #     print("returned present point")
         #     return index_old, present_dis
         # else:
         #     print("at else block")
@@ -180,7 +180,7 @@ class PurePursuit:
         """
         if self.index_old is None:
             print("11")
-            print("first--" ,self.calc_nearest_ind(robot))
+            print("first--", self.calc_nearest_ind(robot))
 
         # self.index_old, cross_track_dis = self.calc_nearest_ind(robot)
         print
@@ -204,10 +204,8 @@ class PurePursuit:
                 if dis > lhd:
                     return self.index_old, ind, lhd, cross_track_dis
                 if ind >= self.ind_end:
-                    return ind, ind, lhd,cross_track_dis
+                    return ind, ind, lhd, cross_track_dis
                     # return ind, ind, lhd,cross_track_dis
-
-
 
     def calc_distance(self, robot, ind):
         # print(robot)
@@ -268,7 +266,7 @@ class PurePursuit:
                 print('close_idx, target_idx, lhd, cross_track_error')
                 print(close_idx, target_idx, lhd, cross_track_error)
 
-                if target_idx >= self.ind_end :
+                if target_idx >= self.ind_end:
                     rospy.loginfo('MISSION COMPLETED ')
                     self.send_ack_msg(0, 0, 0)
                     break
@@ -293,7 +291,7 @@ class PurePursuit:
                 # print("\r Steering: " + str(round(steering_angle)) + "  Speed: " + str(
                 #     round(speed)) + " CTE :" + str(round(cross_track_error,2)) + "  ", end="\t").
                 print(" Steering: " + str(round(steering_angle)) + "  Speed: " + str(
-                    round(self.throttle_speed)) + " CTE :" + str(round(cross_track_error,2)) + "  ")
+                    round(self.throttle_speed)) + " CTE :" + str(round(cross_track_error, 2)) + "  ")
                 r.sleep()
 
     def send_ack_msg(self, steering_angle, speed, jerk):

@@ -1,40 +1,46 @@
 #!/usr/bin/env python3
-import rospy
-import rospkg
-import sys
-import math
-from sensor_msgs.msg import NavSatFix, MagneticField, Imu
-from nav_msgs.msg import Odometry
-from geographic_msgs.msg import GeoPointStamped
-from json import dump 
-from geojson import LineString
-import numpy as np
-import time
-from rospy_message_converter import message_converter
+try:
+    import rospy
+    import rospkg
+    import sys
+    import math
+    from sensor_msgs.msg import NavSatFix, MagneticField, Imu
+    from nav_msgs.msg import Odometry
+    from geographic_msgs.msg import GeoPointStamped
+    from json import dump
+    from geojson import LineString
+    import numpy as np
+    import time
+    from rospy_message_converter import message_converter
+except Exception as e:
+    print("No module named", str(e))
+    exit()
 
-
-# TODO's
+# TODO
 '''
-1. Depening upon the accuracy of the first gps location we need to decide on recording points.
+1. Depending upon the accuracy of the first gps location we need to decide on recording points.
 2. Warn user when, high speed drive.
-3. Warn user when, gps data is less acurate.
+3. Warn user when, gps data is less accurate.
 '''
+
 
 def get_distance(lat1, lon1, lat2, lon2):
-    
-		R = 6371.0*1000.0
-		lat_start = np.radians(lat1)
-		lon_start = np.radians(lon1)
-		lat_end = np.radians(lat2)
-		lon_end = np.radians(lon2)
-		dLat = lat_end - lat_start
-		dLon = lon_end - lon_start
-		a = np.sin(dLat/2.0)*np.sin(dLat/2.0) + np.cos(lat_start)*np.cos(lat_end)*np.sin(dLon/2.0)*np.sin(dLon/2.0)
-		c = 2.0*np.arctan2(np.sqrt(a),np.sqrt(1-a))
-		d = c*R
-		return d
+    r = 6371.0 * 1000.0
+    lat_start = np.radians(lat1)
+    lon_start = np.radians(lon1)
+    lat_end = np.radians(lat2)
+    lon_end = np.radians(lon2)
+    dLat = lat_end - lat_start
+    dLon = lon_end - lon_start
+    a = np.sin(dLat / 2.0) * np.sin(dLat / 2.0) + np.cos(lat_start) * np.cos(lat_end) * np.sin(dLon / 2.0) * np.sin(
+        dLon / 2.0)
+    c = 2.0 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    d = c * r
+    return d
+
+
 class SaveWayPoints:
-    def __init__(self,mission_file_dir):
+    def __init__(self, mission_file_dir):
         self.mission_file_dir = mission_file_dir
         self.prev_lat = 0
         self.prev_long = 0
@@ -48,30 +54,32 @@ class SaveWayPoints:
         self.imu_data = None
         self.gps_data = None
         self.gps_data_msg = None
+        self.time_at_odom = None
+        self.time_at_gps = None
         self.wait_time_limit = 1
-        data = None
 
         # IMP PARAMS
-        self.min_dis_between_waypoints = rospy.get_param('/patrol/min_dis_between_waypoints',0.1)
-        gps_topic = rospy.get_param('/patrol/gps_topic',"/mavros/global_position/global")
-        imu_topic = rospy.get_param('/patrol/imu_topic',"/mavros/imu/data")
-        odom_topic = rospy.get_param('/patrol/odom_topic',"/mavros/local_position/odom")
-
+        self.min_dis_between_waypoints = rospy.get_param('/patrol/min_dis_between_waypoints', 0.1)
+        gps_topic = rospy.get_param('/patrol/gps_topic', "/mavros/global_position/global")
+        imu_topic = rospy.get_param('/patrol/imu_topic', "/mavros/imu/data")
+        odom_topic = rospy.get_param('/patrol/odom_topic', "/mavros/local_position/odom")
+        data = None
         while not rospy.is_shutdown():
             try:
                 data = rospy.wait_for_message(gps_topic, NavSatFix, timeout=2)
             except:
                 data = None
-                rospy.loginfo("Waiting for "+str(gps_topic)) 
+                rospy.loginfo("Waiting for " + str(gps_topic))
             if data:
-                rospy.Subscriber(gps_topic,  NavSatFix, self.gps_callback)
+                rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
                 rospy.Subscriber(imu_topic, Imu, self.imu_callback)
                 rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
-                self.starting_point_pub = rospy.Publisher('/mavros/global_position/set_gp_origin', GeoPointStamped, queue_size=10,latch=True)
+                self.starting_point_pub = rospy.Publisher('/mavros/global_position/set_gp_origin', GeoPointStamped,
+                                                          queue_size=10, latch=True)
                 break
         time.sleep(1)
         self.main_loop()
-        if len(self.final_waypoints_list) == 0 :
+        if len(self.final_waypoints_list) == 0:
             rospy.logwarn('No points to save, Exiting without saving')
             exit()
 
@@ -82,43 +90,43 @@ class SaveWayPoints:
         with open(mission_file_dir, 'w') as f:
             dump(line_string, f)
         print(" ")
-        print('Saved '+str(len(self.final_waypoints_list))+" points into "+self.mission_file_dir)
-        
+        print('Saved ' + str(len(self.final_waypoints_list)) + " points into " + self.mission_file_dir)
+
     def odom_callback(self, data):
-        self.odom_data  = message_converter.convert_ros_message_to_dictionary(data)
+        self.odom_data = message_converter.convert_ros_message_to_dictionary(data)
         self.time_at_odom = time.time()
 
-
     def imu_callback(self, data):
-        self.imu_data  =  message_converter.convert_ros_message_to_dictionary(data)
-                                   
+        self.imu_data = message_converter.convert_ros_message_to_dictionary(data)
+
     def gps_callback(self, data):
         self.gps_data_msg = data
         self.gps_data = message_converter.convert_ros_message_to_dictionary(data)
         self.time_at_gps = time.time()
+
     def main_loop(self):
         now = time.time()
         r = rospy.Rate(10)
         while not rospy.is_shutdown():
-            
-            if self.is_first_point: 
-                if self.gps_data_msg != None:
+            if self.is_first_point:
+                if self.gps_data_msg is not None:
                     # TODO
-                    # Depening upon the accuracy(covarince of gps) of the first gps location we need to decide on recording points
-                    #if gps_data_msg.position_covariance[0]
-
+                    #  Depending upon the accuracy(covariance of gps) of the first gps location we need to decide on
+                    #  recording points if gps_data_msg.position_covariance[0]
                     # https://en.wikipedia.org/wiki/Standard_error
-                    print('Origin gps location ' + 'longitude :'+str(self.gps_data_msg.longitude)+ ', latitude :' +str(self.gps_data_msg.latitude))
-                    self.final_waypoints_list.append([self.gps_data_msg.longitude,self.gps_data_msg.latitude])
+                    print('Origin gps location ' + 'longitude :' + str(
+                        self.gps_data_msg.longitude) + ', latitude :' + str(self.gps_data_msg.latitude))
+                    self.final_waypoints_list.append([self.gps_data_msg.longitude, self.gps_data_msg.latitude])
                     self.imu_list.append(self.imu_data)
-                    self.odometry_list.append(message_converter.convert_ros_message_to_dictionary(Odometry())) # change it to seld.odom_msg
+                    self.odometry_list.append(
+                        message_converter.convert_ros_message_to_dictionary(Odometry()))  # change it to self.odom_msg
                     self.gps_list.append(self.gps_data)
                     self.prev_long = self.gps_data_msg.longitude
                     self.prev_lat = self.gps_data_msg.latitude
                     geo_point = GeoPointStamped()
                     geo_point.position.latitude = self.gps_data_msg.latitude
                     geo_point.position.longitude = self.gps_data_msg.longitude
-                    geo_point.position.altitude = self.gps_data_msg.altitude #29 # change it to actual latitude
+                    geo_point.position.altitude = self.gps_data_msg.altitude  # 29 # change it to actual latitude
                     self.starting_point_pub.publish(geo_point)
                     rospy.loginfo('Origin point set')
                     print('Home location was saved, drive the vehicle')
@@ -134,40 +142,42 @@ class SaveWayPoints:
                     rospy.logwarn('Time out from GPS', str(now))
                     r.sleep()
                     continue
-                if now -  self.time_at_odom > self.wait_time_limit:
-                    rospy.logwarn('Time out from Odometry',str(now))
+                if now - self.time_at_odom > self.wait_time_limit:
+                    rospy.logwarn('Time out from Odometry', str(now))
                     r.sleep()
                     continue
-                dis = get_distance(self.gps_data_msg.latitude, self.gps_data_msg.longitude, self.prev_lat, self.prev_long)
+                dis = get_distance(self.gps_data_msg.latitude, self.gps_data_msg.longitude, self.prev_lat,
+                                   self.prev_long)
                 if dis >= self.min_dis_between_waypoints:
-                    print("\rSaved: "+str(round(self.gps_data_msg.longitude,5))+ " " +str(round(self.gps_data_msg.latitude,5))+ ", saved points count :"+ str(len(self.final_waypoints_list)) + "  ", end="\t")
+                    print("\rSaved: " + str(round(self.gps_data_msg.longitude, 5)) + " " + str(
+                        round(self.gps_data_msg.latitude, 5)) + ", saved points count :" + str(
+                        len(self.final_waypoints_list)) + "  ", end="\t")
                     # print(len(self.final_waypoints_list))
-                    self.final_waypoints_list.append([self.gps_data_msg.longitude,self.gps_data_msg.latitude])
+                    self.final_waypoints_list.append([self.gps_data_msg.longitude, self.gps_data_msg.latitude])
                     self.imu_list.append(self.imu_data)
                     self.odometry_list.append(self.odom_data)
                     self.gps_list.append(self.gps_data)
                     self.prev_long = self.gps_data_msg.longitude
                     self.prev_lat = self.gps_data_msg.latitude
+                else:
+                    #  distance less than min_dis_between_waypoints
+                    pass
             r.sleep()
-                
+
+
 if __name__ == "__main__":
     rospy.init_node('way_point_saver_node')
-    mission_file = rospy.get_param('/patrol/mission_file','default.json')
+    mission_file = rospy.get_param('/patrol/mission_file', 'default.json')
     if '.json' in mission_file:
         pass
     else:
-        mission_file = mission_file+'.json'
+        mission_file = mission_file + '.json'
         rospy.set_param('/patrol1/mission_file', mission_file)
-
     try:
-        rospack = rospkg.RosPack()
-        mission_file_dir = rospack.get_path('autopilot_boson') + "/mission_files/"+str(mission_file)
+        ros_pack = rospkg.RosPack()
+        mission_file_dir = ros_pack.get_path('autopilot_boson') + "/mission_files/" + str(mission_file)
     except Exception as e:
-        rospy.logwarn("Please source autopilot_boson package"+ str(e))
+        rospy.logwarn("Please source autopilot_boson package" + str(e))
         sys.exit()
-    
-
-    # rospy.loginfo()
     save_points = SaveWayPoints(mission_file_dir)
     rospy.spin()
-   
