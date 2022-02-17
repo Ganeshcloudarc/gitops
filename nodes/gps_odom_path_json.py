@@ -21,13 +21,27 @@ import copy
 
 
 '''
+
+def circumradius(xvals,yvals):
+        '''
+        Calculates the circumradius for three 2D points
+        '''
+        x1, x2, x3, y1, y2, y3 = xvals[0], xvals[1], xvals[2], yvals[0], yvals[1], yvals[2]
+        den = 2*((x2-x1)*(y3-y2)-(y2-y1)*(x3-x2))
+        num = ( (((x2-x1)**2) + ((y2-y1)**2)) * (((x3-x2)**2)+((y3-y2)**2)) * (((x1-x3)**2)+((y1-y3)**2)) )**(0.5)
+        if ( den == 0 ):
+            print('Failed: points are either collinear or not distinct')
+            return 0
+        R = abs(num/den)
+        return R
+        
 class PathPubGps:
     def __init__(self,mission_file):      
         self.gps_path_pub = rospy.Publisher('/gps_path', Path, queue_size=10,latch=True)
         self.odom_path_pub = rospy.Publisher('/odom_path', Path, queue_size=10,latch=True)
         self.starting_point_pub = rospy.Publisher('/mavros/global_position/set_gp_origin', GeoPointStamped, queue_size=10,latch=True)
-        self.curvature_pub = rospy.Publisher('/curvature', Float32MultiArray, queue_size=10,latch=True)
-        self.velocities_pub = rospy.Publisher('/velocity', Float32MultiArray, queue_size=10,latch=True)
+        self.curvature_pub = rospy.Publisher('/curvature_profile', Float32MultiArray, queue_size=10,latch=True)
+        self.velocities_pub = rospy.Publisher('/velocity_profile', Float32MultiArray, queue_size=10,latch=True)
         self.curvature_msg = Float32MultiArray()
         self.velocity_msg = Float32MultiArray()
         self.max_speed = rospy.get_param("/patrol/max_speed",1.5)
@@ -36,15 +50,10 @@ class PathPubGps:
         # msgs
         self.gps_path_msg = Path()
         self.gps_path_msg.header.frame_id = 'map'
-        self.gps_path_msg.header.seq = 1
         self.gps_path_msg.header.stamp= rospy.Time.now()
-        self.gps_pose = PoseStamped()
-        self.gps_pose.header.frame_id = 'map'
         self.odom_path_msg = Path()
         self.odom_path_msg.header.frame_id = 'map'
-        self.odom_pose = PoseStamped()
-        self.odom_pose.header.frame_id = 'map'
-
+        
 
 
         try:
@@ -59,6 +68,8 @@ class PathPubGps:
         else:
             rospy.loginfo("Success in reading mission file")
             pass
+        self.data_len = len(data['coordinates'])
+        self.data = data
 
         home_lat = data['coordinates'][0][1]
         home_long = data['coordinates'][0][0]
@@ -114,11 +125,31 @@ class PathPubGps:
  
 
     def find_curvature_at_index(self, i):
-        return 0
         # find curbature at given index
+       
+        if i ==0 or i >= len(self.data['coordinates'])-1:
+            return 0
+        else:
+            xvals = [self.data['odometry'][i-1]['pose']['pose']['position']['x'],
+            self.data['odometry'][i]['pose']['pose']['position']['x'], 
+            self.data['odometry'][i+1]['pose']['pose']['position']['x']]
+            yvals =[self.data['odometry'][i-1]['pose']['pose']['position']['y'],
+            self.data['odometry'][i]['pose']['pose']['position']['y'], 
+            self.data['odometry'][i+1]['pose']['pose']['position']['y']]
+
+            radius = circumradius(xvals, yvals)
+            if radius == 0:
+                return 0
+            else:
+                return 1/radius
+
+
+
+    
+
 if __name__ =="__main__":
     rospy.init_node("gps_path_publisher")
-    mission_file = rospy.get_param('/patrol/mission_file','default.json')
+    mission_file = rospy.get_param('/patrol/mission_file', 'default.json')
     if '.json' in mission_file:
         pass
     else:

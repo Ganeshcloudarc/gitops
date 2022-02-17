@@ -111,7 +111,7 @@ class SaveWayPoints:
                     print('Origin gps location ' + 'longitude :'+str(self.gps_data_msg.longitude)+ ', latitude :' +str(self.gps_data_msg.latitude))
                     self.final_waypoints_list.append([self.gps_data_msg.longitude,self.gps_data_msg.latitude])
                     self.imu_list.append(self.imu_data)
-                    self.odometry_list.append(Odometry()) # change it to seld.odom_msg
+                    self.odometry_list.append(message_converter.convert_ros_message_to_dictionary(Odometry())) # change it to seld.odom_msg
                     self.gps_list.append(self.gps_data)
                     self.prev_long = self.gps_data_msg.longitude
                     self.prev_lat = self.gps_data_msg.latitude
@@ -152,7 +152,7 @@ class SaveWayPoints:
                 
 if __name__ == "__main__":
     rospy.init_node('way_point_saver_node')
-    mission_file = rospy.get_param('/patrol1/mission_file','default.json')
+    mission_file = rospy.get_param('/patrol/mission_file','default.json')
     if '.json' in mission_file:
         pass
     else:

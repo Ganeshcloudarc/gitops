@@ -1,9 +1,10 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
     <arg name='od_enable' default = 'false'/>
+    <arg name = 'from_start' default= 'false'/>
     <param name="/patrol/mission_file" value="$(arg mission_file)"/>
     <param name='/patrol/od_enable' value="$(arg od_enable)"/>
-
+    <param name='/patrol/from_start' value="$(arg from_start)"/>
     <rosparam command="load" file="$(find autopilot_boson)/params/patrol_params.yaml"/>
     <node pkg="autopilot_boson" type="gps_odom_path_json.py" name="gps_path_pub_node" />
     <node pkg="autopilot_boson" type="pure_pursuit_odom.py" name="pure_pursuit_node" output='screen' />
