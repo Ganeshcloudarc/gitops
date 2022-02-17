@@ -34,3 +34,9 @@ http://0.0.0.0:8000/ (open it on web browser)
 Then navigate as below 
 boson_console_ui->boson_map.html (open it)
 ```
+
+TODO
+* velocity and curvature based speed control
+* reverse option in launch file
+* keep on loop option in launch file
+* indepth code review by Dinesh
