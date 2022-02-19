@@ -23,6 +23,7 @@ except Exception as e:
 class PurePursuit:
     def __init__(self):
         self.load_params()
+        self.MISSION_MODE = rospy.get_param('/patrol/mission_mode', 0)
         self.robot_state = {
             'x': 0.0,
             'y': 0.0,
@@ -57,6 +58,7 @@ class PurePursuit:
         self.present_look_ahead = None
         self.target_id = None
         self.close_idx, self.cross_track_dis = 0.0, 0.0
+        self.count_mission_repeat = 0
 
         data1, data2, data3 = None, None, None
         while not rospy.is_shutdown():
@@ -100,6 +102,7 @@ class PurePursuit:
         self.speed_constant = rospy.get_param('/patrol/speed_gain', 0.1)
         self.speed_curvature_gain = rospy.get_param('/patrol/speed_curvature_gain', 0.1)
 
+
     def curvature_profile_callback(self, data):
         self.curvature_profile = data.data
 
@@ -140,35 +143,14 @@ class PurePursuit:
         # fy = y + self.wheelbase * np.sin(yaw)
 
     def find_close_point(self, robot, index_old):
-        # present_dis = self.calc_distance(robot, index_old)
-        # next_dis = self.calc_distance(robot, index_old + 1)
-        print("index_old", index_old)
         n = min(50, len(range(index_old, self.ind_end)))
-        print("n,", n)
         distance_list = [self.calc_distance(robot, ind) for ind in range(index_old, index_old + n)]
         ind = np.argmin(distance_list)
-        # print("----------------")
         print(" ind", ind)
         final = ind + index_old
         print("final ", final)
-        # self.index_old = ind
         dis = distance_list[ind]
         return final, dis
-
-        #
-        # if next_dis > present_dis:
-        #     print("returned present point")
-        #     return index_old, present_dis
-        # else:
-        #     print("at else block")
-        #     for idx in range(index_old + 1, self.ind_end):
-        #         dis = self.calc_distance(robot, idx)
-        #         print('idx,dis ',idx,dis)
-        #         if dis < next_dis:
-        #             next_dis = dis
-        #             pass
-        #         else:
-        #             return idx - 1, next_dis
 
     def target_index(self, robot):
         """
@@ -179,17 +161,10 @@ class PurePursuit:
             close_index, target_index, lookahead_distance, cross_track_dis,
         """
         if self.index_old is None:
-            print("11")
-            print("first--", self.calc_nearest_ind(robot))
-
-        # self.index_old, cross_track_dis = self.calc_nearest_ind(robot)
-        print
+            self.calc_nearest_ind(robot)
         self.index_old, cross_track_dis = self.find_close_point(robot, self.index_old)
-        print('self.index_old', self.index_old)
-        print('CTE', cross_track_dis)
-
         # self.cross_track_dis = self.calc_distance(robot, self.close_idx)
-        if self.cross_track_dis > self.given_look_ahead_dis:
+        if self.cross_track_dis > self.given_look_ahead_dis:  # try divided by 2
             # Find a point on the path which is look ahead distance from the closest path, then find distance to the
             # robot and give it as a look_ahead_distance to pure pursuit formulae.
             for ind in range(self.index_old, self.ind_end):
@@ -248,7 +223,7 @@ class PurePursuit:
         rospy.loginfo('Pure pursuit is started')
         r = rospy.Rate(2)
         while not rospy.is_shutdown():
-            print("----------------")
+            print("---------------------------------------------------------------")
 
             # Main Loop
             self.vehicle_pose_msg.pose.position.x = self.robot_state['x']
@@ -269,7 +244,20 @@ class PurePursuit:
                 if target_idx >= self.ind_end:
                     rospy.loginfo('MISSION COMPLETED ')
                     self.send_ack_msg(0, 0, 0)
-                    break
+                    self.count_mission_repeat += 1
+                    state, state_text = self.mission_mode_selector(self.count_mission_repeat)
+                    if state:
+                        print("------------------")
+                        rospy.logwarn(state_text)
+                        time.sleep(5)
+                        print("------------------")
+                        continue
+                    else:
+                        print("------------------")
+                        rospy.logwarn(state_text)
+                        time.sleep(5)
+                        print("------------------")
+                        break
                 # publish target point
                 self.target_pose_msg.pose.position.x = self.path[target_idx][0]
                 self.target_pose_msg.pose.position.y = self.path[target_idx][1]
@@ -293,6 +281,41 @@ class PurePursuit:
                 print(" Steering: " + str(round(steering_angle)) + "  Speed: " + str(
                     round(self.throttle_speed)) + " CTE :" + str(round(cross_track_error, 2)) + "  ")
                 r.sleep()
+
+    def mission_mode_selector(self, count_mission_repeat):
+        """
+        Args:
+            count_mission_repeat:
+
+        Returns:
+            stop/continue , summary
+
+        """
+        if self.MISSION_MODE == 0:
+            return False, 'Completed Mission '
+        elif self.MISSION_MODE == 1:
+            if count_mission_repeat <= 1:
+                self.revived_path.reverse()
+                self.path.reverse()
+                self.index_old = None
+                True, "Completed Reaching the end , starting back"
+            else:
+                False, "Completed Mission, both reached target and retuned to starting"
+        elif self.MISSION_MODE == 2:
+            self.revived_path.reverse()
+            self.path.reverse()
+            self.index_old = None
+            True, "Reached one end, starting towards to other end"
+        else:
+            False, "Invalid Mission mode was given, Treating the mission as Mission mode 0"
+
+
+
+
+
+
+
+
 
     def send_ack_msg(self, steering_angle, speed, jerk):
         self.ackermann_msg.steering_angle = steering_angle

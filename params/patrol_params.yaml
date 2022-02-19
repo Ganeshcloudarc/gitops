@@ -1,7 +1,7 @@
 patrol:
   max_speed           : 1.5 # meter/sec
   wheel_base          : 2   # distance meter
-  look_ahead_distance : 3   # distance meter
+  look_ahead_distance : 4   # distance meter
   speed_gain          : 0.1 #
   speed_curvature_gain : 0.1
   path_topic           : "odom_path"
