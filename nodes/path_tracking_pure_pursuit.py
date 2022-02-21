@@ -88,12 +88,18 @@ class PurePursuit:
         self.main_loop()
 
     def load_params(self):
-        od_enable = rospy.get_param('patrol/od_enable', False)
-        if od_enable:
-            self.ack_pub_topic = '/vehicle/cmd_drive_nosafe'
-        else:
-            self.ack_pub_topic = '/vehicle/cmd_drive_safe'
         # IMP PARAMS
+        rc_enable = rospy.get_param('patrol/rc_control', False)
+        if rc_enable:
+            self.ack_pub_topic = '/vehicle/cmd_drive_rc'
+        else:
+            od_enable = rospy.get_param('patrol/od_enable', False)
+            if od_enable:
+                self.ack_pub_topic = '/vehicle/cmd_drive_nosafe'
+            else:
+                self.ack_pub_topic = '/vehicle/cmd_drive_safe'
+
+
         self.path_topic = rospy.get_param('/patrol/path_topic', 'odom_path')  # gps_path or odom_path(good one)
         self.start_from_first_point = rospy.get_param('/patrol/from_start', False)  # TODO
         self.throttle_speed = rospy.get_param('/patrol/max_speed', 1.5)
@@ -245,6 +251,7 @@ class PurePursuit:
                     rospy.loginfo('MISSION COMPLETED ')
                     self.send_ack_msg(0, 0, 0)
                     self.count_mission_repeat += 1
+                    # print('mode ',self.mission_mode_selector(self.count_mission_repeat))
                     state, state_text = self.mission_mode_selector(self.count_mission_repeat)
                     if state:
                         print("------------------")
@@ -296,18 +303,21 @@ class PurePursuit:
         elif self.MISSION_MODE == 1:
             if count_mission_repeat <= 1:
                 self.revived_path.reverse()
+                print("before",self.path[0])
                 self.path.reverse()
+                print("after", self.path[0])
+
                 self.index_old = None
-                True, "Completed Reaching the end , starting back"
+                return True, "Completed Reaching the end , starting back"
             else:
-                False, "Completed Mission, both reached target and retuned to starting"
+                return False, "Completed Mission, both reached target and retuned to starting"
         elif self.MISSION_MODE == 2:
             self.revived_path.reverse()
             self.path.reverse()
             self.index_old = None
-            True, "Reached one end, starting towards to other end"
+            return True, "Reached one end, starting towards to other end"
         else:
-            False, "Invalid Mission mode was given, Treating the mission as Mission mode 0"
+            return False, "Invalid Mission mode was given, Treating the mission as Mission mode 0"
 
 
 
