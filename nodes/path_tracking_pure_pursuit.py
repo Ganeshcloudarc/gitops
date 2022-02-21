@@ -319,14 +319,6 @@ class PurePursuit:
         else:
             return False, "Invalid Mission mode was given, Treating the mission as Mission mode 0"
 
-
-
-
-
-
-
-
-
     def send_ack_msg(self, steering_angle, speed, jerk):
         self.ackermann_msg.steering_angle = steering_angle
         self.ackermann_msg.speed = speed
