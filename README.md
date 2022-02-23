@@ -23,6 +23,7 @@ change it according to port
 roslaunch autopilot_boson save_path.launch mission_file:=name_of_file.json
 ```
 #### Arguments
+* `mission_file` (str, default: default.json) - name of json file you want to save to.
 * `min_dis` (float, default: 0.1) - minimum distance between the two consecutive gps points
 
 ## Launch patrolling
