@@ -10,7 +10,8 @@ installation:
 
 launch mavros node
 ```
-roslaunch mavros px4.launch
+roslaunch mavros px4.launch fcu_url:=/dev/ttyACM0:57600 
+change it according to port
 ```
 
 
