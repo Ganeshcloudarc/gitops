@@ -1,10 +1,10 @@
 patrol:
-  wait_time_at_ends   : 5  # secs
   max_speed           : 1.5 # meter/sec
   wheel_base          : 2   # distance meter
   look_ahead_distance : 3   # distance meter
   speed_gain          : 0.1 #
   speed_curvature_gain : 0.1
   path_topic           : "odom_path"
+   wait_time_at_ends   : 5  # secs
 map:
  to_center: true
