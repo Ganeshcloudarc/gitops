@@ -99,7 +99,6 @@ class PurePursuit:
             else:
                 self.ack_pub_topic = '/vehicle/cmd_drive_safe'
 
-
         self.path_topic = rospy.get_param('/patrol/path_topic', 'odom_path')  # gps_path or odom_path(good one)
         self.start_from_first_point = rospy.get_param('/patrol/from_start', False)  # TODO
         self.throttle_speed = rospy.get_param('/patrol/max_speed', 1.5)
@@ -107,6 +106,8 @@ class PurePursuit:
         self.given_look_ahead_dis = rospy.get_param('/patrol/look_ahead_distance', 3)
         self.speed_constant = rospy.get_param('/patrol/speed_gain', 0.1)
         self.speed_curvature_gain = rospy.get_param('/patrol/speed_curvature_gain', 0.1)
+        self.wait_time_at_ends = rospy.get_param('/patrol/wait_time_at_ends', 5)  # in secs
+        self.mission_trips = rospy.get_param('/patrol/mission_trips', 0)
 
     def curvature_profile_callback(self, data):
         self.curvature_profile = data.data
@@ -169,7 +170,7 @@ class PurePursuit:
             self.calc_nearest_ind(robot)
         self.index_old, cross_track_dis = self.find_close_point(robot, self.index_old)
         # self.cross_track_dis = self.calc_distance(robot, self.close_idx)
-        if self.cross_track_dis > self.given_look_ahead_dis/2:  # try divided by 2
+        if self.cross_track_dis > self.given_look_ahead_dis / 2:  # try divided by 2
             # Find a point on the path which is look ahead distance from the closest path, then find distance to the
             # robot and give it as a look_ahead_distance to pure pursuit formulae.
             for ind in range(self.index_old, self.ind_end):
@@ -237,9 +238,8 @@ class PurePursuit:
             self.vehicle_pose_pub.publish(self.vehicle_pose_msg)
 
             if self.start_from_first_point:
-                pass
-                # program to make it to first point
-
+                self.index_old = 0
+                self.start_from_first_point = False
             else:
 
                 close_idx, target_idx, lhd, cross_track_error = self.target_index(self.robot_state)
@@ -255,13 +255,15 @@ class PurePursuit:
                     if state:
                         print("------------------")
                         rospy.logwarn(state_text)
-                        time.sleep(5)
+                        print("waiting for " + str(self.wait_time_at_ends) + ' secs')
+                        time.sleep(self.wait_time_at_ends)
                         print("------------------")
                         continue
                     else:
                         print("------------------")
                         rospy.logwarn(state_text)
-                        time.sleep(5)
+                        print("waiting for " + str(self.wait_time_at_ends) + ' secs')
+                        time.sleep(self.wait_time_at_ends)
                         print("------------------")
                         break
                 # publish target point
@@ -304,19 +306,29 @@ class PurePursuit:
         elif self.MISSION_MODE == 1:
             if count_mission_repeat <= 1:
                 self.revived_path.reverse()
-                print("before",self.path[0])
+                print("before", self.path[0])
                 self.path.reverse()
                 print("after", self.path[0])
 
-                self.index_old = None
+                self.index_old = 0
                 return True, "Completed Reaching the end , starting back"
             else:
                 return False, "Completed Mission, both reached target and retuned to starting"
         elif self.MISSION_MODE == 2:
-            self.revived_path.reverse()
-            self.path.reverse()
-            self.index_old = None
-            return True, "Reached one end, starting towards to other end"
+            if self.mission_trips == 0:
+                self.revived_path.reverse()
+                self.path.reverse()
+                self.index_old = 0
+                return True, "Reached one end, starting towards to other end"
+            else:
+                if self.mission_trips <= count_mission_repeat / 2:
+                    return False, 'Completed ' + str(self.mission_reapeat_number) + ' trips'
+                else:
+                    self.revived_path.reverse()
+                    self.path.reverse()
+                    self.index_old = 0
+                    return True, 'Trips of ' + str(count_mission_repeat / 2) + " are completed " + str(
+                        self.mission_trips - count_mission_repeat / 2) + " are yet to completed"
         else:
             return False, "Invalid Mission mode was given, Treating the mission as Mission mode 0"
 

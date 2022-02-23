@@ -1,4 +1,5 @@
 patrol:
+  wait_time_at_ends   : 5  # secs
   max_speed           : 1.5 # meter/sec
   wheel_base          : 2   # distance meter
   look_ahead_distance : 3   # distance meter
