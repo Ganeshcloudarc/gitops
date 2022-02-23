@@ -139,11 +139,11 @@ class SaveWayPoints:
             else:
                 now = time.time()
                 if now - self.time_at_gps > self.wait_time_limit:
-                    rospy.logwarn('Time out from GPS', str(now))
+                    rospy.logwarn('Time out from GPS: '+ str(now - self.time_at_gps))
                     r.sleep()
                     continue
                 if now - self.time_at_odom > self.wait_time_limit:
-                    rospy.logwarn('Time out from Odometry', str(now))
+                    rospy.logwarn('Time out from Odometry: ' + str(now - self.time_at_gps))
                     r.sleep()
                     continue
                 dis = get_distance(self.gps_data_msg.latitude, self.gps_data_msg.longitude, self.prev_lat,

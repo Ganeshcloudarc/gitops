@@ -108,7 +108,6 @@ class PurePursuit:
         self.speed_constant = rospy.get_param('/patrol/speed_gain', 0.1)
         self.speed_curvature_gain = rospy.get_param('/patrol/speed_curvature_gain', 0.1)
 
-
     def curvature_profile_callback(self, data):
         self.curvature_profile = data.data
 
@@ -170,7 +169,7 @@ class PurePursuit:
             self.calc_nearest_ind(robot)
         self.index_old, cross_track_dis = self.find_close_point(robot, self.index_old)
         # self.cross_track_dis = self.calc_distance(robot, self.close_idx)
-        if self.cross_track_dis > self.given_look_ahead_dis:  # try divided by 2
+        if self.cross_track_dis > self.given_look_ahead_dis/2:  # try divided by 2
             # Find a point on the path which is look ahead distance from the closest path, then find distance to the
             # robot and give it as a look_ahead_distance to pure pursuit formulae.
             for ind in range(self.index_old, self.ind_end):
@@ -287,6 +286,8 @@ class PurePursuit:
                 #     round(speed)) + " CTE :" + str(round(cross_track_error,2)) + "  ", end="\t").
                 print(" Steering: " + str(round(steering_angle)) + "  Speed: " + str(
                     round(self.throttle_speed)) + " CTE :" + str(round(cross_track_error, 2)) + "  ")
+                print('vel: ', self.velocity_profile[close_idx])
+                print("cur: ", self.curvature_profile[close_idx])
                 r.sleep()
 
     def mission_mode_selector(self, count_mission_repeat):
