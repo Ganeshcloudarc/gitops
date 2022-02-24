@@ -18,7 +18,9 @@ try:
 except Exception as e:
     print('No module named :', str(e))
     exit(e)
-
+'''
+time out from odometry
+'''
 
 class PurePursuit:
     def __init__(self):
@@ -170,15 +172,24 @@ class PurePursuit:
             self.calc_nearest_ind(robot)
         self.index_old, cross_track_dis = self.find_close_point(robot, self.index_old)
         # self.cross_track_dis = self.calc_distance(robot, self.close_idx)
-        if self.cross_track_dis > self.given_look_ahead_dis / 2:  # try divided by 2
+        print(cross_track_dis)
+        # print(self.given_look_ahead_dis / 2)
+        if cross_track_dis > self.given_look_ahead_dis:  # try divided by 2
             # Find a point on the path which is look ahead distance from the closest path, then find distance to the
             # robot and give it as a look_ahead_distance to pure pursuit formulae.
+            print("from here old")
             for ind in range(self.index_old, self.ind_end):
+                print(ind)
                 dis = self.calc_distance_idx(self.index_old, ind)
                 if dis > self.given_look_ahead_dis:
                     present_look_ahead_dis = self.calc_distance(robot, ind)
-                    return self.index_old, ind, present_look_ahead_dis, cross_track_dis
+                    return self.index_old, ind, self.given_look_ahead_dis, cross_track_dis
+                if ind >= self.ind_end:
+                    return ind, ind, self.given_look_ahead_dis, cross_track_dis
+                    # return ind, ind, lhd,cross_track_dis
+
         else:
+            print("from here")
             lhd = self.given_look_ahead_dis + self.speed_constant * robot['vel']  # evaluate it afterwards
             for ind in range(self.index_old, self.ind_end + 1):
                 dis = self.calc_distance(robot, ind)
@@ -227,7 +238,7 @@ class PurePursuit:
             r.sleep()
 
         rospy.loginfo('Pure pursuit is started')
-        r = rospy.Rate(2)
+        r = rospy.Rate(10)
         while not rospy.is_shutdown():
             print("---------------------------------------------------------------")
 
@@ -240,6 +251,7 @@ class PurePursuit:
             if self.start_from_first_point:
                 self.index_old = 0
                 self.start_from_first_point = False
+                # close_idx, target_idx, lhd, cross_track_error = 0, 0,
             else:
 
                 close_idx, target_idx, lhd, cross_track_error = self.target_index(self.robot_state)

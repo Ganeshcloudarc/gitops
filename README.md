@@ -69,6 +69,9 @@ roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json mission_
 roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json rviz:=false
 7 - to enable to obstacle detection
 roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json ob_enable:=true
+8 - to enable rc control
+roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json rc_control:=true
+
 ```
 
 ## Visualize live tracking of vehicle on Google Maps.

@@ -11,7 +11,7 @@
 
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
     <param name = '/patrol/mission_mode' value = "$(arg mission_mode)"/>
-    <param name = 'patrol/mission_trips' value = "$(arg mission_trips"/>
+    <param name = 'patrol/mission_trips' value = "$(arg mission_trips)"/>
     <param name = '/patrol/od_enable' value = "$(arg od_enable)"/>
     <param name = '/patrol/from_start' value = "$(arg from_start)"/>
     <param name="/patrol/rc_control" value="$(arg rc_control)" />
