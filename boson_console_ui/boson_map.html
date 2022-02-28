@@ -41,6 +41,7 @@
         //
         var to_center = false;
         var waypointfile = '../cicle_big.json'
+        let tracking_coors_data =[]
         // 80.000778, 13.593665
         
         var map = L.map('map').setView([13.589854,80.0035143 ], 500); //37.72658953064916, -121.8088442588894
@@ -125,6 +126,13 @@
         mapMarkers1.addTo(map);
         if (to_center){
         map.setView([message.latitude, message.longitude]);}
+        tracking_coors_data.push([message.longitude, message.latitude])
+        var data_1 = {"type": "LineString", "coordinates": tracking_coors_data}
+        var pol = L.geoJSON(data_1
+                ,{
+                    style: {color:'red'} 
+                }
+                ).addTo(map)
 
         });
 
