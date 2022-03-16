@@ -8,7 +8,7 @@ patrol:
   google_map_center_always : true
   min_speed: 0.3 # mean of these are considered as actual speed
   max_speed: 3
-  control_topic: "/cmd_drive/pure_pursuit"
+  control_topic: "/vehicle/cmd_drive_safe"
 
 pure_pursuit:
   min_look_ahead : 3 # meters
