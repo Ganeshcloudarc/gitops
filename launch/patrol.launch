@@ -1,6 +1,8 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
     <arg name="carla" default="false"/>
+    <arg name="record" default="false"/>
+    <arg name="bags_dir" value="/home/boson/.bags"/>
     <arg name="mission_mode" default="0" doc="mode type [0, 1, 2], 0-> go and stop
                                                                    1-> go and return to the path starting point
                                                                    2-> Keep on doing (go and return) "/>
@@ -40,6 +42,9 @@
     <node pkg = "autopilot_boson" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" if = "$(eval arg('rviz'))" />
     <node pkg = "autopilot_boson" type = "odom_path_plotter.py" name = "odom_path_plotter_node" if = "$(eval arg('rviz'))"/>
 
+    <node name="bag_record" pkg="rosbag" type="record"
+        args="record -o $(arg bags_dir)/boson -a" if="$(eval record)"/>
+<!--        if="$(eval is_record_velodyne or is_record_odom)"/>-->
 </launch>
 
 
