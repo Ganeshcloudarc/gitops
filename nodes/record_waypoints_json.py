@@ -23,6 +23,12 @@ except Exception as e:
 3. Warn user when, gps data is less accurate.
 '''
 
+# TODO
+"""
+do some thing when time from gps/odom
+"""
+
+
 
 def get_distance(lat1, lon1, lat2, lon2):
     r = 6371.0 * 1000.0
@@ -64,6 +70,8 @@ class SaveWayPoints:
         imu_topic = rospy.get_param('/patrol/imu_topic', "/mavros/imu/data")
         odom_topic = rospy.get_param('/patrol/odom_topic', "/mavros/local_position/odom")
         data = None
+        # TODO
+        # wait for odom
         while not rospy.is_shutdown():
             try:
                 data = rospy.wait_for_message(gps_topic, NavSatFix, timeout=2)

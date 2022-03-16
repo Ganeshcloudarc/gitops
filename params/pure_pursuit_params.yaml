@@ -1,5 +1,0 @@
-pure_pursuit:
-  min_look_ahead : 3 # meters
-  max_look_ahead : 6 # meters
-  speed_to_lookahead_ratio : 2
-  curvature_speed_ratio : 1

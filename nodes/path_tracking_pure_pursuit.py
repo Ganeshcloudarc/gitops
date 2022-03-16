@@ -24,13 +24,17 @@ class Config:
     def __init__(self):
         """Configuration class for pure pursuit"""
         # patrol specific
-
         self.path_topic = rospy.get_param('/patrol/path_topic', 'odom_path')  # gps_path or odom_path(good one)
         self.odom_topic = rospy.get_param("/patrol/odom_topic", "/mavros/local_position/odom")
         self.start_from_first_point = rospy.get_param('/patrol/from_start', False)  # TODO
         self.min_speed = rospy.get_param('/patrol/min_speed', 0.3)
         self.max_speed = rospy.get_param('/patrol/max_speed', 3)
-        self.ack_pub_topic = '/cmd_drive/pure_pursuit'
+        self.carla = rospy.get_param("/carla_sim", False)
+        if self.carla:
+            self.average_speed = rospy.get_param("carla_sim/speed", 0.3)
+        else:
+            self.average_speed = (self.min_speed + self.max_speed) / 2
+        self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/cmd_drive/pure_pursuit')
 
         # vehicle specific
         self.wheel_base = rospy.get_param('/vehicle/wheel_base', 2)
@@ -40,8 +44,8 @@ class Config:
         self.min_look_ahead = rospy.get_param('/pure_pursuit/min_look_ahead', 3)
         self.max_look_ahead = rospy.get_param('/pure_pursuit/max_look_ahead', 6)
         self.speed_to_lookahead_ratio = rospy.get_param('/pure_pursuit/speed_to_lookahead_ratio',
-                                                        2)  # taken from autoware
-        self.curvature_speed_ratio = rospy.get_param('/pure_pursuit/curvature_speed_ratio', 10)
+                                                        1)  # taken from autoware
+        self.curvature_speed_ratio = rospy.get_param('/pure_pursuit/curvature_speed_ratio', 1)
 
 
 class PurePursuit:
@@ -124,11 +128,11 @@ class PurePursuit:
         self.main_loop()
 
     def curvature_profile_callback(self, data):
-        rospy.loginfo("curvature data received of length %s", str(len(data.data)))
+        rospy.logdebug("curvature data received of length %s", str(len(data.data)))
         self.curvature_profile = data.data
 
     def velocity_profile_callback(self, data):
-        rospy.loginfo("velocity data received of length %s", str(len(data.data)))
+        rospy.logdebug("velocity data received of length %s", str(len(data.data)))
         self.velocity_profile = data.data
 
     def home_position_callback(self, data):
@@ -142,9 +146,8 @@ class PurePursuit:
     def mission_status_callback(self, data):
         self.mission_complete = data.data
 
-
     def path_callback(self, data):
-        rospy.loginfo("path data data received of length %s", str(len(data.poses)))
+        rospy.logdebug("path data data received of length %s", str(len(data.poses)))
         # data.poses.reverse() 
         self.revived_path = data.poses
         for pose in data.poses:
@@ -172,14 +175,17 @@ class PurePursuit:
 
     def compute_lookahead_distance(self, vel):
         # https://gitlab.com/-/ide/project/RamanaBotta/AutowareAuto/tree/master/-/src/control/pure_pursuit/src/pure_pursuit.cpp/#L136
-
+        rospy.loginfo("vel %s ", vel)
         look_ahead = vel * self.config.speed_to_lookahead_ratio
+        rospy.loginfo("vel_lookahead: %s", look_ahead)
         final_look_ahead = max(self.config.min_look_ahead, min(look_ahead, self.config.max_look_ahead))
+        rospy.loginfo('final_look_ahead %s', final_look_ahead)
         return final_look_ahead
 
     def compute_velocity_at_point(self, curvature, velocity_at_index):
         # TODO
         # add obstacle velocity_profile.
+        rospy.loginfo("curvature %s", curvature)
         try:
             circum_radius = (1 / curvature)
         except:
@@ -212,7 +218,9 @@ class PurePursuit:
             self.index_old, cross_track_dis = self.calc_nearest_ind(robot)
         else:
             self.index_old, cross_track_dis = self.find_close_point(robot, self.index_old)
+            # cross_track_dis = 3
         lhd = self.compute_lookahead_distance(robot['vel'])
+        # lhd = 3
         for ind in range(self.index_old, self.ind_end):
             dis = self.calc_distance(robot, ind)
             if dis > lhd:
@@ -220,6 +228,7 @@ class PurePursuit:
             if ind + 1 >= self.ind_end:
                 return ind, ind, lhd, cross_track_dis
                 # return ind, ind, lhd,cross_track_dis
+        return self.ind_end, self.ind_end, lhd, cross_track_dis
 
     def calc_distance(self, robot, ind):
         # print(robot)
@@ -279,24 +288,11 @@ class PurePursuit:
                 time.sleep(1)
                 self.revived_path.reverse()
                 self.path.reverse()
-                self.index_old = 0
+                self.index_old = None
                 if self.speed < 0:
                     self.speed = 0.3
                 else:
                     self.speed = -0.3
-
-
-                # self.speed =  -self.speed
-
-
-                # if not self.mission_complete:
-                #     self.path = None
-                #     self.main_loop()
-                #     break
-                # else:
-                #     rospy.loginfo('COMPLETE MISSION COMPLETED')
-                #     break
-            # publish target point
             self.target_pose_msg.pose.position.x = self.path[target_idx][0]
             self.target_pose_msg.pose.position.y = self.path[target_idx][1]
             self.target_pose_msg.pose.orientation = self.revived_path[target_idx].pose.orientation

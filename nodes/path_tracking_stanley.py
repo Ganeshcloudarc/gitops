@@ -57,7 +57,7 @@ class StanlyControl:
         self.throttle_speed = rospy.get_param('/patrol/speed',1.5)
         self.wheel_base     = rospy.get_param('/patrol/wheel_base',2.9)
         self.look_ahead_dis = rospy.get_param('/patrol/look_ahead_distance',4)
-        self.control_gain_k = 8  # control gain
+        self.control_gain_k = 0.1  # control gain
         self.max_steer = 30.0  # [rad] max steering angle
 
 
@@ -194,6 +194,9 @@ class StanlyControl:
         print("heading error: ", math.degrees(theta_e))
         # theta_d corrects the cross track error
         ks = 1
+        print('control_gain_k',self.control_gain_k)
+        print("error_front_axle",error_front_axle)
+        print('deno',ks + self.robot['vel'])
         theta_d = arctan2(self.control_gain_k * error_front_axle, ks + self.robot['vel'])
         print("ctc componet: ", math.degrees(theta_d ))
         
@@ -209,10 +212,17 @@ class StanlyControl:
         distance_list = [self.calc_distance(robot, ind) for ind in range(index_old, index_old + n)]
         ind = np.argmin(distance_list)
         print(" ind", ind)
-        final = ind + index_old
-        print("final ", final)
+        target_idx = ind + index_old
+        print("final ", target_idx)
         dis = distance_list[ind]
-        return final, dis
+        # Project RMS error onto front axle vector
+        front_axle_vec = [-np.cos(robot['yaw'] + np.pi / 2),
+                          -np.sin(robot['yaw'] + np.pi / 2)]
+        print(self.path[target_idx])
+        error_front_axle = np.dot([self.path[target_idx][0],self.path[target_idx][1]], front_axle_vec)
+
+        return target_idx, error_front_axle
+
 
     def main_loop(self):
         r = rospy.Rate(1)
@@ -228,10 +238,10 @@ class StanlyControl:
             print('close_idx, cte')
             print(close_idx, cte)
 
-            front_axle_vector = [np.sin(self.robot['yaw']), -np.cos(self.robot['yaw'])]
-            nearest_path_vector = [self.path[close_idx][0], self.path[close_idx][1]]
-            crosstrack_error = np.sign(np.dot(nearest_path_vector, front_axle_vector)) * cte
-            print("signed ctc", crosstrack_error)
+            # front_axle_vector = [np.sin(self.robot['yaw']), -np.cos(self.robot['yaw'])]
+            # nearest_path_vector = [self.path[close_idx][0], self.path[close_idx][1]]
+            # crosstrack_error = np.sign(np.dot(nearest_path_vector, front_axle_vector)) * cte
+            print("signed ctc", cte)
             self.target_pose_msg.pose.position.x = self.path[close_idx][0]
             self.target_pose_msg.pose.position.y = self.path[close_idx][1]
             self.target_pose_msg.pose.orientation = self.revived_path[close_idx].pose.orientation
@@ -251,8 +261,6 @@ class StanlyControl:
 
             r.sleep()
 
-
-            
             
     def send_ack_msg(self,steering_angle, speed, jerk):
         if abs(steering_angle)> 30:
