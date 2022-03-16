@@ -29,7 +29,7 @@ class Config:
         self.start_from_first_point = rospy.get_param('/patrol/from_start', False)  # TODO
         self.min_speed = rospy.get_param('/patrol/min_speed', 0.3)
         self.max_speed = rospy.get_param('/patrol/max_speed', 3)
-        self.carla = rospy.get_param("/carla_sim", False)
+        self.carla = rospy.get_param("/carla_sim/activate", False)
         if self.carla:
             self.average_speed = rospy.get_param("carla_sim/speed", 0.3)
         else:
@@ -174,29 +174,31 @@ class PurePursuit:
         # fy = y + self.wheelbase * np.sin(yaw)
 
     def compute_lookahead_distance(self, vel):
-        # https://gitlab.com/-/ide/project/RamanaBotta/AutowareAuto/tree/master/-/src/control/pure_pursuit/src/pure_pursuit.cpp/#L136
-        rospy.loginfo("vel %s ", vel)
-        look_ahead = vel * self.config.speed_to_lookahead_ratio
-        rospy.loginfo("vel_lookahead: %s", look_ahead)
-        final_look_ahead = max(self.config.min_look_ahead, min(look_ahead, self.config.max_look_ahead))
-        rospy.loginfo('final_look_ahead %s', final_look_ahead)
-        return final_look_ahead
+        return self.config.min_look_ahead
+        # # https://gitlab.com/-/ide/project/RamanaBotta/AutowareAuto/tree/master/-/src/control/pure_pursuit/src/pure_pursuit.cpp/#L136
+        # rospy.loginfo("vel %s ", vel)
+        # look_ahead = vel * self.config.speed_to_lookahead_ratio
+        # rospy.loginfo("vel_lookahead: %s", look_ahead)
+        # final_look_ahead = max(self.config.min_look_ahead, min(look_ahead, self.config.max_look_ahead))
+        # rospy.loginfo('final_look_ahead %s', final_look_ahead)
+        # return final_look_ahead
 
     def compute_velocity_at_point(self, curvature, velocity_at_index):
-        # TODO
-        # add obstacle velocity_profile.
-        rospy.loginfo("curvature %s", curvature)
-        try:
-            circum_radius = (1 / curvature)
-        except:
-            circum_radius = 10000
-        rospy.loginfo("circum radius %s", circum_radius)
-        curvature_vel = circum_radius * self.config.curvature_speed_ratio
-        rospy.loginfo("curvature_vel: %s velocity_at_index: %s max_speed: %s", curvature_vel, velocity_at_index,
-                       self.config.max_speed)
-        final_vel = min(self.config.max_speed, velocity_at_index, curvature_vel)
-        final_vel = max(final_vel, self.config.min_speed)
-        return final_vel
+        return self.config.average_speed
+        # # TODO
+        # # add obstacle velocity_profile.
+        # rospy.loginfo("curvature %s", curvature)
+        # try:
+        #     circum_radius = (1 / curvature)
+        # except:
+        #     circum_radius = 10000
+        # rospy.loginfo("circum radius %s", circum_radius)
+        # curvature_vel = circum_radius * self.config.curvature_speed_ratio
+        # rospy.loginfo("curvature_vel: %s velocity_at_index: %s max_speed: %s", curvature_vel, velocity_at_index,
+        #                self.config.max_speed)
+        # final_vel = min(self.config.max_speed, velocity_at_index, curvature_vel)
+        # final_vel = max(final_vel, self.config.min_speed)
+        # return final_vel
 
     def find_close_point(self, robot, index_old):
         n = min(100, len(range(index_old, self.ind_end)))

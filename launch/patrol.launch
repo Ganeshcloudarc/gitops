@@ -22,7 +22,7 @@
         <param name='/patrol/odom_topic' value = '/mavros/local_position/odom'/>
     </group>
 
-    <param name = "/carla_sim" value = "$(arg carla)"/>
+    <param name = "/carla_sim/activate" value = "$(arg carla)"/>
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
     <param name = '/patrol/mission_mode' value = "$(arg mission_mode)"/>
     <param name = 'patrol/mission_trips' value = "$(arg mission_trips)"/>
@@ -32,13 +32,14 @@
 
     <rosparam command="load" file="$(find autopilot_boson)/params/patrol_params.yaml"/>
     <node pkg = "autopilot_boson" type = "path_publisher.py" name = "gps_path_pub_node" />
-    <node pkg = "autopilot_boson" type = "odom_path_plotter.py" name = "odom_path_plotter_node" />
     <node pkg = "autopilot_boson" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
     <node name="rc_control" pkg="autopilot_boson" type="control_mode_selector.py"  if = "$(eval arg('rc_control'))"/>
 
 
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find autopilot_boson)/rviz/path.rviz" if = "$(eval arg('rviz'))"/>
     <node pkg = "autopilot_boson" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" if = "$(eval arg('rviz'))" />
+    <node pkg = "autopilot_boson" type = "odom_path_plotter.py" name = "odom_path_plotter_node" if = "$(eval arg('rviz'))"/>
+
 </launch>
 
 

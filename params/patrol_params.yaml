@@ -1,6 +1,6 @@
 vehicle:
   wheel_base          : 2   # distance meter
-  dist_front_rear_wheels : 1.5 # distance meter
+  dist_front_rear_wheels : 1.2 # distance meter
 
 patrol:
   path_topic           : "odom_path"
