@@ -50,8 +50,8 @@ class Config:
 
 class PurePursuit:
     def __init__(self):
-        self.speed = 0.3 # test variable for reverse
         self.config = Config()
+        self.speed = self.config.average_speed  # test variable for reverse
         self.robot_state = {
             'x': 0.0,
             'y': 0.0,
@@ -148,7 +148,7 @@ class PurePursuit:
 
     def path_callback(self, data):
         rospy.logdebug("path data data received of length %s", str(len(data.poses)))
-        # data.poses.reverse() 
+        # data.poses.reverse()
         self.revived_path = data.poses
         for pose in data.poses:
             _, _, heading = euler_from_quaternion(
@@ -287,14 +287,15 @@ class PurePursuit:
                 rospy.loginfo(' MISSION COUNT %s ', self.count_mission_repeat)
                 self.mission_count_pub.publish(self.count_mission_repeat)
                 self.send_ack_msg(0, 0, 0)
-                time.sleep(1)
+                print("waiting for 5 secs")
+                time.sleep(5)
                 self.revived_path.reverse()
                 self.path.reverse()
                 self.index_old = None
                 if self.speed < 0:
-                    self.speed = 0.3
+                    self.speed = self.speed
                 else:
-                    self.speed = -0.3
+                    self.speed = -self.speed
             self.target_pose_msg.pose.position.x = self.path[target_idx][0]
             self.target_pose_msg.pose.position.y = self.path[target_idx][1]
             self.target_pose_msg.pose.orientation = self.revived_path[target_idx].pose.orientation
@@ -307,10 +308,11 @@ class PurePursuit:
             delta_degrees = -1 * math.degrees(delta)
             steering_angle = np.clip(delta_degrees, -30, 30)
             speed = self.compute_velocity_at_point(self.curvature_profile[target_idx], self.velocity_profile[target_idx])
+            speed = self.speed
             rospy.loginfo("cur: %s, vel: %s", self.curvature_profile[target_idx], self.velocity_profile[target_idx])
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
-            rospy.loginfo("self.speed %s", self.speed)
-            self.send_ack_msg(steering_angle, self.speed, 0)
+            rospy.loginfo("self.speed %s", speed)
+            self.send_ack_msg(steering_angle, speed, 0)
             r.sleep()
 
     def mission_mode_selector(self, count_mission_repeat):
