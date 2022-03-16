@@ -1,9 +1,18 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
     <arg name='min_dis' default='0.1'/>
+    <arg name="carla" default="false"/>
+    <group if="$(eval arg('carla'))">
+        <param name='/patrol/gps_topic' value = '/carla/ego_vehicle/gnss'/>
+        <param name='/patrol/imu_topic' value = '/carla/ego_vehicle/imu'/>
+        <param name='/patrol/odom_topic' value = '/carla/ego_vehicle/odometry'/>
+    </group>
+    <group unless="$(arg carla)">
+       <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
+        <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
+        <param name='/patrol/odom_topic' value = '/mavros/local_position/odom'/>
+   </group>
 
-    <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
-    <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
     <param name="/patrol/mission_file" value="$(arg mission_file)"/>
     <param name="/patrol/min_dis_between_waypoints" value="$(arg min_dis)"/>
     <node pkg="autopilot_boson" type="record_waypoints_json.py" name="waypoints_recorder_node" output='screen' />

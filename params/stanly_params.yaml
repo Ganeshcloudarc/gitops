@@ -1,0 +1,3 @@
+stanley:
+  control_gain : 0.1 # meters
+  softening_gain : 1 # meters

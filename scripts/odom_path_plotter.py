@@ -7,7 +7,12 @@ from geometry_msgs.msg import PoseStamped
 class OdomPathPlotter:
     def __init__(self):
         self.path_pub = rospy.Publisher('/Vehicle_travelled_path', Path, queue_size=10)
-        rospy.Subscriber("/mavros/local_position/odom", Odometry, self.odom_callback)
+        carla_status = rospy.get_param("carla", False)
+        if carla_status:
+            odom_topic = '/carla/ego_vehicle/odometry'
+        else:
+            odom_topic = '/mavros/local_position/odom'
+        rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
         self.prev_x, self.prev_y = 0.0, 0.0
         self.path_msg = Path()
 

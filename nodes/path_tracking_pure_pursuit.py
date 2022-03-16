@@ -18,14 +18,36 @@ try:
 except Exception as e:
     print('No module named :', str(e))
     exit(e)
-'''
-time out from odometry
-'''
+
+
+class Config:
+    def __init__(self):
+        """Configuration class for pure pursuit"""
+        # patrol specific
+
+        self.path_topic = rospy.get_param('/patrol/path_topic', 'odom_path')  # gps_path or odom_path(good one)
+        self.odom_topic = rospy.get_param("/patrol/odom_topic", "/mavros/local_position/odom")
+        self.start_from_first_point = rospy.get_param('/patrol/from_start', False)  # TODO
+        self.min_speed = rospy.get_param('/patrol/min_speed', 0.3)
+        self.max_speed = rospy.get_param('/patrol/max_speed', 3)
+        self.ack_pub_topic = '/cmd_drive/pure_pursuit'
+
+        # vehicle specific
+        self.wheel_base = rospy.get_param('/vehicle/wheel_base', 2)
+        self.dist_front_rear_wheels = rospy.get_param('/vehicle/dist_front_rear_wheels', 1.5)
+
+        # Pure Pursuit specific
+        self.min_look_ahead = rospy.get_param('/pure_pursuit/min_look_ahead', 3)
+        self.max_look_ahead = rospy.get_param('/pure_pursuit/max_look_ahead', 6)
+        self.speed_to_lookahead_ratio = rospy.get_param('/pure_pursuit/speed_to_lookahead_ratio',
+                                                        2)  # taken from autoware
+        self.curvature_speed_ratio = rospy.get_param('/pure_pursuit/curvature_speed_ratio', 10)
+
 
 class PurePursuit:
     def __init__(self):
-        self.load_params()
-        self.MISSION_MODE = rospy.get_param('/patrol/mission_mode', 0)
+        self.speed = 0.3 # test variable for reverse
+        self.config = Config()
         self.robot_state = {
             'x': 0.0,
             'y': 0.0,
@@ -38,16 +60,13 @@ class PurePursuit:
             'altitude': 0.0
         }
         # Publishers
-        self.ackermann_publisher = rospy.Publisher(self.ack_pub_topic, AckermannDrive, queue_size=10)
-        self.vehicle_pose_pub = rospy.Publisher('/vehicle_pose', PoseStamped, queue_size=10)
-        self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=10)
-
-        self.rc_stop = False
+        self.ackermann_publisher = rospy.Publisher(self.config.ack_pub_topic, AckermannDrive, queue_size=10)
+        self.vehicle_pose_pub = rospy.Publisher('/vehicle_pose', PoseStamped, queue_size=2)
+        self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
+        self.mission_count_pub = rospy.Publisher('/mission_count', Int16, queue_size=2)
         self.vehicle_pose_msg = PoseStamped()
         self.target_pose_msg = PoseStamped()
         self.ackermann_msg = AckermannDrive()
-        self.vehicle_pose_msg.header.frame_id = 'map'
-        self.target_pose_msg.header.frame_id = 'map'
         self.path = []  # change it later
         self.velocity_profile = []
         self.curvature_profile = []
@@ -61,60 +80,55 @@ class PurePursuit:
         self.target_id = None
         self.close_idx, self.cross_track_dis = 0.0, 0.0
         self.count_mission_repeat = 0
+        self.mission_complete = True
 
-        data1, data2, data3 = None, None, None
+        path_data, odom_data = None, None
         while not rospy.is_shutdown():
-            if not data1:
+            if not path_data:
                 try:
-                    data1 = rospy.wait_for_message(self.path_topic, Path, timeout=1.5)
+                    path_data = rospy.wait_for_message(self.config.path_topic, Path, timeout=1)
                 except:
-                    data1 = None
-                    rospy.loginfo("waiting for /gps_path")
-            if not data2:
+                    path_data = None
+                    rospy.logwarn("Waiting for %s", str(self.config.path_topic))
+                else:
+                    rospy.logdebug("Topic %s is active", str(self.config.path_topic))
+            if not odom_data:
                 try:
-                    data2 = rospy.wait_for_message("/mavros/local_position/odom", Odometry, timeout=1.5)
+                    odom_data = rospy.wait_for_message(self.config.odom_topic, Odometry, timeout=1)
                 except:
-                    data2 = None
-                    rospy.loginfo("Waiting for /mavros/local_position/odom")
+                    odom_data = None
+                    rospy.logwarn("Waiting for %s", str(self.config.odom_topic))
+                else:
+                    rospy.logdebug("Topic %s is active", str(self.config.path_topic))
 
-            if data1 and data2:
-                rospy.loginfo('Subscribers defined properly')
-                rospy.Subscriber(self.path_topic, Path, self.path_callback)
-                rospy.Subscriber('/mavros/local_position/odom', Odometry, self.odom_callback)
-                # newly added
-                rospy.Subscriber('/curvature_profile', Float32MultiArray, self.curvature_profile_callback)
-                rospy.Subscriber('/velocity_profile', Float32MultiArray, self.velocity_profile_callback)
-                rospy.Subscriber('/mavros/global_position/set_gp_origin', GeoPointStamped, self.home_position_callback)
-                break
+            if path_data and odom_data:
+                if path_data.header.frame_id == odom_data.header.frame_id:
+
+                    self.vehicle_pose_msg.header.frame_id = path_data.header.frame_id
+                    self.target_pose_msg.header.frame_id = path_data.header.frame_id
+                    rospy.Subscriber(self.config.path_topic, Path, self.path_callback)
+                    rospy.Subscriber(self.config.odom_topic, Odometry, self.odom_callback)
+                    rospy.Subscriber('/curvature_profile', Float32MultiArray, self.curvature_profile_callback)
+                    rospy.Subscriber('/velocity_profile', Float32MultiArray, self.velocity_profile_callback)
+                    rospy.Subscriber('/mavros/global_position/set_gp_origin', GeoPointStamped,
+                                     self.home_position_callback)
+                    rospy.loginfo('All the subscribers defined properly %s %s %s %s %s', self.config.path_topic,
+                                  self.config.odom_topic, '/curvature_profile', '/velocity_profile',
+                                  '/mavros/global_position/set_gp_origin')
+                    break
+                else:
+                    rospy.logfatal('tf frames of path and odometry are not same: path %s , odom %s',
+                                   path_data.header.frame_id, odom_data.header.frame_id)
+                    sys.exit('tf frames of path and odometry are not same"')
         time.sleep(1)
         self.main_loop()
 
-    def load_params(self):
-        # IMP PARAMS
-        rc_enable = rospy.get_param('patrol/rc_control', False)
-        if rc_enable:
-            self.ack_pub_topic = '/vehicle/cmd_drive_rc'
-        else:
-            od_enable = rospy.get_param('patrol/od_enable', False)
-            if od_enable:
-                self.ack_pub_topic = '/vehicle/cmd_drive_nosafe'
-            else:
-                self.ack_pub_topic = '/vehicle/cmd_drive_safe'
-
-        self.path_topic = rospy.get_param('/patrol/path_topic', 'odom_path')  # gps_path or odom_path(good one)
-        self.start_from_first_point = rospy.get_param('/patrol/from_start', False)  # TODO
-        self.throttle_speed = rospy.get_param('/patrol/max_speed', 1.5)
-        self.wheel_base = rospy.get_param('/patrol/wheel_base', 2)
-        self.given_look_ahead_dis = rospy.get_param('/patrol/look_ahead_distance', 3)
-        self.speed_constant = rospy.get_param('/patrol/speed_gain', 0.1)
-        self.speed_curvature_gain = rospy.get_param('/patrol/speed_curvature_gain', 0.1)
-        self.wait_time_at_ends = rospy.get_param('/patrol/wait_time_at_ends', 5)  # in secs
-        self.mission_trips = rospy.get_param('/patrol/mission_trips', 0)
-
     def curvature_profile_callback(self, data):
+        rospy.loginfo("curvature data received of length %s", str(len(data.data)))
         self.curvature_profile = data.data
 
     def velocity_profile_callback(self, data):
+        rospy.loginfo("velocity data received of length %s", str(len(data.data)))
         self.velocity_profile = data.data
 
     def home_position_callback(self, data):
@@ -123,8 +137,14 @@ class PurePursuit:
             'longitude': data.position.longitude,
             'altitude': data.position.altitude
         }
+        rospy.loginfo("home position data received %s", str(self.home_gps_location))
+
+    def mission_status_callback(self, data):
+        self.mission_complete = data.data
+
 
     def path_callback(self, data):
+        rospy.loginfo("path data data received of length %s", str(len(data.poses)))
         # data.poses.reverse() 
         self.revived_path = data.poses
         for pose in data.poses:
@@ -132,31 +152,51 @@ class PurePursuit:
                 [pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w])
             heading = math.degrees(heading)
             self.path.append([pose.pose.position.x, pose.pose.position.y, heading])
-        rospy.loginfo('path received')
         self.ind_end = len(self.path) - 1
 
     def odom_callback(self, data):
+        rospy.loginfo_once("Odom data received")
         self.time_when_odom = time.time()
         self.odom_data = data
         _, _, pose_heading = euler_from_quaternion(
             [data.pose.pose.orientation.x, data.pose.pose.orientation.y,
              data.pose.pose.orientation.z, data.pose.pose.orientation.w]
         )
-        self.robot_state['x'] = data.pose.pose.position.x - self.wheel_base * np.cos(pose_heading)
-        self.robot_state['y'] = data.pose.pose.position.y - self.wheel_base * np.sin(pose_heading)
+        self.robot_state['x'] = data.pose.pose.position.x - self.config.wheel_base * np.cos(pose_heading)
+        self.robot_state['y'] = data.pose.pose.position.y - self.config.wheel_base * np.sin(pose_heading)
         self.robot_state['yaw'] = pose_heading
         self.robot_state['vel'] = abs(data.twist.twist.linear.x)
 
         # fx = x + self.wheelbase * np.cos(yaw)
         # fy = y + self.wheelbase * np.sin(yaw)
 
+    def compute_lookahead_distance(self, vel):
+        # https://gitlab.com/-/ide/project/RamanaBotta/AutowareAuto/tree/master/-/src/control/pure_pursuit/src/pure_pursuit.cpp/#L136
+
+        look_ahead = vel * self.config.speed_to_lookahead_ratio
+        final_look_ahead = max(self.config.min_look_ahead, min(look_ahead, self.config.max_look_ahead))
+        return final_look_ahead
+
+    def compute_velocity_at_point(self, curvature, velocity_at_index):
+        # TODO
+        # add obstacle velocity_profile.
+        try:
+            circum_radius = (1 / curvature)
+        except:
+            circum_radius = 10000
+        rospy.loginfo("circum radius %s", circum_radius)
+        curvature_vel = circum_radius * self.config.curvature_speed_ratio
+        rospy.loginfo("curvature_vel: %s velocity_at_index: %s max_speed: %s", curvature_vel, velocity_at_index,
+                       self.config.max_speed)
+        final_vel = min(self.config.max_speed, velocity_at_index, curvature_vel)
+        final_vel = max(final_vel, self.config.min_speed)
+        return final_vel
+
     def find_close_point(self, robot, index_old):
-        n = min(50, len(range(index_old, self.ind_end)))
+        n = min(100, len(range(index_old, self.ind_end)))
         distance_list = [self.calc_distance(robot, ind) for ind in range(index_old, index_old + n)]
         ind = np.argmin(distance_list)
-        print(" ind", ind)
         final = ind + index_old
-        print("final ", final)
         dis = distance_list[ind]
         return final, dis
 
@@ -169,35 +209,17 @@ class PurePursuit:
             close_index, target_index, lookahead_distance, cross_track_dis,
         """
         if self.index_old is None:
-            self.calc_nearest_ind(robot)
-        self.index_old, cross_track_dis = self.find_close_point(robot, self.index_old)
-        # self.cross_track_dis = self.calc_distance(robot, self.close_idx)
-        print(cross_track_dis)
-        # print(self.given_look_ahead_dis / 2)
-        if cross_track_dis > self.given_look_ahead_dis:  # try divided by 2
-            # Find a point on the path which is look ahead distance from the closest path, then find distance to the
-            # robot and give it as a look_ahead_distance to pure pursuit formulae.
-            print("from here old")
-            for ind in range(self.index_old, self.ind_end):
-                print(ind)
-                dis = self.calc_distance_idx(self.index_old, ind)
-                if dis > self.given_look_ahead_dis:
-                    present_look_ahead_dis = self.calc_distance(robot, ind)
-                    return self.index_old, ind, self.given_look_ahead_dis, cross_track_dis
-                if ind >= self.ind_end:
-                    return ind, ind, self.given_look_ahead_dis, cross_track_dis
-                    # return ind, ind, lhd,cross_track_dis
-
+            self.index_old, cross_track_dis = self.calc_nearest_ind(robot)
         else:
-            print("from here")
-            lhd = self.given_look_ahead_dis + self.speed_constant * robot['vel']  # evaluate it afterwards
-            for ind in range(self.index_old, self.ind_end + 1):
-                dis = self.calc_distance(robot, ind)
-                if dis > lhd:
-                    return self.index_old, ind, lhd, cross_track_dis
-                if ind >= self.ind_end:
-                    return ind, ind, lhd, cross_track_dis
-                    # return ind, ind, lhd,cross_track_dis
+            self.index_old, cross_track_dis = self.find_close_point(robot, self.index_old)
+        lhd = self.compute_lookahead_distance(robot['vel'])
+        for ind in range(self.index_old, self.ind_end):
+            dis = self.calc_distance(robot, ind)
+            if dis > lhd:
+                return self.index_old, ind, lhd, cross_track_dis
+            if ind + 1 >= self.ind_end:
+                return ind, ind, lhd, cross_track_dis
+                # return ind, ind, lhd,cross_track_dis
 
     def calc_distance(self, robot, ind):
         # print(robot)
@@ -219,90 +241,79 @@ class PurePursuit:
         return ind, dis
 
     def main_loop(self):
-        # print("Here on Loop")
         r = rospy.Rate(1)
-
         all_data_received = False
         while not all_data_received and not rospy.is_shutdown():
             # print(" Here in inner Loop")
             if len(self.path) < 1:
-                rospy.loginfo('No path received')
+                rospy.logwarn('No path received')
             if len(self.curvature_profile) < 1:
-                rospy.loginfo('No curvature_profile received')
+                rospy.logwarn('No curvature_profile received')
             if len(self.velocity_profile) < 1:
-                rospy.loginfo('No velocity_profile received')
-            print(len(self.velocity_profile) > 1 and len(self.curvature_profile) > 1 and len(self.path) > 1)
+                rospy.logwarn('No velocity_profile received')
+            # print(len(self.velocity_profile) > 1 and len(self.curvature_profile) > 1 and len(self.path) > 1)
             if len(self.velocity_profile) > 1 and len(self.curvature_profile) > 1 and len(self.path) > 1:
                 rospy.loginfo("Path, velocity_profile and curvature profile are received")
                 all_data_received = True
             r.sleep()
 
         rospy.loginfo('Pure pursuit is started')
-        r = rospy.Rate(10)
+        r = rospy.Rate(20)
         while not rospy.is_shutdown():
-            print("---------------------------------------------------------------")
-
-            # Main Loop
+            # print("---------------------------------------------------------------")
+            # not necessary
             self.vehicle_pose_msg.pose.position.x = self.robot_state['x']
             self.vehicle_pose_msg.pose.position.y = self.robot_state['y']
             self.vehicle_pose_msg.pose.orientation = self.odom_data.pose.pose.orientation
             self.vehicle_pose_pub.publish(self.vehicle_pose_msg)
 
-            if self.start_from_first_point:
+            close_idx, target_idx, lhd, cross_track_error = self.target_index(self.robot_state)
+            rospy.loginfo("close index %s , target point index %s, lookahead dis %s, ctc %s",
+                          str(close_idx), str(target_idx), str(lhd), str(cross_track_error))
+
+            if target_idx + 1 >= self.ind_end:
+                self.count_mission_repeat += 0.5
+                rospy.loginfo(' MISSION COUNT %s ', self.count_mission_repeat)
+                self.mission_count_pub.publish(self.count_mission_repeat)
+                self.send_ack_msg(0, 0, 0)
+                time.sleep(1)
+                self.revived_path.reverse()
+                self.path.reverse()
                 self.index_old = 0
-                self.start_from_first_point = False
-                # close_idx, target_idx, lhd, cross_track_error = 0, 0,
-            else:
+                if self.speed < 0:
+                    self.speed = 0.3
+                else:
+                    self.speed = -0.3
 
-                close_idx, target_idx, lhd, cross_track_error = self.target_index(self.robot_state)
-                print('close_idx, target_idx, lhd, cross_track_error')
-                print(close_idx, target_idx, lhd, cross_track_error)
 
-                if target_idx >= self.ind_end:
-                    rospy.loginfo('MISSION COMPLETED ')
-                    self.send_ack_msg(0, 0, 0)
-                    self.count_mission_repeat += 1
-                    # print('mode ',self.mission_mode_selector(self.count_mission_repeat))
-                    state, state_text = self.mission_mode_selector(self.count_mission_repeat)
-                    if state:
-                        print("------------------")
-                        rospy.logwarn(state_text)
-                        print("waiting for " + str(self.wait_time_at_ends) + ' secs')
-                        time.sleep(self.wait_time_at_ends)
-                        print("------------------")
-                        continue
-                    else:
-                        print("------------------")
-                        rospy.logwarn(state_text)
-                        print("waiting for " + str(self.wait_time_at_ends) + ' secs')
-                        time.sleep(self.wait_time_at_ends)
-                        print("------------------")
-                        break
-                # publish target point
-                self.target_pose_msg.pose.position.x = self.path[target_idx][0]
-                self.target_pose_msg.pose.position.y = self.path[target_idx][1]
-                self.target_pose_msg.pose.orientation = self.revived_path[target_idx].pose.orientation
-                self.target_pose_pub.publish(self.target_pose_msg)
-                delta_x = self.path[target_idx][0] - self.robot_state['x']
-                delta_y = self.path[target_idx][1] - self.robot_state['y']
-                slope = math.atan2(delta_y, delta_x)
-                alpha = slope - self.robot_state['yaw']
-                delta = math.atan2(2.0 * self.wheel_base * math.sin(alpha), lhd)
-                delta_degrees = -1 * math.degrees(delta)
-                steering_angle = np.clip(delta_degrees, -30, 30)
-                # Speed calculation
-                # speed = min(self.velocity_profile[close_idx],
-                #             self.curvature_profile[close_idx] * self.speed_curvature_gain,
-                #             self.throttle_speed)
+                # self.speed =  -self.speed
 
-                self.send_ack_msg(steering_angle, self.throttle_speed, 0)
-                # print("\r Steering: " + str(round(steering_angle)) + "  Speed: " + str(
-                #     round(speed)) + " CTE :" + str(round(cross_track_error,2)) + "  ", end="\t").
-                print(" Steering: " + str(round(steering_angle)) + "  Speed: " + str(
-                    round(self.throttle_speed)) + " CTE :" + str(round(cross_track_error, 2)) + "  ")
-                print('vel: ', self.velocity_profile[close_idx])
-                print("cur: ", self.curvature_profile[close_idx])
-                r.sleep()
+
+                # if not self.mission_complete:
+                #     self.path = None
+                #     self.main_loop()
+                #     break
+                # else:
+                #     rospy.loginfo('COMPLETE MISSION COMPLETED')
+                #     break
+            # publish target point
+            self.target_pose_msg.pose.position.x = self.path[target_idx][0]
+            self.target_pose_msg.pose.position.y = self.path[target_idx][1]
+            self.target_pose_msg.pose.orientation = self.revived_path[target_idx].pose.orientation
+            self.target_pose_pub.publish(self.target_pose_msg)
+            delta_x = self.path[target_idx][0] - self.robot_state['x']
+            delta_y = self.path[target_idx][1] - self.robot_state['y']
+            slope = math.atan2(delta_y, delta_x)
+            alpha = slope - self.robot_state['yaw']
+            delta = math.atan2(2.0 * self.config.wheel_base * math.sin(alpha), lhd)
+            delta_degrees = -1 * math.degrees(delta)
+            steering_angle = np.clip(delta_degrees, -30, 30)
+            speed = self.compute_velocity_at_point(self.curvature_profile[target_idx], self.velocity_profile[target_idx])
+            rospy.loginfo("cur: %s, vel: %s", self.curvature_profile[target_idx], self.velocity_profile[target_idx])
+            rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
+            rospy.loginfo("self.speed %s", self.speed)
+            self.send_ack_msg(steering_angle, self.speed, 0)
+            r.sleep()
 
     def mission_mode_selector(self, count_mission_repeat):
         """
@@ -354,6 +365,6 @@ class PurePursuit:
 if __name__ == "__main__":
     rospy.init_node('pure_pursuit1')
 
-    pure_parsuit = PurePursuit()
+    pure_pursuit = PurePursuit()
 
     rospy.spin()
