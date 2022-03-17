@@ -293,7 +293,7 @@ class PurePursuit:
                 self.path.reverse()
                 self.index_old = None
                 if self.speed < 0:
-                    self.speed = self.speed
+                    self.speed = abs(self.speed)
                 else:
                     self.speed = -self.speed
             self.target_pose_msg.pose.position.x = self.path[target_idx][0]
