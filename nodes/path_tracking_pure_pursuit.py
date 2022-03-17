@@ -85,6 +85,8 @@ class PurePursuit:
         self.close_idx, self.cross_track_dis = 0.0, 0.0
         self.count_mission_repeat = 0
         self.mission_complete = True
+        self.odom_wait_time_limit = 1  # change it
+        self.time_when_odom_cb = time.time()
 
         path_data, odom_data = None, None
         while not rospy.is_shutdown():
@@ -126,6 +128,7 @@ class PurePursuit:
                     sys.exit('tf frames of path and odometry are not same"')
         time.sleep(1)
         self.main_loop()
+        print("exited main loop")
 
     def curvature_profile_callback(self, data):
         rospy.logdebug("curvature data received of length %s", str(len(data.data)))
@@ -159,7 +162,7 @@ class PurePursuit:
 
     def odom_callback(self, data):
         rospy.loginfo_once("Odom data received")
-        self.time_when_odom = time.time()
+        self.time_when_odom_cb = time.time()
         self.odom_data = data
         _, _, pose_heading = euler_from_quaternion(
             [data.pose.pose.orientation.x, data.pose.pose.orientation.y,
@@ -312,6 +315,12 @@ class PurePursuit:
             rospy.loginfo("cur: %s, vel: %s", self.curvature_profile[target_idx], self.velocity_profile[target_idx])
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
             rospy.loginfo("self.speed %s", speed)
+            now = time.time()
+            if now - self.time_when_odom_cb > self.odom_wait_time_limit:
+                rospy.logwarn('Time out from Odometry: %s', str(now - self.time_at_odom))
+                r.sleep()
+                self.send_ack_msg(0, 0, 0)
+                continue
             self.send_ack_msg(steering_angle, speed, 0)
             r.sleep()
 
