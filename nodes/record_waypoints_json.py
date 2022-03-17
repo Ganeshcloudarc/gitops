@@ -29,7 +29,6 @@ do some thing when time from gps/odom
 """
 
 
-
 def get_distance(lat1, lon1, lat2, lon2):
     r = 6371.0 * 1000.0
     lat_start = np.radians(lat1)
@@ -98,7 +97,7 @@ class SaveWayPoints:
         with open(mission_file_dir, 'w') as f:
             dump(line_string, f)
         print(" ")
-        print('Saved ' + str(len(self.final_waypoints_list)) + " points into " + self.mission_file_dir)
+        rospy.loginfo("saved %s points to %s", str(len(self.final_waypoints_list)), self.mission_file_dir)
 
     def odom_callback(self, data):
         self.odom_data = message_converter.convert_ros_message_to_dictionary(data)
@@ -123,8 +122,9 @@ class SaveWayPoints:
                         #  Depending upon the accuracy(covariance of gps) of the first gps location we need to decide on
                         #  recording points if gps_data_msg.position_covariance[0]
                         # https://en.wikipedia.org/wiki/Standard_error
-                        print('Origin gps location ' + 'longitude :' + str(
-                            self.gps_data_msg.longitude) + ', latitude :' + str(self.gps_data_msg.latitude))
+                        rospy.loginfo("Origin gps location:- longitude: %s latitude: %s altitude: %s covariance:%s",
+                                      str(self.gps_data_msg.longitude), str(self.gps_data_msg.latitude),
+                                      str(self.gps_data_msg.altitude), str(self.gps_data_msg.position_covariance))
                         self.final_waypoints_list.append([self.gps_data_msg.longitude, self.gps_data_msg.latitude])
                         self.imu_list.append(self.imu_data)
                         self.odometry_list.append(
@@ -138,7 +138,7 @@ class SaveWayPoints:
                         geo_point.position.altitude = self.gps_data_msg.altitude  # 29 # change it to actual latitude
                         self.starting_point_pub.publish(geo_point)
                         rospy.loginfo('Origin point set')
-                        print('Home location was saved, drive the vehicle')
+                        rospy.loginfo('Home location was saved, drive the vehicle')
                         self.is_first_point = False
                         time.sleep(0.5)
                     else:
@@ -148,11 +148,11 @@ class SaveWayPoints:
                 else:
                     now = time.time()
                     if now - self.time_at_gps > self.wait_time_limit:
-                        rospy.logwarn('Time out from GPS: '+ str(now - self.time_at_gps))
+                        rospy.logwarn('Time out from GPS: %s secs', str(now - self.time_at_gps))
                         r.sleep()
                         continue
                     if now - self.time_at_odom > self.wait_time_limit:
-                        rospy.logwarn('Time out from Odometry: ' + str(now - self.time_at_gps))
+                        rospy.logwarn('Time out from Odometry: %s secs', str(now - self.time_at_gps))
                         r.sleep()
                         continue
                     dis = get_distance(self.gps_data_msg.latitude, self.gps_data_msg.longitude, self.prev_lat,
