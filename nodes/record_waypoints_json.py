@@ -113,7 +113,7 @@ class SaveWayPoints:
 
     def main_loop(self):
         now = time.time()
-        r = rospy.Rate(10)
+        r = rospy.Rate(50)
         try:
             while not rospy.is_shutdown():
                 if self.is_first_point:
