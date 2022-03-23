@@ -317,7 +317,7 @@ class PurePursuit:
             rospy.loginfo("self.speed %s", speed)
             now = time.time()
             if now - self.time_when_odom_cb > self.odom_wait_time_limit:
-                rospy.logwarn('Time out from Odometry: %s', str(now - self.time_at_odom))
+                rospy.logwarn('Time out from Odometry: %s', str(now - self.time_when_odom_cb))
                 r.sleep()
                 self.send_ack_msg(0, 0, 0)
                 continue
