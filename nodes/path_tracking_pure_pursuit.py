@@ -324,9 +324,9 @@ class PurePursuit:
             rospy.loginfo("cur: %s, vel: %s", self.curvature_profile[target_idx], self.velocity_profile[target_idx])
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
             rospy.loginfo("self.speed %s", speed)
-            now = time.time()
-            if now - self.time_when_odom_cb > self.odom_wait_time_limit:
-                rospy.logwarn('Time out from Odometry: %s', str(now - self.time_at_odom))
+            timeout = time.time() - self.time_when_odom_cb
+            if timeout > self.odom_wait_time_limit:
+                rospy.logwarn('Time out from Odometry: %s', str(timeout))
                 r.sleep()
                 self.send_ack_msg(0, 0, 0)
                 continue
