@@ -3,6 +3,7 @@
     <arg name="carla" default="false"/>
     <arg name="record" default="false"/>
     <arg name="bags_dir" value="/home/boson/.bags"/>
+    <arg name="mission_repeat" value="false"/>
     <arg name="mission_mode" default="0" doc="mode type [0, 1, 2], 0-> go and stop
                                                                    1-> go and return to the path starting point
                                                                    2-> Keep on doing (go and return) "/>
@@ -31,16 +32,19 @@
     <param name = '/patrol/od_enable' value = "$(arg od_enable)"/>
     <param name = '/patrol/from_start' value = "$(arg from_start)"/>
     <param name="/patrol/rc_control" value="$(arg rc_control)" />
+    <param name="/patrol/mission_repeat" value="$(arg mission_repeat)" />
+
+
 
     <rosparam command="load" file="$(find autopilot_boson)/params/patrol_params.yaml"/>
     <node pkg = "autopilot_boson" type = "path_publisher.py" name = "gps_path_pub_node" />
     <node pkg = "autopilot_boson" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
-    <node name="rc_control" pkg="autopilot_boson" type="control_mode_selector.py"  if = "$(eval arg('rc_control'))"/>
+    <node name="control_mode_selector" pkg="autopilot_boson" type="control_mode_selector.py"  if = "$(eval arg('rc_control'))" output = 'screen'/>
 
 
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find autopilot_boson)/rviz/path.rviz" if = "$(eval arg('rviz'))"/>
-    <node pkg = "autopilot_boson" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" if = "$(eval arg('rviz'))" />
-    <node pkg = "autopilot_boson" type = "odom_path_plotter.py" name = "odom_path_plotter_node" if = "$(eval arg('rviz'))"/>
+    <node pkg = "autopilot_boson" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
+    <node pkg = "autopilot_boson" type = "odom_path_plotter.py" name = "odom_path_plotter_node"/>
 
     <node name="bag_record" pkg="rosbag" type="record"
         args="record -o $(arg bags_dir)/boson -a" if="$(eval record)"/>
@@ -52,4 +56,4 @@
 
 
 
-    
+

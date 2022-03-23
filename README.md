@@ -33,16 +33,12 @@ roslaunch pilot all_pilot.launch
 ```
 #### Arguments
 * `mission_file`  (str, default: default.json) - mission file name (should be present in mission_files directory)
-* `mission_mode`  (int, default: 0) - mission mode 0,1 or 2. mode type [0, 1, 2]. **0**-> go and stop
-                                                                   **1**-> go and return to the path starting point
-                                                                   **2-**> Keep on doing (go and return) .
-* `mission_trips` (int , default: 0) - if the mission_mode == 2 then how meny times you want to loop the path.
-* `od_enable`     (boolean, default: false) - true when obstacle detection node running.
-* `from_start`    (boolean, default: false) - true if you want to start patrol from first recorded path, else it will start to follow the path from its present location.
-* `rc_control`    (boolean, default: false) - true to enable RC control (both automode and manual mode).
-* `rviz`         (boolean, default: true) -- to open rviz.
-
-
+* `mission_repeat` (boolean, default: false) - to keep on loop of mission trips 
+* `rc_control`    (boolean, default: false) - true to enable RC control (both automode and manual mode and stop).
+* `rviz`         (boolean, default: true) - to open rviz.
+* `record`        (boolean, default: false) - to record bag file.
+* `bags_dir`       (str, default: /home/boson/.bags) - saving directory of bags files(make sure directory exits).
+* `carla`           (boolean, default: false) - to run the entire patrol on carla simulator.
 #### Parameters
 * `max_speed` (float, default: 1.5) - The max speed vehicle can go in patrol mode in meters/sec
 * `wheel_base` (float, default: 2) - distance between front and rear wheels in meters.
@@ -57,21 +53,8 @@ roslaunch pilot all_pilot.launch
 ```
 1 - to just launch
 roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json
-2 - launch with mission_mode 1 (go to B and come back to A)
-roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json mission_mode:=1
-3 - launch with mission_mode 1 (go to B and come back to A and repeat for ever)
-roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json mission_mode:=2
-4 - launch with mission_mode 1 (go to B and come back to A and repeat for given times)
-roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json mission_mode:=2 mission_trips:=3
-5 - launch with rc_control enable
-roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json mission_mode:=2 mission_trips:=3 rc_control:=true
-6 - to disable rviz
-roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json rviz:=false
-7 - to enable to obstacle detection
-roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json ob_enable:=true
-8 - to enable rc control
+2- to enable rc control
 roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json rc_control:=true
-
 ```
 
 ## Visualize live tracking of vehicle on Google Maps.

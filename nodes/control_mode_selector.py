@@ -20,12 +20,12 @@ class ControlModeSelector:
         self.time_on_cmd_drive = time.time()
         self.cmd_drive = AckermannDrive()
         self.rc_stop = None
-        self.wait_time_limit = 0.5
-        rc_enable = rospy.get_param('patrol/rc_control', True)
+        self.wait_time_limit = 1
+        rc_enable = rospy.get_param('patrol/rc_control', False)
         if rc_enable:
             self.ack_sub_topic = '/vehicle/cmd_drive_rc'
 
-        od_enable = rospy.get_param('patrol/od_enable', False)
+        od_enable = rospy.get_param('patrol/od_enable', True)
         if od_enable:
             self.ack_pub_topic = '/vehicle/cmd_drive_nosafe'
         else:
@@ -61,7 +61,7 @@ class ControlModeSelector:
         # self.manual_control()
 
     def main_loop(self):
-        r = rospy.Rate(10)
+        r = rospy.Rate(20)
         while not rospy.is_shutdown():
             if self.default_mode:
                 print("waiting for mode select from rc trasmitor")
@@ -76,14 +76,18 @@ class ControlModeSelector:
                 if now - self.time_on_cmd_drive < self.wait_time_limit:
                     if self.cmd_drive.jerk or self.rc_stop:
                         stop = 1
+                        print("stopping")
                     else:
+                        print("not stopping")
                         stop = 0
+
                     self.send_ack_msg(self.cmd_drive.steering_angle, self.cmd_drive.speed, stop)
                 else:
                     print('time out from cmd_drive')
                     self.send_ack_msg(0, 0, self.rc_stop)
             else:
                 print(" No valid option selected")
+                self.send_ack_msg(0, 0, 0)
             r.sleep()
 
     def manual_control(self):

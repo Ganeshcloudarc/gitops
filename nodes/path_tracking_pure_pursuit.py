@@ -34,8 +34,11 @@ class Config:
             self.average_speed = rospy.get_param("carla_sim/speed", 0.3)
         else:
             self.average_speed = (self.min_speed + self.max_speed) / 2
-        self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/cmd_drive/pure_pursuit')
-
+        rc_enable = rospy.get_param('patrol/rc_control', False)
+        if rc_enable:
+            self.ack_pub_topic = '/vehicle/cmd_drive_rc'
+        else:
+            self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/cmd_drive/pure_pursuit')
         # vehicle specific
         self.wheel_base = rospy.get_param('/vehicle/wheel_base', 2)
         self.dist_front_rear_wheels = rospy.get_param('/vehicle/dist_front_rear_wheels', 1.5)
@@ -46,6 +49,7 @@ class Config:
         self.speed_to_lookahead_ratio = rospy.get_param('/pure_pursuit/speed_to_lookahead_ratio',
                                                         1)  # taken from autoware
         self.curvature_speed_ratio = rospy.get_param('/pure_pursuit/curvature_speed_ratio', 1)
+        self.mission_repeat = rospy.get_param("/patrol/mission_repeat", False)
 
 
 class PurePursuit:
@@ -290,15 +294,20 @@ class PurePursuit:
                 rospy.loginfo(' MISSION COUNT %s ', self.count_mission_repeat)
                 self.mission_count_pub.publish(self.count_mission_repeat)
                 self.send_ack_msg(0, 0, 0)
-                print("waiting for 5 secs")
-                time.sleep(5)
-                self.revived_path.reverse()
-                self.path.reverse()
-                self.index_old = None
-                if self.speed < 0:
-                    self.speed = abs(self.speed)
+                if self.config.mission_repeat:
+                    print("waiting for 5 secs")
+                    time.sleep(5)
+                    self.revived_path.reverse()
+                    self.path.reverse()
+                    self.index_old = None
+                    if self.speed < 0:
+                        self.speed = abs(self.speed)
+                    else:
+                        self.speed = -self.speed
                 else:
-                    self.speed = -self.speed
+                    rospy.loginfo('MISSION COMPLETED')
+                    break
+
             self.target_pose_msg.pose.position.x = self.path[target_idx][0]
             self.target_pose_msg.pose.position.y = self.path[target_idx][1]
             self.target_pose_msg.pose.orientation = self.revived_path[target_idx].pose.orientation
@@ -315,10 +324,9 @@ class PurePursuit:
             rospy.loginfo("cur: %s, vel: %s", self.curvature_profile[target_idx], self.velocity_profile[target_idx])
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
             rospy.loginfo("self.speed %s", speed)
-            # time out condition from odometry.
-            timeout = time.time() - self.time_when_odom_cb
-            if  timeout > self.odom_wait_time_limit:
-                rospy.logwarn('Time out from Odometry: %s', str(timeout))
+            now = time.time()
+            if now - self.time_when_odom_cb > self.odom_wait_time_limit:
+                rospy.logwarn('Time out from Odometry: %s', str(now - self.time_at_odom))
                 r.sleep()
                 self.send_ack_msg(0, 0, 0)
                 continue
