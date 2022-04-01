@@ -46,6 +46,7 @@ def get_distance(lat1, lon1, lat2, lon2):
 
 class SaveWayPoints:
     def __init__(self, mission_file_dir):
+
         self.mission_file_dir = mission_file_dir
         self.prev_lat = 0
         self.prev_long = 0
@@ -56,6 +57,7 @@ class SaveWayPoints:
         self.gps_list = []
         self.heading = 0
         self.odom_data = None
+        self.odom_data_msg = None
         self.imu_data = None
         self.gps_data = None
         self.gps_data_msg = None
@@ -100,6 +102,7 @@ class SaveWayPoints:
         rospy.loginfo("saved %s points to %s", str(len(self.final_waypoints_list)), self.mission_file_dir)
 
     def odom_callback(self, data):
+        self.odom_data_msg = data
         self.odom_data = message_converter.convert_ros_message_to_dictionary(data)
         self.time_at_odom = time.time()
 
@@ -128,7 +131,7 @@ class SaveWayPoints:
                         self.final_waypoints_list.append([self.gps_data_msg.longitude, self.gps_data_msg.latitude])
                         self.imu_list.append(self.imu_data)
                         odom_msg = Odometry()
-                        odom_msg.pose.pose.orientation = self.odom_data['odometry']['pose']['pose']['orientation']
+                        odom_msg.pose.pose.orientation = self.odom_data_msg.pose.pose.orientation
                         self.odometry_list.append(
                             message_converter.convert_ros_message_to_dictionary(odom_msg))  # change it to self.odom_msg
                         self.gps_list.append(self.gps_data)
