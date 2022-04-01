@@ -71,7 +71,7 @@ class PathPubGps:
         geo_point = GeoPointStamped()
         geo_point.position.latitude = home_lat
         geo_point.position.longitude = home_long
-        geo_point.position.altitude = 29  # change it to actual latitude
+        geo_point.position.altitude = data['gps_coordinates'][0]['altitude']
         self.starting_point_pub.publish(geo_point)
         rospy.loginfo('Origin point set')
         time.sleep(0.5)
@@ -91,6 +91,7 @@ class PathPubGps:
             self.gps_path_msg.poses.append(gps_pose)
 
             # Odom based path
+            print()
             odom_position = data['odometry'][i]['pose']['pose']['position']
             odom_orientation = data['odometry'][i]['pose']['pose']['orientation']
             odom_pose = PoseStamped()
