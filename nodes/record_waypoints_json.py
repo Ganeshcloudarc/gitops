@@ -117,7 +117,7 @@ class SaveWayPoints:
         try:
             while not rospy.is_shutdown():
                 if self.is_first_point:
-                    if self.gps_data_msg is not None:
+                    if self.gps_data_msg and self.odom_data:
                         # TODO
                         #  Depending upon the accuracy(covariance of gps) of the first gps location we need to decide on
                         #  recording points if gps_data_msg.position_covariance[0]
@@ -127,8 +127,10 @@ class SaveWayPoints:
                                       str(self.gps_data_msg.altitude), str(self.gps_data_msg.position_covariance))
                         self.final_waypoints_list.append([self.gps_data_msg.longitude, self.gps_data_msg.latitude])
                         self.imu_list.append(self.imu_data)
+                        odom_msg = Odometry()
+                        odom_msg.pose.pose.orientation = self.odom_data['odometry']['pose']['pose']['orientation']
                         self.odometry_list.append(
-                            message_converter.convert_ros_message_to_dictionary(Odometry()))  # change it to self.odom_msg
+                            message_converter.convert_ros_message_to_dictionary(odom_msg))  # change it to self.odom_msg
                         self.gps_list.append(self.gps_data)
                         self.prev_long = self.gps_data_msg.longitude
                         self.prev_lat = self.gps_data_msg.latitude
@@ -152,7 +154,7 @@ class SaveWayPoints:
                         r.sleep()
                         continue
                     if now - self.time_at_odom > self.wait_time_limit:
-                        rospy.logwarn('Time out from Odometry: %s secs', str(now - self.time_at_gps))
+                        rospy.logwarn('Time out from Odometry: %s secs', str(now - self.time_at_odom))
                         r.sleep()
                         continue
                     dis = get_distance(self.gps_data_msg.latitude, self.gps_data_msg.longitude, self.prev_lat,
@@ -172,7 +174,8 @@ class SaveWayPoints:
                         #  distance less than min_dis_between_waypoints
                         pass
                 r.sleep()
-        except:
+        except Exception as e:
+            print('exception', e)
             pass
 
 
