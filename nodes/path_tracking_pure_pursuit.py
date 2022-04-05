@@ -13,7 +13,7 @@ try:
     import time
     import numpy as np
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
-    from std_msgs.msg import Float32MultiArray, Int32MultiArray, Bool, Int16, String, Int8, UInt16
+    from std_msgs.msg import Float32MultiArray, Int32MultiArray, Bool, Int16, String, Int8, UInt16, Float32
     from geographic_msgs.msg import GeoPointStamped
 except Exception as e:
     print('No module named :', str(e))
@@ -71,7 +71,7 @@ class PurePursuit:
         self.ackermann_publisher = rospy.Publisher(self.config.ack_pub_topic, AckermannDrive, queue_size=10)
         self.vehicle_pose_pub = rospy.Publisher('/vehicle_pose', PoseStamped, queue_size=2)
         self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
-        self.mission_count_pub = rospy.Publisher('/mission_count', Int16, queue_size=2)
+        self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2)
         self.vehicle_pose_msg = PoseStamped()
         self.target_pose_msg = PoseStamped()
         self.ackermann_msg = AckermannDrive()
