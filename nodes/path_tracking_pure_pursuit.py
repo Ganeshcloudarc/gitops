@@ -208,12 +208,20 @@ class PurePursuit:
         # return final_vel
 
     def find_close_point(self, robot, index_old):
-        n = min(100, len(range(index_old, self.ind_end)))
-        distance_list = [self.calc_distance(robot, ind) for ind in range(index_old, index_old + n)]
-        ind = np.argmin(distance_list)
-        final = ind + index_old
-        dis = distance_list[ind]
-        return final, dis
+        # n = min(100, len(range(index_old, self.ind_end)))
+        # distance_list = [self.calc_distance(robot, ind) for ind in range(index_old, index_old + n)]
+        # ind = np.argmin(distance_list)
+        # final = ind + index_old
+        # dis = distance_list[ind]
+        # return final, dis
+        close_dis = self.calc_distance(robot, index_old)
+        for ind in range(index_old + 1, self.ind_end):
+            dis = self.calc_distance(robot, ind)
+            if close_dis >= dis:
+                close_dis = dis
+            else:
+                # print("find close", index_old, ind)
+                return ind - 1, close_dis
 
     def target_index(self, robot):
         """
@@ -227,29 +235,21 @@ class PurePursuit:
             self.index_old, cross_track_dis = self.calc_nearest_ind(robot)
         else:
             self.index_old, cross_track_dis = self.find_close_point(robot, self.index_old)
-            # cross_track_dis = 3
-        # lhd = self.compute_lookahead_distance(robot['vel'])
-        # # lhd = 3
-        # for ind in range(self.index_old, self.ind_end):
-        #     dis = self.calc_distance(robot, ind)
-        #     if dis > lhd:
-        #         return self.index_old, ind, lhd, cross_track_dis
-        #     if ind + 1 >= self.ind_end:
-        #         return ind, ind, lhd, cross_track_dis
-        #         # return ind, ind, lhd,cross_track_dis
-        # return self.ind_end, self.ind_end, lhd, cross_track_dis
+        # The following implementation was inspired from
+        # http://dyros.snu.ac.kr/wp-content/uploads/2021/02/Ahn2021_Article_AccuratePathTrackingByAdjustin-1.pdf
         sum_dis = 0
         for ind in range(self.index_old, self.ind_end):
             sum_dis += self.distance_between_points_by_index(ind)
-            print(sum_dis)
+            # print(sum_dis)
             if sum_dis >= self.config.min_look_ahead:
                 lhd = self.calc_distance(robot, ind)
                 return self.index_old, ind, lhd, cross_track_dis
             if ind + 1 >= self.ind_end:
                 return ind, ind, 0, cross_track_dis
+        return self.ind_end, self.ind_end, 0, 0
 
     def distance_between_points_by_index(self, ind):
-        return math.dist(self.path[ind][0:2], self.path[ind+1][0:2])
+        return math.dist(self.path[ind][0:2], self.path[ind + 1][0:2])
 
     def calc_distance(self, robot, ind):
         # print(robot)
@@ -331,7 +331,8 @@ class PurePursuit:
             delta = math.atan2(2.0 * self.config.wheel_base * math.sin(alpha), lhd)
             delta_degrees = -1 * math.degrees(delta)
             steering_angle = np.clip(delta_degrees, -30, 30)
-            speed = self.compute_velocity_at_point(self.curvature_profile[target_idx], self.velocity_profile[target_idx])
+            speed = self.compute_velocity_at_point(self.curvature_profile[target_idx],
+                                                   self.velocity_profile[target_idx])
             speed = self.speed
             rospy.loginfo("cur: %s, vel: %s", self.curvature_profile[target_idx], self.velocity_profile[target_idx])
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
