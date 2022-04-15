@@ -228,16 +228,28 @@ class PurePursuit:
         else:
             self.index_old, cross_track_dis = self.find_close_point(robot, self.index_old)
             # cross_track_dis = 3
-        lhd = self.compute_lookahead_distance(robot['vel'])
-        # lhd = 3
+        # lhd = self.compute_lookahead_distance(robot['vel'])
+        # # lhd = 3
+        # for ind in range(self.index_old, self.ind_end):
+        #     dis = self.calc_distance(robot, ind)
+        #     if dis > lhd:
+        #         return self.index_old, ind, lhd, cross_track_dis
+        #     if ind + 1 >= self.ind_end:
+        #         return ind, ind, lhd, cross_track_dis
+        #         # return ind, ind, lhd,cross_track_dis
+        # return self.ind_end, self.ind_end, lhd, cross_track_dis
+        sum_dis = 0
         for ind in range(self.index_old, self.ind_end):
-            dis = self.calc_distance(robot, ind)
-            if dis > lhd:
+            sum_dis += self.distance_between_points_by_index(ind)
+            print(sum_dis)
+            if sum_dis >= self.config.min_look_ahead:
+                lhd = self.calc_distance(robot, ind)
                 return self.index_old, ind, lhd, cross_track_dis
             if ind + 1 >= self.ind_end:
-                return ind, ind, lhd, cross_track_dis
-                # return ind, ind, lhd,cross_track_dis
-        return self.ind_end, self.ind_end, lhd, cross_track_dis
+                return ind, ind, 0, cross_track_dis
+
+    def distance_between_points_by_index(self, ind):
+        return math.dist(self.path[ind][0:2], self.path[ind+1][0:2])
 
     def calc_distance(self, robot, ind):
         # print(robot)
