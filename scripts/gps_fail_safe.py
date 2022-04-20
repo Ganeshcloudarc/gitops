@@ -55,8 +55,8 @@ class GpsFixMonitor:
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             diagnose_status_msg = DiagnosticStatus()
-            # print("elf.gps1_fix", self.gps1_fix)
-            # print("self.gps2_fix", self.gps2_fix)
+            print("elf.gps1_fix", self.gps1_fix)
+            print("self.gps2_fix", self.gps2_fix)
 
             if self.gps1_fix == self.RTK_FIX_NUMBER and self.gps2_fix == self.RTK_FIX_NUMBER:
                 diagnose_status_msg.level = diagnose_status_msg.OK
