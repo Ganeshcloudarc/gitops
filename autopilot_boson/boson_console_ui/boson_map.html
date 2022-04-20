@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+   <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+    crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+    integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+    crossorigin=""></script>
+
+    <script type="text/javascript" src="https://static.robotwebtools.org/roslibjs/current/roslib.min.js">
+
+
+	</script>    
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
+  
+
+  <style>
+    
+    body{
+      margin: 0;
+      padding:0;
+    }
+    #map{
+      width: 100%;
+      height: 100vh;
+
+    }
+  </style>
+
+      <title>Boson Live Map</title>
+   </head>	
+   <body>
+     
+      <div id="map" ></div>
+    
+      <script>
+
+        //
+        var to_center = false;
+        var waypointfile = '../cicle_big.json'
+        let tracking_coors_data =[]
+        // 80.000778, 13.593665
+        
+        var map = L.map('map').setView([13.589854,80.0035143 ], 500); //37.72658953064916, -121.8088442588894
+        //cat icon
+        var carIcon = L.icon({
+        iconSize: [37, 26],
+        iconAnchor: [19, 13],
+        iconUrl:  'car.png'
+         });
+       
+
+        googleStreets = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+            maxZoom: 20,
+            subdomains:['mt0','mt1','mt2','mt3']
+        });
+
+        googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+            maxZoom: 21,
+            subdomains:['mt0','mt1','mt2','mt3']
+        });
+        googleHybrid.addTo(map)
+
+        var baseLayers = {
+            "googleSteets": googleStreets ,
+            "googleHSat":googleHybrid,
+        };
+
+        L.control.layers(baseLayers).addTo(map);
+
+        // console.log('at waypoint load')
+        // fetch(waypointfile)
+        // .then(results=>results.json())
+        // .then(data=>{
+        //         console.log('in',data)
+        //         var pol = L.geoJSON(data
+        //         ,{
+        //             style: {color:'red'} 
+        //         }
+        //         ).addTo(map)
+
+                
+        // })
+
+        
+    
+
+        console.log("completed plotting")
+        
+        //  ##### ROS RELATED ###
+        // GPS TOPIC NAME ROS
+        // var topic_name = '/mavros/global_position/global'
+        var topic_name = '/carla/ego_vehicle/gnss'
+        var ros = new ROSLIB.Ros({
+        url : 'ws://localhost:9090'
+        });
+
+        ros.on('connection', function() {
+            console.log('Connected to websocket server.');
+        });
+
+        ros.on('error', function(error) {
+            console.log('Error connecting to websocket server: ', error);
+        });
+
+        ros.on('close', function() {
+            console.log('Connection to websocket server closed.');
+        });
+
+        var listener = new ROSLIB.Topic({
+            ros : ros,
+            name : topic_name,
+            messageType : 'sensor_msgs/NavSatFix'
+        });
+        let mapMarkers1;
+        listener.subscribe(function(message) {
+        // console.log('Received message on ' + listener.name + ': ' + message.latitude);
+        // console.log(message.latitude,message.latitude);
+        if (mapMarkers1){
+            map.removeLayer(mapMarkers1)
+        }
+        mapMarkers1 = L.marker([message.latitude, message.longitude],{icon: carIcon})    
+        mapMarkers1.addTo(map);
+        if (to_center){
+        map.setView([message.latitude, message.longitude]);}
+        tracking_coors_data.push([message.longitude, message.latitude])
+        var data_1 = {"type": "LineString", "coordinates": tracking_coors_data}
+        var pol = L.geoJSON(data_1
+                ,{
+                    style: {color:'red'} 
+                }
+                ).addTo(map)
+
+        });
+
+        var waypoints_file = new ROSLIB.Param({
+        ros : ros,
+        name : '/patrol/mission_file'
+        });
+
+
+        waypoints_file.get(function(value) {
+        console.log('MAX VAL: ' + value);
+
+        waypointfile = '/mission_files/'+value
+        fetch(waypointfile)
+        .then(results=>results.json())
+        .then(data=>{
+                console.log('in',data)
+                var pol = L.geoJSON(data
+                ,{
+                    style: {color:'yellow'} 
+                }
+                ).addTo(map)
+
+                
+        })
+
+    });
+
+        var to_center = new ROSLIB.Param({
+        ros : ros,
+        name : '/map/to_center'
+        });
+        to_center.get(function(value) {
+        console.log('MAX VAL: ' + value);
+        to_center = value
+    });
+        
+
+
+
+
+      </script>
+
+
+      
+   </body>	
+</html>
