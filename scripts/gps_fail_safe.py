@@ -55,6 +55,9 @@ class GpsFixMonitor:
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             diagnose_status_msg = DiagnosticStatus()
+            print("elf.gps1_fix", self.gps1_fix)
+            print("self.gps2_fix", self.gps2_fix)
+
             if self.gps1_fix == self.RTK_FIX_NUMBER and self.gps2_fix == self.RTK_FIX_NUMBER:
                 diagnose_status_msg.level = diagnose_status_msg.OK
                 diagnose_status_msg.name = "gps_fix_monitor"
@@ -64,7 +67,7 @@ class GpsFixMonitor:
                 gps1_keyval.value = self.GPS_FIX_TYPE[self.gps1_fix]
                 gps2_keyval = KeyValue()
                 gps2_keyval.key = "GPS2"
-                gps2_keyval.value = self.GPS_FIX_TYPE[self.gps1_fix]
+                gps2_keyval.value = self.GPS_FIX_TYPE[self.gps2_fix]
                 diagnose_status_msg.values.append(gps1_keyval)
                 diagnose_status_msg.values.append(gps2_keyval)
             else:
@@ -76,7 +79,7 @@ class GpsFixMonitor:
                 gps1_keyval.value = self.GPS_FIX_TYPE[self.gps1_fix]
                 gps2_keyval = KeyValue()
                 gps2_keyval.key = "GPS2"
-                gps2_keyval.value = self.GPS_FIX_TYPE[self.gps1_fix]
+                gps2_keyval.value = self.GPS_FIX_TYPE[self.gps2_fix]
                 diagnose_status_msg.values.append(gps1_keyval)
                 diagnose_status_msg.values.append(gps2_keyval)
             self.rtk_fix_status_pub.publish(diagnose_status_msg.message)
