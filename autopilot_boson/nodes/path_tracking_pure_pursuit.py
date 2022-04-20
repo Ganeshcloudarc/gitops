@@ -15,6 +15,7 @@ try:
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
     from std_msgs.msg import Float32MultiArray, Int32MultiArray, Bool, Int16, String, Int8, UInt16, Float32
     from geographic_msgs.msg import GeoPointStamped
+    from autopilot_msgs.msg import ControllerDiagnose
 except Exception as e:
     print('No module named :', str(e))
     exit(e)
@@ -72,6 +73,7 @@ class PurePursuit:
         self.vehicle_pose_pub = rospy.Publisher('/vehicle_pose', PoseStamped, queue_size=2)
         self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
         self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2)
+        self.controller_diagnose_pub = rospy.Publisher("pure_pursuit_diagnose", ControllerDiagnose, queue_size=2)
         self.vehicle_pose_msg = PoseStamped()
         self.target_pose_msg = PoseStamped()
         self.ackermann_msg = AckermannDrive()
@@ -290,8 +292,8 @@ class PurePursuit:
         rospy.loginfo('Pure pursuit is started')
         r = rospy.Rate(20)
         while not rospy.is_shutdown():
-            # print("---------------------------------------------------------------")
-            # not necessary
+            diagnostic_msg = ControllerDiagnose()
+            diagnostic_msg.name = "Pure Pursuit Node"
             self.vehicle_pose_msg.pose.position.x = self.robot_state['x']
             self.vehicle_pose_msg.pose.position.y = self.robot_state['y']
             self.vehicle_pose_msg.pose.orientation = self.odom_data.pose.pose.orientation
@@ -306,6 +308,10 @@ class PurePursuit:
                 rospy.loginfo(' MISSION COUNT %s ', self.count_mission_repeat)
                 self.mission_count_pub.publish(self.count_mission_repeat)
                 self.send_ack_msg(0, 0, 0)
+                diagnostic_msg.level = diagnostic_msg.OK
+                diagnostic_msg.message = 'MISSION COUNT  ', +str(self.count_mission_repeat)
+                self.controller_diagnose_pub.publish(diagnostic_msg)
+
                 if self.config.mission_repeat:
                     print("waiting for 5 secs")
                     time.sleep(5)
@@ -318,6 +324,9 @@ class PurePursuit:
                         self.speed = -self.speed
                 else:
                     rospy.loginfo('MISSION COMPLETED')
+                    diagnostic_msg.level = diagnostic_msg.OK
+                    diagnostic_msg.message = 'MISSION COMPLETED'
+                    self.controller_diagnose_pub.publish(diagnostic_msg)
                     break
 
             self.target_pose_msg.pose.position.x = self.path[target_idx][0]
@@ -338,13 +347,36 @@ class PurePursuit:
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
             rospy.loginfo("self.speed %s", speed)
             timeout = time.time() - self.time_when_odom_cb
+
+            # diagnose msg
+            diagnostic_msg.level = diagnostic_msg.OK
+            diagnostic_msg.message = 'Executing path'
+            diagnostic_msg.look_ahead = lhd
+            diagnostic_msg.cte = cross_track_error
+            diagnostic_msg.speed = speed
+            diagnostic_msg.steering_angle = steering_angle
+            diagnostic_msg.current_point_heading = math.degrees(self.robot_state['yaw'])
+            diagnostic_msg.target_point_heading = self.path[target_idx][2]
+            diagnostic_msg.current_point_curvature = self.curvature_profile[close_idx]
+            diagnostic_msg.target_point_curvature = self.curvature_profile[target_idx]
+
             if timeout > self.odom_wait_time_limit:
                 rospy.logwarn('Time out from Odometry: %s', str(timeout))
-                r.sleep()
+                diagnostic_msg.level = diagnostic_msg.WARN
+                diagnostic_msg.message = 'Time out from Odometry: ' + str(timeout)
+                diagnostic_msg.speed = 0
+                diagnostic_msg.steering_angle = 0
+                self.controller_diagnose_pub.publish(diagnostic_msg)
                 self.send_ack_msg(0, 0, 0)
+                r.sleep()
                 continue
+
             self.send_ack_msg(steering_angle, speed, 0)
+            self.controller_diagnose_pub.publish(diagnostic_msg)
             r.sleep()
+
+    def send_controller_diagnose(self):
+        pass
 
     def mission_mode_selector(self, count_mission_repeat):
         """
