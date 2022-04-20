@@ -251,7 +251,7 @@ class PurePursuit:
         return self.ind_end, self.ind_end, 0, 0
 
     def distance_between_points_by_index(self, ind):
-        return math.dist(self.path[ind][0:2], self.path[ind + 1][0:2])
+        return math.hypot(self.path[ind][0]-self.path[ind+1][0], self.path[ind][1]-self.path[ind+1][1])
 
     def calc_distance(self, robot, ind):
         # print(robot)
