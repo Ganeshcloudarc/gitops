@@ -38,8 +38,14 @@ class Config:
         if rc_enable:
             self.ack_pub_topic = '/vehicle/cmd_drive_rc'
         else:
-            self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/cmd_drive/pure_pursuit')
+            self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/cmd_drive/cmd_drive_safe')
         # vehicle specific
+        ob_enable = rospy.get_param("/patrol/od_enable", False)
+        if ob_enable:
+            self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/vehicle/cmd_drive_nosafe')
+        else:
+            self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/cmd_drive/cmd_drive_safe')
+
         self.wheel_base = rospy.get_param('/vehicle/wheel_base', 2)
         self.dist_front_rear_wheels = rospy.get_param('/vehicle/dist_front_rear_wheels', 1.5)
 
