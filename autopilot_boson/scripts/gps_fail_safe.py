@@ -1,4 +1,4 @@
-#!usr/bin/env python3
+#!/usr/bin/env python3
 """
 A Node to listen to GPS1 and GPS2 and report on their gps status.
 """
@@ -53,15 +53,17 @@ class GpsFixMonitor:
     def main_loop(self):
         rospy.logdebug("main_loop started")
         rate = rospy.Rate(10)
+        print("No log warns, means both are RTK")
         while not rospy.is_shutdown():
             diagnose_status_msg = DiagnosticStatus()
-            print("elf.gps1_fix", self.gps1_fix)
-            print("self.gps2_fix", self.gps2_fix)
+            # print("elf.gps1_fix", self.gps1_fix)
+            # print("self.gps2_fix", self.gps2_fix)
 
             if self.gps1_fix == self.RTK_FIX_NUMBER and self.gps2_fix == self.RTK_FIX_NUMBER:
                 diagnose_status_msg.level = diagnose_status_msg.OK
                 diagnose_status_msg.name = "gps_fix_monitor"
                 diagnose_status_msg.message = "Both RTK FIX"
+                rospy.logwarn("Both RTK FIX")
                 gps1_keyval = KeyValue()
                 gps1_keyval.key = "GPS1"
                 gps1_keyval.value = self.GPS_FIX_TYPE[self.gps1_fix]
@@ -74,6 +76,8 @@ class GpsFixMonitor:
                 diagnose_status_msg.level = diagnose_status_msg.WARN
                 diagnose_status_msg.name = "gps_fix_monitor"
                 diagnose_status_msg.message = "NO RTK FIX"
+                rospy.logwarn("NO RTK FIX")
+
                 gps1_keyval = KeyValue()
                 gps1_keyval.key = "GPS1"
                 gps1_keyval.value = self.GPS_FIX_TYPE[self.gps1_fix]

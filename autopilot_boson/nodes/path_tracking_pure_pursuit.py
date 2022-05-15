@@ -41,6 +41,17 @@ class Config:
         else:
             self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/cmd_drive/pure_pursuit')
         # vehicle specific
+        ob_enable = rospy.get_param("/patrol/od_enable", False)
+        if ob_enable:
+            self.ack_pub_topic = "/vehicle/cmd_drive_nosafe"# rospy.get_param('/patrol/control_topic', '/vehicle/cmd_drive_nosafe')
+        else:
+            self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/cmd_drive/cmd_drive_safe')
+        od_enable = rospy.get_param("/patrol/zed_od_enable", False)
+        if od_enable:
+            self.ack_pub_topic = "/vehicle/cmd_drive_nosafe"#rospy.get_param('/patrol/control_topic', '/vehicle/cmd_drive_nosafe')
+        else:
+            self.ack_pub_topic = rospy.get_param('/patrol/control_topic', '/cmd_drive/cmd_drive_safe')
+
         self.wheel_base = rospy.get_param('/vehicle/wheel_base', 2)
         self.dist_front_rear_wheels = rospy.get_param('/vehicle/dist_front_rear_wheels', 1.5)
 
@@ -309,7 +320,7 @@ class PurePursuit:
                 self.mission_count_pub.publish(self.count_mission_repeat)
                 self.send_ack_msg(0, 0, 0)
                 diagnostic_msg.level = diagnostic_msg.OK
-                diagnostic_msg.message = 'MISSION COUNT  ', +str(self.count_mission_repeat)
+                diagnostic_msg.message = 'MISSION COUNT  '+str(self.count_mission_repeat)
                 self.controller_diagnose_pub.publish(diagnostic_msg)
 
                 if self.config.mission_repeat:
