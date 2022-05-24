@@ -303,13 +303,13 @@ class PurePursuit:
                 if self.config.mission_repeat:
                     print("waiting for 5 secs")
                     time.sleep(5)
-                    self.revived_path.reverse()
-                    self.path.reverse()
-                    self.index_old = None
-                    if self.speed < 0:
-                        self.speed = abs(self.speed)
-                    else:
-                        self.speed = -self.speed
+                    # self.revived_path.reverse()
+                    # self.path.reverse()
+                    self.index_old = 0
+                    # if self.speed < 0:
+                    #     self.speed = abs(self.speed)
+                    # else:
+                    #     self.speed = -self.speed
                 else:
                     rospy.loginfo('MISSION COMPLETED')
                     break
