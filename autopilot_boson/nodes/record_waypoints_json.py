@@ -189,7 +189,7 @@ if __name__ == "__main__":
         pass
     else:
         mission_file = mission_file + '.json'
-        rospy.set_param('/patrol1/mission_file', mission_file)
+        rospy.set_param('/patrol/mission_file', mission_file)
     try:
         ros_pack = rospkg.RosPack()
         mission_file_dir = ros_pack.get_path('autopilot_boson') + "/mission_files/" + str(mission_file)

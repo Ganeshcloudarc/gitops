@@ -1,0 +1,75 @@
+dimensions: # for yellow porter ref https://trucks.cardekho.com/en/trucks/piaggio/porter-700/specifications
+  overall_length    : 3.544 # all the mesurments in MKS(meters, kgs, seconds)
+  overall_width     : 1.460
+  overall_height     : 1.75
+  wheel_base        : 1.82
+  track_width       : 1.40
+  front_overhang    : 1.0
+  rear_overhang     : 0.7
+  ground_clearance  : 0.2
+  payload           : 750 # kgs
+  tyre_radius       : 0.3
+  tyre_section_width :  0.145
+
+speed:
+  max_forward_speed      : 3  # m/s
+  min_forward_speed      : 0.3 # m/s
+  max_backward_speed : -3
+  min_backward_speed : -0.3
+  max_acceleration : 0.5
+  min_acceleration : -0.5
+  max_steering_angle : 30 # degrees
+  min_steering_angle : -30 # degrees
+
+## center of gravity also a point
+COG_position:
+  - 0.4
+  - 1
+  - 0.5   # [X, Y, Z] distances from rear wheel axle center
+
+robot_origin_frame: "base_link" # name of link at rear wheel
+
+
+# sensor info and locations
+fcu:
+  model: "pixhawk4"
+  sensor_frame: "fcu_link"
+  position :
+    - 0.2
+    - 0
+    - 0    # [X, Y, Z] distances from front wheel axle center to fcu
+  orientation:
+    - 0
+    - 0
+    - 0 # [row, pitch, yaw] of fcu in radians wrt front wheel axle center
+
+zed_camera:
+  model : "zed2i"
+  sensor_frame : "zed2i_base_link"
+  position:
+      - 0.4
+      - 0
+      - 0.4    # [X, Y, Z] distances from front wheel axle center to camera_center
+  orientation:
+      - 0
+      - 0
+      - 0 # [row, pitch, yaw] of zed camera in radians wrt front wheel axle center
+
+lidar:
+  model: "rs_lidar"
+  sensor_frame : "rs_lidar"
+  position:
+    - 0.4
+    - 0
+    - 0.2    # [X, Y, Z] distances from front wheel axle center to lidar
+  orientation:
+    - 0
+    - 0
+    - 0 # [row, pitch, yaw] of lidar in radians wrt front wheel axle center
+
+
+
+
+
+
+

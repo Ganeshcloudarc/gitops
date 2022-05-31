@@ -32,13 +32,18 @@ roslaunch autopilot_boson patrol.launch mission_file:=name_of_file.json
 roslaunch pilot all_pilot.launch
 ```
 #### Arguments
-* `mission_file`  (str, default: default.json) - mission file name (should be present in mission_files directory)
-* `mission_repeat` (boolean, default: false) - to keep on loop of mission trips 
+* `mission_file`  (string, default: default.json) - mission file name (should be present in mission_files directory)
+* `continue` (boolean, default: false)  - continue to reach first after reaching last point in a loop.
+* `mission_trips` (Integer, default: 0) - Integer - number of times you want to continue mission (forward direction), zero to keep forever
+* `zed_od_enable`   (boolean, default: false) - true to start zed camera object detection and stop the vehicle if any object in range.
+* `gps_failsafe` (boolean, default: false) - true, to stop vehicle when lost GPS RTK.
+False, to warn and vehicle continues to move even without RTK.
+* `ctc_failsafe` (boolean, default: false) - true -> to stop vehicle when cross-track-error is more than a threshold (3m)
 * `rc_control`    (boolean, default: false) - true to enable RC control (both automode and manual mode and stop).
 * `rviz`         (boolean, default: true) - to open rviz.
 * `record`        (boolean, default: false) - to record bag file.
-* `bags_dir`       (str, default: /home/boson/.bags) - saving directory of bags files(make sure directory exits).
-* `carla`           (boolean, default: false) - to run the entire patrol on carla simulator.
+* `carla`          (boolean, default: false) - to run the entire patrol on carla simulator.
+
 #### Parameters
 * `max_speed` (float, default: 1.5) - The max speed vehicle can go in patrol mode in meters/sec
 * `wheel_base` (float, default: 2) - distance between front and rear wheels in meters.

@@ -11,7 +11,7 @@ from geometry_msgs.msg import TransformStamped
 
 
 # parameters
-dis_x = rospy.get_param("/tf/dis_from_real_wheel_center_x", 2)  # assuming only x translation is available between
+dis_x = rospy.get_param("/vehicle/", 2)  # assuming only x translation is available between
 # sensor and real axle
 child_frame_name = rospy.get_param('/tf/child_frame', 'base_link')  # frame_id of vehicle base
 odom_topic = rospy.get_param("/tf/odom_topic", '/mavros/local_position/odom')

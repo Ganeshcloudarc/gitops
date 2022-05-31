@@ -1,18 +1,14 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
-    <arg name="carla" default="false"/>
-    <arg name="record" default="false"/>
+    <arg name="mission_continue" default="false"/>
     <arg name="zed_od_enable" default="false"/>
-    <arg name="bags_dir" value="/home/boson/.bags"/>
-    <arg name="mission_repeat" default="false"/>
-    <arg name="mission_mode" default="0" doc="mode type [0, 1, 2], 0-> go and stop
-                                                                   1-> go and return to the path starting point
-                                                                   2-> Keep on doing (go and return) "/>
-    <arg name="mission_trips" default="0" doc="Only valid on mission_mode 2, default is keep on loop(always until killed) "/>
-    <arg name='od_enable' default = 'false'/>
-    <arg name = 'from_start' default= 'false'/>
+
     <arg name = 'rc_control' default="false"/>
     <arg name ='rviz' default = 'true'/>
+    <arg name="record" default="false"/>
+
+    <arg name="carla" default="false"/>
+
 
     <group if="$(eval arg('carla'))">
         <param name='/patrol/gps_topic' value = '/carla/ego_vehicle/gnss'/>
@@ -28,14 +24,9 @@
 
     <param name = "/carla_sim/activate" value = "$(arg carla)"/>
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
-    <param name = '/patrol/mission_mode' value = "$(arg mission_mode)"/>
-    <param name = 'patrol/mission_trips' value = "$(arg mission_trips)"/>
-    <param name = '/patrol/od_enable' value = "$(arg od_enable)"/>
-    <param name = '/patrol/from_start' value = "$(arg from_start)"/>
-    <param name="/patrol/rc_control" value="$(arg rc_control)" />
-    <param name="/patrol/mission_repeat" value="$(arg mission_repeat)" />
-    <param name="/patrol/zed_od_enable" value="$(arg zed_od_enable)" />
+    <param name="patrol/mission_continue" value ="$(arg mission_continue)"/>
 
+    <param name="/patrol/rc_control" value="$(arg rc_control)" />
 
     <rosparam command="load" file="$(find autopilot_boson)/params/patrol_params.yaml"/>
     <node pkg = "autopilot_boson" type = "path_publisher.py" name = "gps_path_pub_node" />
@@ -48,9 +39,10 @@
     <node pkg = "autopilot_boson" type = "odom_path_plotter.py" name = "odom_path_plotter_node"/>
     <node pkg = "autopilot_boson" type = "gps_fail_safe.py" name = "gps_fail_safe_node" />
     <node pkg ='autopilot_boson' type = 'zed_object_detect.py' name = 'zed_object_node'  if = "$(eval arg('zed_od_enable'))" />
+    <node pkg="autopilot_boson" type="failsafe_manager.py"  name="failsafe_manager_node" />
 
     <node name="bag_record" pkg="rosbag" type="record"
-        args="record -o $(arg bags_dir)/boson -a" if="$(eval record)"/>
+        args="record -o $(env HOME)/.bags/boson -a" if="$(eval record)"/>
 <!--        if="$(eval is_record_velodyne or is_record_odom)"/>-->
 </launch>
 

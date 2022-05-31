@@ -10,7 +10,7 @@ class ZedObjectDetect:
         cam_name = rospy.get_param("camera_name", "zed2i")
         cmd_topic_in = "/vehicle/cmd_drive_nosafe" # rospy.get_param("/patrol/control_topic")
 
-        cmd_topic_out = '/vehicle/cmd_drive_safe1'
+        cmd_topic_out = '/vehicle/cmd_drive_safe'
         self.cmd_in_data = AckermannDrive()
         self.time_on_zed = rospy.Time.now().secs
         self.object_in_range = True  # defaluts to True
