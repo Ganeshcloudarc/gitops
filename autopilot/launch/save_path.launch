@@ -15,7 +15,7 @@
 
     <param name="/patrol/mission_file" value="$(arg mission_file)"/>
     <param name="/patrol/min_dis_between_waypoints" value="$(arg min_dis)"/>
-    <node pkg="autopilot_boson" type="record_waypoints_json.py" name="waypoints_recorder_node" output='screen' />
-    <node pkg = "autopilot_boson" type = "gps_fail_safe.py" name = "gps_fail_safe_node"/>
+    <node pkg="autopilot" type="record_waypoints_json.py" name="waypoints_recorder_node" output='screen' />
+    <node pkg = "autopilot" type = "gps_fail_safe.py" name = "gps_fail_safe_node"/>
 
 </launch>

@@ -192,9 +192,9 @@ if __name__ == "__main__":
         rospy.set_param('/patrol/mission_file', mission_file)
     try:
         ros_pack = rospkg.RosPack()
-        mission_file_dir = ros_pack.get_path('autopilot_boson') + "/mission_files/" + str(mission_file)
+        mission_file_dir = ros_pack.get_path('autopilot') + "/mission_files/" + str(mission_file)
     except Exception as e:
-        rospy.logwarn("Please source autopilot_boson package" + str(e))
+        rospy.logwarn("Please source autopilot package" + str(e))
         sys.exit()
     save_points = SaveWayPoints(mission_file_dir)
     rospy.spin()

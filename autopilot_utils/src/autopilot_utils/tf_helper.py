@@ -195,7 +195,6 @@ def align_pose_orientation_to_frame(from_pose, from_reference_frame, to_referenc
 
     return from_pose
 
-
 # def add_poses(pose1, pose2):
 #
 #     tf =gmsg.TransformStamped()

@@ -14,5 +14,3 @@ if __name__ == '__main__':
     # print(vehicle.check())
 
     print(list_to_quaternion([1,2,4,4]))
-
-

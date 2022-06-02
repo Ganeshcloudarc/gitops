@@ -14,7 +14,7 @@
         <param name='/patrol/gps_topic' value = '/carla/ego_vehicle/gnss'/>
         <param name='/patrol/imu_topic' value = '/carla/ego_vehicle/imu'/>
         <param name='/patrol/odom_topic' value = '/carla/ego_vehicle/odometry'/>
-        <node name="carla_control_converter_node" pkg="autopilot_boson" type="carla_control_converter.py" />
+        <node name="carla_control_converter_node" pkg="autopilot" type="carla_control_converter.py" />
     </group>
     <group unless="$(arg carla)">
         <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
@@ -28,18 +28,18 @@
 
     <param name="/patrol/rc_control" value="$(arg rc_control)" />
 
-    <rosparam command="load" file="$(find autopilot_boson)/params/patrol_params.yaml"/>
-    <node pkg = "autopilot_boson" type = "path_publisher.py" name = "gps_path_pub_node" />
-    <node pkg = "autopilot_boson" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
-    <node name="control_mode_selector" pkg="autopilot_boson" type="control_mode_selector.py"  if = "$(eval arg('rc_control'))" output = 'screen'/>
+    <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
+    <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />
+    <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
+    <node name="control_mode_selector" pkg="autopilot" type="control_mode_selector.py"  if = "$(eval arg('rc_control'))" output = 'screen'/>
 
 
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find autopilot_boson)/rviz/path.rviz" if = "$(eval arg('rviz'))"/>
-    <node pkg = "autopilot_boson" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
-    <node pkg = "autopilot_boson" type = "odom_path_plotter.py" name = "odom_path_plotter_node"/>
-    <node pkg = "autopilot_boson" type = "gps_fail_safe.py" name = "gps_fail_safe_node" />
-    <node pkg ='autopilot_boson' type = 'zed_object_detect.py' name = 'zed_object_node'  if = "$(eval arg('zed_od_enable'))" />
-    <node pkg="autopilot_boson" type="failsafe_manager.py"  name="failsafe_manager_node" />
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/path.rviz" if = "$(eval arg('rviz'))"/>
+    <node pkg = "autopilot" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
+    <node pkg = "autopilot" type = "odom_path_plotter.py" name = "odom_path_plotter_node"/>
+    <node pkg = "autopilot" type = "gps_fail_safe.py" name = "gps_fail_safe_node" />
+    <node pkg ='autopilot' type = 'zed_object_detect.py' name = 'zed_object_node'  if = "$(eval arg('zed_od_enable'))" />
+    <node pkg="autopilot" type="failsafe_manager.py"  name="failsafe_manager_node" />
 
     <node name="bag_record" pkg="rosbag" type="record"
         args="record -o $(env HOME)/.bags/boson -a" if="$(eval record)"/>

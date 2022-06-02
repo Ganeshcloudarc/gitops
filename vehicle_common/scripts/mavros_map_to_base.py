@@ -30,7 +30,7 @@ vehicle_frame = rospy.get_param("vehicle/robot_origin_frame", "base_link")
 odom_topic = rospy.get_param("/tf/odom_topic", '/mavros/local_position/odom')
 send_odom = rospy.get_param("/tf/send_odom", True)  # send odom from base link
 send_foot_print = rospy.get_param("/tf/send_foot_print", True)
-
+send_odom_topic_name = rospy.get_param("/tf/sent_odom_topic_name", "/vehicle/odom")
 tf_broad_caster = tf2_ros.TransformBroadcaster()
 tf_msg = TransformStamped()
 fcu_offset_vehicle = (wheel_base + front_axle_to_fcu_position[0])
@@ -144,7 +144,7 @@ if __name__ == '__main__':
     rospy.loginfo("tf broadcaster node started for mavros")
 
     if send_odom:
-        odom_publisher = rospy.Publisher("/mavros/local_position/vehicle_odom", Odometry, queue_size=2)
+        odom_publisher = rospy.Publisher(send_odom_topic_name, Odometry, queue_size=2)
     if send_foot_print:
         foot_prin_pub = rospy.Publisher("/vehicle/foot_print", PolygonStamped, queue_size=2)
     rospy.Subscriber(odom_topic, Odometry, odom_callback)
