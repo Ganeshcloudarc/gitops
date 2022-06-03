@@ -1,11 +1,13 @@
 <launch>
 
-    <arg name="robot_namespace" default="/j"/>
+    <arg name="robot_namespace" default="/india_vehicle"/>
     <arg name="footprint_pub" default="true"/>
     <arg name="odom_pub" default="true"/>
 
+
     <param name="/tf/send_odom" value="$(arg odom_pub)" />
     <param name="/tf/send_foot_print" value="$(arg footprint_pub)" />
+    <param name="/tf/sent_odom_topic_name" value="/vehicle/odom" />
 
     <rosparam command="load" file="$(find vehicle_common)/params/vehicle_config.yaml" ns="vehicle"/>
 
@@ -14,6 +16,6 @@
   	<param name="publish_frequency" value="50"/>
   </node>
 
-    <node pkg = "vehicle_common" type = "mavros_map_to_base.py" name = "tf_converter" />
+  <node pkg = "vehicle_common" type = "mavros_map_to_base.py" name = "tf_converter" />
 
 </launch>

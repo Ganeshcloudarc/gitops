@@ -8,18 +8,26 @@
     <arg name="record" default="false"/>
 
     <arg name="carla" default="false"/>
+    <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
 
 
     <group if="$(eval arg('carla'))">
         <param name='/patrol/gps_topic' value = '/carla/ego_vehicle/gnss'/>
         <param name='/patrol/imu_topic' value = '/carla/ego_vehicle/imu'/>
         <param name='/patrol/odom_topic' value = '/carla/ego_vehicle/odometry'/>
+        <param name="/patrol/base_frame" value ="ego_vehicle"/>
+        <param name ='/patrol/max_forward_speed' value="0.3"/>
+        <param name ='/patrol/min_forward_speed' value="0.01"/>
+        <param name ='/patrol/max_backward_speed' value="0.3"/>
+        <param name ='/patrol/min_backward_speed' value="0.01"/>
+
         <node name="carla_control_converter_node" pkg="autopilot" type="carla_control_converter.py" />
     </group>
     <group unless="$(arg carla)">
         <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
         <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
         <param name='/patrol/odom_topic' value = '/mavros/local_position/odom'/>
+
     </group>
 
     <param name = "/carla_sim/activate" value = "$(arg carla)"/>
@@ -28,7 +36,6 @@
 
     <param name="/patrol/rc_control" value="$(arg rc_control)" />
 
-    <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
     <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />
     <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
     <node name="control_mode_selector" pkg="autopilot" type="control_mode_selector.py"  if = "$(eval arg('rc_control'))" output = 'screen'/>
@@ -39,7 +46,7 @@
     <node pkg = "autopilot" type = "odom_path_plotter.py" name = "odom_path_plotter_node"/>
     <node pkg = "autopilot" type = "gps_fail_safe.py" name = "gps_fail_safe_node" />
     <node pkg ='autopilot' type = 'zed_object_detect.py' name = 'zed_object_node'  if = "$(eval arg('zed_od_enable'))" />
-    <node pkg="autopilot" type="failsafe_manager.py"  name="failsafe_manager_node" />
+<!--    <node pkg="autopilot" type="failsafe_manager.py"  name="failsafe_manager_node" />-->
 
     <node name="bag_record" pkg="rosbag" type="record"
         args="record -o $(env HOME)/.bags/boson -a" if="$(eval record)"/>

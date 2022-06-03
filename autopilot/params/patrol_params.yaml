@@ -9,7 +9,6 @@ patrol:
   path_topic           : "odom_path"
   wait_time_on_mission_complete  : 20  # secs
   google_map_center_always : true
-  control_topic: "/vehicle/cmd_drive_safe"
   max_forward_speed : 1.2
   min_forward_speed : 0.3
   max_backward_speed : -1.2

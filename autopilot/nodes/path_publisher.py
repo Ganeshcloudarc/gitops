@@ -146,6 +146,7 @@ class PathPubGps:
                                                     odom_orientation['w'])
             odom_pose.header.seq += 1
             odom_pose.header.stamp = rospy.Time.now()
+            odom_pose.header.frame_id = "map"
             odom_path_msg.poses.append(odom_pose)
             # Velocity driven
             velocity = data['odometry'][i]['twist']['twist']['linear']['x']

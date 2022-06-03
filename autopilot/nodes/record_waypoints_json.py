@@ -21,6 +21,7 @@ except Exception as e:
 1. Depending upon the accuracy of the first gps location we need to decide on recording points.
 2. Warn user when, high speed drive.
 3. Warn user when, gps data is less accurate.
+4. when gps speed is less call a service call to speed up the sensor data
 '''
 
 # TODO
@@ -120,7 +121,7 @@ class SaveWayPoints:
         try:
             while not rospy.is_shutdown():
                 if self.is_first_point:
-                    if self.gps_data_msg and self.odom_data:
+                    if self.gps_data_msg and self.odom_data and self.imu_data:
                         # TODO
                         #  Depending upon the accuracy(covariance of gps) of the first gps location we need to decide on
                         #  recording points if gps_data_msg.position_covariance[0]
@@ -147,7 +148,7 @@ class SaveWayPoints:
                         self.is_first_point = False
                         time.sleep(0.5)
                     else:
-                        rospy.logwarn("Waiting for GPS FIX")
+                        rospy.logwarn("Waiting for data")
                         r.sleep()
                         continue
                 else:

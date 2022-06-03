@@ -1,4 +1,5 @@
 setup.py
+src/autopilot_utils/occ_grid_helper.py
 src/autopilot_utils/tf_helper.py
 src/autopilot_utils.egg-info/PKG-INFO
 src/autopilot_utils.egg-info/SOURCES.txt

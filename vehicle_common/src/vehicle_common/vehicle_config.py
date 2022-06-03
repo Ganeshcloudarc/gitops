@@ -10,10 +10,12 @@ try:
     rospy.loginfo("config_file", config_file)
     with open(config_file) as f:
         vehicle_d = yaml.safe_load(f)
-        vehicle_data = DotMap(vehicle_d)
 except Exception as e:
     rospy.logerr("Please source 'vehicle_common' package" + str(e))
     sys.exit()
 
+vehicle_data = DotMap(vehicle_d)
+
 if __name__ == "__main__":
-    print(vehicle_data.dimentions)
+    print(vehicle_data.dimensions.wheel_base)
+

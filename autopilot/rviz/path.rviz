@@ -135,13 +135,21 @@ Visualization Manager:
       Marker Topic: /vehicle_pose_marker
       Name: Vehicle_pose_marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
       Enabled: true
       Marker Topic: /target_pose_marker
       Name: Target_pose_marker
+      Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /carla/markers
+      Name: MarkerArray
       Namespaces:
         "": true
       Queue Size: 100
@@ -174,7 +182,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 7.468364238739014
+      Distance: 34.876808166503906
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -182,17 +190,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 75.35347747802734
-        Y: -26.093830108642578
-        Z: -5.976238026050851e-05
-      Focal Shape Fixed Size: true
+        X: 0
+        Y: 0
+        Z: 0
+      Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8447973728179932
-      Target Frame: base_link
-      Yaw: 5.527682304382324
+      Pitch: 0.7853981852531433
+      Target Frame: ego_vehicle
+      Yaw: 0.7853981852531433
     Saved: ~
 Window Geometry:
   Displays:

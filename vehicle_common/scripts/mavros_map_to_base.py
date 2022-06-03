@@ -2,16 +2,17 @@
 """
 A node to publish tf between base link to map by subscribing odometry msg from mavros.
 """
-
-import rospy
-import math
-import tf2_ros
-import tf_conversions
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import TransformStamped, Pose, Quaternion, Vector3, TransformStamped, PoseStamped, Polygon, \
-    PolygonStamped, Point
-from vehicle_common.vehicle_config import vehicle_data
-
+try:
+    import rospy
+    import math, os
+    import tf2_ros
+    import tf_conversions
+    from nav_msgs.msg import Odometry
+    from geometry_msgs.msg import TransformStamped, Pose, Quaternion, Vector3, PoseStamped, Polygon, \
+        PolygonStamped, Point
+    from vehicle_common.vehicle_config import vehicle_data
+except ImportError as error:
+    print("No module named:", error)
 
 # parameters
 wheel_base = rospy.get_param('/vehicle/dimensions/wheel_base', 1.82)
@@ -141,8 +142,10 @@ def transform_footprint(x, y, yaw):
 
 if __name__ == '__main__':
     rospy.init_node('tf2_broadcaster_mavros')
-    rospy.loginfo("tf broadcaster node started for mavros")
 
+    rospy.loginfo("tf broadcaster node started for mavros")
+    # increasing the speed to 50 hz
+    os.system('rosrun mavros mavsys rate --all 50')  # TODO
     if send_odom:
         odom_publisher = rospy.Publisher(send_odom_topic_name, Odometry, queue_size=2)
     if send_foot_print:
