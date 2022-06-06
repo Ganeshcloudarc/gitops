@@ -56,9 +56,9 @@ class PurePursuit:
         self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.base_frame = rospy.get_param("/patrol/base_frame", "base_link")
-        carla_sim = rospy.get_param("/carla_sim/activate", False)
+        self.carla_sim = rospy.get_param("/carla_sim/activate", False)
 
-        if carla_sim:
+        if self.carla_sim:
             self.cmd_topic = "pure_pursuit/cmd_drive"
             self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 0.3)
             self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.03)
@@ -185,12 +185,13 @@ class PurePursuit:
         # return final_look_ahead
 
     def compute_velocity_at_index(self, index):
-        # return 0.3
+        # if self.carla_sim:
+        #     return 0.3
         if self.updated_vel:
             return self.updated_vel[index]
         else:
             final_vel = min(self.velocity_profile[index], self.curvature_velocity[index])
-            final_vel = min(self.min_forward_speed, final_vel)
+            final_vel = max(self.min_forward_speed, final_vel)
             return final_vel
 
         # # add obstacle velocity_profile.

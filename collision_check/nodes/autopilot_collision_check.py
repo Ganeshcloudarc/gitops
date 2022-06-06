@@ -1,9 +1,10 @@
 #!bin/usr/env python3
+
 import rospy
 import tf2_ros
 from nav_msgs.msg import Path, Odometry
 from zed_interfaces.msg import ObjectsStamped, Object
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, PoseArray, Pose
 from tf_helper import *
 import tf2_geometry_msgs
 from visualization_msgs.msg import Marker, MarkerArray
@@ -11,9 +12,12 @@ from std_msgs.msg import Float32MultiArray
 import copy
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 import math
+import numpy as np
 from numpy import argmin, zeros
 from autopilot_utils.occ_grid_helper import OccupancyGridManager
 from autopilot_utils.tf_helper import current_robot_pose
+from vehicle_common.vehicle_config import vehicle_data
+
 
 # from autopilot_boson.nodes.vehicle_config import VehicleConfig
 
@@ -35,9 +39,16 @@ def distance_to_robot(pose):
     return distance_btw_poses(robot_pose, pose)
 
 
+def get_yaw(orientation):
+    _, _, yaw = euler_from_quaternion(
+        [orientation.x, orientation.y, orientation.z, orientation.w])
+    return yaw
+
+
 class CollisionEstimator:
     def __init__(self):
 
+        self.path_end_index = None
         self.obstacle_aware_vel = None
         self.stop_index = None
         self.global_vel = None
@@ -45,28 +56,41 @@ class CollisionEstimator:
         self.revived_path = None
         self.process_data = None
         self.target_frame = "map"
+        self.index_old = None
+        self.path = None
         self.modified_obj_data = ObjectsStamped()
         self.modified_obj_data.header.frame_id = self.target_frame
         cam_name = rospy.get_param("camera_name", "zed2")
         rospy.Subscriber(f"{cam_name}/zed_node/obj_det/objects", ObjectsStamped, self.objects_cb)
         self.obj_map_frame_pub = rospy.Publisher("/zed_objects_map_frame", ObjectsStamped, queue_size=1)
+        self.vel_update_pub = rospy.Publisher("/vel_updates", Float32MultiArray, queue_size=1)
 
-        rospy.Subscriber('/odom_path', Path, self.path_cb)
-        rospy.Subscriber('/velocity_profiler', Float32MultiArray, self.global_vel_cb)
+        rospy.Subscriber('/odom_path', Path, self.path_callback)
+        rospy.Subscriber('/curvature_velocity_profile', Float32MultiArray, self.global_vel_cb)
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         # parameters
 
         self.obstacle_threshold_radius = rospy.get_param("obstacle_threshold_radius", 1.5)
-        self.max_cte = self.get_param("max_cte_to_interpolate", 3)
-        self.forward_collision_check_dis = self.get_param("forward_collision_check_dis", 15)  # 15 meters
-        self.stop_distance = self.get_param("spot_distance_before_collision_ind", 3)
+        self.max_cte = rospy.get_param("max_cte_to_interpolate", 3)
+        self.forward_collision_check_dis = rospy.get_param("forward_collision_check_dis", 15)  # 15 meters
+        self.stop_distance = rospy.get_param("spot_distance_before_collision_ind", 3)
 
-        local_cost_map_topic =self.get_param("local_cost_map_topic", "/move_base/local_costmap/costmap")
+        local_cost_map_topic = rospy.get_param("local_cost_map_topic", "/move_base/local_costmap/costmap")
+        self.base_frame = rospy.get_param("/patrol/base_frame", "edo_vehicle")
 
-        self.main_loop(self,local_cost_map_topic)
+        self.ogm = OccupancyGridManager(local_cost_map_topic, True)
+        self.left = -1.0 * vehicle_data.dimensions.rear_overhang
+        self.right = vehicle_data.dimensions.overall_length
+        self.top = vehicle_data.dimensions.overall_width / 2
+        self.bottom = - vehicle_data.dimensions.overall_width / 2
+        self.resolution = self.ogm.resolution
 
-
+        # pose array pub
+        self.rotated_poses_pub = rospy.Publisher("/rotated_poses", PoseArray, queue_size=10)
+        self.pose_arr_msg = PoseArray()
+        self.pose_arr_msg.header.frame_id = 'map'
+        self.main_loop()
 
         # try:
         #     transform = self.tf_buffer.lookup_transform(
@@ -106,11 +130,13 @@ class CollisionEstimator:
 
     def path_callback(self, data):
         rospy.logdebug("path data data received of length %s", str(len(data.poses)))
-        self.revived_path = data.poses
+        self.path = data.poses
+        self.path_end_index = len(self.path) - 1
 
     def global_vel_cb(self, data):
+
         self.global_vel = data.data
-        self.obstacle_aware_vel = copy.deepcopy(self.global_vel)
+        self.obstacle_aware_vel = list(copy.deepcopy(self.global_vel))
 
     def find_close_point(self, prev_close_ind):
 
@@ -122,65 +148,159 @@ class CollisionEstimator:
             else:
                 return ind - 1, close_dis
 
-    def calc_nearest_ind(self):
-        """ return close path point index and distance"""
-        robot_pose = current_robot_pose()
-        dis_list = []
-        for pose in self.revived_path:
-            dis = distance_btw_poses(robot_pose, pose)
-            dis_list.append(dis)
-        ind = argmin(dis_list)
-        dis = dis_list[ind]
+    def find_close_point(self, robot_pose, old_close_index):
+        # n = min(100, len(range(index_old, self.path_end_index)))
+        # distance_list = [self.calc_distance(robot, ind) for ind in range(index_old, index_old + n)]
+        # ind = np.argmin(distance_list)
+        # final = ind + index_old
+        # dis = distance_list[ind]
+        # return final, dis
+        close_dis = self.calc_distance(robot_pose, old_close_index)
+        for ind in range(old_close_index + 1, self.path_end_index):
+            dis = self.calc_distance(robot_pose, ind)
+            if close_dis >= dis:
+                close_dis = dis
+            else:
+                # print("find close", index_old, ind)
+                return ind - 1, close_dis
+        return self.path_end_index, 0
+
+    def calc_nearest_ind(self, robot_pose):
+        """
+        calc index of the nearest point to current position
+        Args:
+            robot_pose: pose of robot
+        Returns:
+            close_index , distance
+        """
+        distance_list = [self.calc_distance(robot_pose, ind) for ind in range(len(self.path))]
+        ind = np.argmin(distance_list)
+        self.index_old = ind
+        dis = distance_list[ind]
         return ind, dis
 
-    def main_loop(self, local_cost_map_topic):
-        rate = rospy.Rate(10)
-        ogm = OccupancyGridManager(local_cost_map_topic, ubscribe_to_updates=True)
+    def distance_to_next_index(self, ind):
+        return math.hypot(self.path[ind].pose.position.x - self.path[ind + 1].pose.position.x,
+                          self.path[ind].pose.position.y - self.path[ind + 1].pose.position.y)
+
+    def calc_distance(self, robot_pose, ind):
+        return math.hypot(robot_pose.position.x - self.path[ind].pose.position.x, robot_pose.position.y -
+                          self.path[ind].pose.position.y)
+
+    def calc_distance_idx(self, close, next_id):
+        return math.hypot(self.path[close][0] - self.path[next_id][0], self.path[close][1] - self.path[next_id][1])
+
+    def check_collision_on_path(self, robot_pose, index_old):
+        cost_list = []
+
+        for i in range(index_old, index_old + 100):
+
+            path_pose = self.path[i].pose
+            base_x, base_y = self.ogm.get_costmap_x_y(path_pose.position.x, path_pose.position.y)
+            print("base_x: %s, base_y: %s", base_x, base_y)
+            origin = self.ogm.origin
+            angle = math.atan2(origin.position.y, origin.position.x)  # * (180 / Math.PI)
+
+            cos_theta = math.cos(get_yaw(path_pose.orientation))
+            sin_theta = math.sin(get_yaw(path_pose.orientation))
+            # cos_theta = math.cos(angle)
+            # sin_theta = math.sin(angle)
+            # for i in np.arange(0.5, 1.5, 0.2):
+            # prev_b = path_pose.position.x
+            # self.rotated_poses_pub
+
+            '''
+            data.pose.pose.position.x - fcu_offset_vehicle * math.cos(yaw)
+            '''
+            poses_list = []
+            min_cost = 0
+            for x in np.arange(self.left, self.right, self.resolution):
+                for y in np.arange(self.top, self.bottom, -self.resolution):
+                    pose = Pose()
+                    world_x = path_pose.position.x + (x * cos_theta - y * sin_theta)
+                    world_y = path_pose.position.y + (x * sin_theta + y * cos_theta)
+                    pose.position.x = world_x
+                    pose.position.y = world_y
+                    poses_list.append(pose)
+                    cost = self.ogm.get_cost_from_world_x_y(world_x, world_y)
+                    min_cost = max(cost, min_cost)
+                    if min_cost >= 100:
+                        return True, i
+
+            self.pose_arr_msg.poses = poses_list
+            self.rotated_poses_pub.publish(self.pose_arr_msg)
+            rospy.logwarn("published")
+            cost_list.append(min_cost)
+        return False, i
+
+    def main_loop(self):
+        rate = rospy.Rate(100)
 
         while not rospy.is_shutdown():
-            if self.close_index is None:
-                self.close_index, dis = self.calc_nearest_ind()
+            robot_pose = current_robot_pose("map", self.base_frame)
+            # print("robot_pose",robot_pose)
+            if robot_pose is None:
+                rospy.logerr("waiting for tf between map and %s", self.base_frame)
+                rate.sleep()
+                continue
+
+            if self.index_old is None:
+                self.index_old, cross_track_dis = self.calc_nearest_ind(robot_pose)
             else:
-                self.close_index, dis = self.find_close_point(self.close_index)
+                self.index_old, cross_track_dis = self.find_close_point(robot_pose, self.index_old)
 
-            if dis > self.max_cte:
-                # do collision check on the interpolated path and activate rectangle collision check
-                pass
-            else:
+            collision_status, collision_index = self.check_collision_on_path(robot_pose, self.index_old)
+            if collision_status:
+                self.velocity_smoother(robot_pose, collision_index)
 
 
-                # FOR CAMERA
-                # for i in range(self.close_index, len(self.revived_path)):
-                #     for ob in self.modified_obj_data.objects:
-                #         dis = min_distance_to_object(self.revived_path[i], ob.corners)
-                #         if dis <= self.obstacle_threshold_radius:
-                #             rospy.loginfo("object detected at index", i)
-                #             distance_to_vehicle = distance_to_robot(self.revived_path[i])
-                #             self.in_collision_marker_at_index(i)
-                #             rospy.loginfo("distance_to_vehicle", distance_to_vehicle)
-                #         else:
-                #             self.velocity_smoother(i)
-                #             self.no_collision_markers_at_index(i)
-                #
-                #     if distance_to_robot(self.revived_path[i]) > self.forward_collision_check_dis:
-                #         break
-
-                ## FOR COSTMAP
-
-    def velocity_smoother(self, ind):
+    def velocity_smoother(self, robot_pose, ind):
         """ Depending upon distance between the robot and the collision point, will set the speed and publish into
         velocity profile for path tracker """
-        dis = distance_to_robot(self.revived_path[ind])
-        if dis < self.spot_distance_before_collision_ind:
-            pass
-        else:
-            acc_dis = 0
-            for j in range(ind, 0, -1):
-                acc_dis += distance_btw_poses(self.revived_path[j], self.revived_path[j - 1])
-                if acc_dis > self.spot_distance_before_collision_ind:
-                    self.stop_index = j
-                    break
-            for i, k in enumerate(range(self.stop_index, 0, -1)):
+        # dis = distance_btw_poses(robot_pose, self.path[ind].pose)
+        # acc_dis = 0
+        # for i, k in enumerate(range(ind, 0, -1)):
+        #     acc_dis += distance_btw_poses(self.path[i].pose, self.path[i - 1].pose)
+        #     if acc_dis > 2:
+        #         stop_index = i
+        #         break
+
+        print("global vel",len(self.obstacle_aware_vel))
+        print(type(self.global_vel))
+        # print(a)
+        for j in range(ind-10, ind+10):
+            self.obstacle_aware_vel[j] = 0.0
+
+        # self.obstacle_aware_vel[ind-20:100] = tuple(np.zeros(120).tolist())
+        msg = Float32MultiArray()
+        msg.data = self.obstacle_aware_vel
+        self.vel_update_pub.publish(msg)
+        print('data',self.obstacle_aware_vel[ind-30:ind+30])
+        print("ind",ind)
+
+        rospy.loginfo("updated vel  published")
+        # print(a)
+
+
+
+
+
+
+
+
+
+
+        # if dis < self.spot_distance_before_collision_ind:
+        #     pass
+        # else:
+        #     acc_dis = 0
+        #     for j in range(ind, 0, -1):
+        #         acc_dis += distance_btw_poses(self.revived_path[j], self.revived_path[j - 1])
+        #         if acc_dis > self.spot_distance_before_collision_ind:
+        #             self.stop_index = j
+        #             break
+        #     for i, k in enumerate(range(self.stop_index, 0, -1)):
+        #         pass
 
     def in_collision_marker_at_index(self, i):
         """ A Marker with connected points, with read colour indication collision will happen will be published"""

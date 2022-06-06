@@ -7,16 +7,21 @@ import math
 
 def ackremann_callback(data):
     rospy.loginfo_once("/cmd_drive/pure_pursuit data received" )
-    global carla_msg_pub, carla_msg
+    global carla_msg_pub
+    carla_msg =CarlaEgoVehicleControl()
+
     if data.speed < 0:
         carla_msg.throttle = abs(data.speed)
         carla_msg.reverse = True
     else:
         carla_msg.throttle = data.speed
         carla_msg.reverse = False
-
+    if data.speed == 0:
+        carla_msg.brake = 1
+    if data.jerk:
+        carla_msg.brake = data.jerk
     carla_msg.steer = -math.radians(data.steering_angle)
-    carla_msg.brake = data.jerk
+    # carla_msg.brake = data.jerk
     carla_msg_pub.publish(carla_msg)
 
 

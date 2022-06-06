@@ -64,7 +64,7 @@ class OccupancyGridManager(object):
         return self._reference_frame
 
     def _occ_grid_cb(self, data):
-        rospy.loginfo("Got a full OccupancyGrid update")
+        # rospy.loginfo("Got a full OccupancyGrid update")
         self._occ_grid_metadata = data.info
         # Contains resolution, width & height
         # np.set_printoptions(threshold=99999999999, linewidth=200)
@@ -77,7 +77,7 @@ class OccupancyGridManager(object):
         # print(self._grid_data)
 
     def _occ_grid_update_cb(self, data):
-        rospy.loginfo("Got a partial OccupancyGrid update")
+        # rospy.loginfo("Got a partial OccupancyGrid update")
         # x, y origin point of the update
         # width and height of the update
         # data, the update
@@ -240,6 +240,7 @@ if __name__ == '__main__':
 
     cx2, cy2 = ogm.get_costmap_x_y(0.0, 0.0)
     print("costmap from world coords  0 0: ")
+
     print((cx2, cy2))
     wx2, wy2 = ogm.get_world_x_y(cx2, cy2)
     print("back to world: ")

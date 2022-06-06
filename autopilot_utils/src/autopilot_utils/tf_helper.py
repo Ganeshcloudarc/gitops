@@ -73,8 +73,8 @@ def convert_point(point, from_frame, to_frame):
     try:
         trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time(0), rospy.Duration(1.0))
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-        print(e)
         rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, from_frame))
+        rospy.logerr('REASON IS' % (str(e)))
         return None
     final_point = gmsg.Point()
     if type(point) == type(gmsg.Point()):
