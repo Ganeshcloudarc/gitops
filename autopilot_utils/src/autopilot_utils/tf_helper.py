@@ -5,6 +5,7 @@ import rospy
 import geometry_msgs.msg as gmsg
 import tf2_ros
 import tf2_geometry_msgs
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 # Lazy create on use (convert_pose) to avoid errors.
 tfBuffer = None
@@ -195,6 +196,11 @@ def align_pose_orientation_to_frame(from_pose, from_reference_frame, to_referenc
 
     return from_pose
 
+
+def get_yaw(orientation):
+    _, _, yaw = euler_from_quaternion(
+        [orientation.x, orientation.y, orientation.z, orientation.w])
+    return yaw
 # def add_poses(pose1, pose2):
 #
 #     tf =gmsg.TransformStamped()

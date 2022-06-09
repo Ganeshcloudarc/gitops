@@ -76,10 +76,11 @@ class CollisionEstimator:
         self.forward_collision_check_dis = rospy.get_param("forward_collision_check_dis", 15)  # 15 meters
         self.stop_distance = rospy.get_param("spot_distance_before_collision_ind", 3)
 
-        local_cost_map_topic = rospy.get_param("local_cost_map_topic", "/move_base/local_costmap/costmap")
+        local_cost_map_topic = rospy.get_param("local_cost_map_topic", "/semantics/costmap_generator/occupancy_grid")
         self.base_frame = rospy.get_param("/patrol/base_frame", "edo_vehicle")
 
-        self.ogm = OccupancyGridManager(local_cost_map_topic, True)
+        self.ogm = OccupancyGridManager('/semantics/costmap_generator/occupancy_grid',
+                                   subscribe_to_updates=False, base_frame=self.base_frame)
         self.left = -1.0 * vehicle_data.dimensions.rear_overhang
         self.right = vehicle_data.dimensions.overall_length
         self.top = vehicle_data.dimensions.overall_width / 2
@@ -253,7 +254,6 @@ class CollisionEstimator:
             if collision_status:
                 self.velocity_smoother(robot_pose, collision_index)
 
-
     def velocity_smoother(self, robot_pose, ind):
         """ Depending upon distance between the robot and the collision point, will set the speed and publish into
         velocity profile for path tracker """
@@ -265,30 +265,22 @@ class CollisionEstimator:
         #         stop_index = i
         #         break
 
-        print("global vel",len(self.obstacle_aware_vel))
+        print("global vel", len(self.obstacle_aware_vel))
         print(type(self.global_vel))
         # print(a)
-        for j in range(ind-10, ind+10):
+        self.obstacle_aware_vel = list(copy.deepcopy(self.global_vel))
+        for j in range(ind - 20, ind):
             self.obstacle_aware_vel[j] = 0.0
 
         # self.obstacle_aware_vel[ind-20:100] = tuple(np.zeros(120).tolist())
         msg = Float32MultiArray()
         msg.data = self.obstacle_aware_vel
-        self.vel_update_pub.publish(msg)
-        print('data',self.obstacle_aware_vel[ind-30:ind+30])
-        print("ind",ind)
+        # self.vel_update_pub.publish(msg)
+        print('data', self.obstacle_aware_vel[ind - 30:ind + 30])
+        print("ind", ind)
 
         rospy.loginfo("updated vel  published")
         # print(a)
-
-
-
-
-
-
-
-
-
 
         # if dis < self.spot_distance_before_collision_ind:
         #     pass

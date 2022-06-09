@@ -1,10 +1,15 @@
 #!/usr/bin/env python
+import time
 
 import rospy
 from nav_msgs.msg import OccupancyGrid
 from map_msgs.msg import OccupancyGridUpdate
 import numpy as np
 from itertools import product
+from tf_helper import current_robot_pose, get_yaw, convert_point
+import math
+
+## extras
 
 """
 Class to deal with OccupancyGrid in Python
@@ -15,11 +20,13 @@ Author: Sammy Pfeiffer <Sammy.Pfeiffer at student.uts.edu.au>
 
 
 class OccupancyGridManager(object):
-    def __init__(self, topic, subscribe_to_updates=False):
+    def __init__(self, topic, subscribe_to_updates=False, base_frame='base_link',world_frame="map"):
         # OccupancyGrid starts on lower left corner
         self._grid_data = None
         self._occ_grid_metadata = None
         self._reference_frame = None
+        self._base_frame = base_frame
+        self._world_frame = world_frame
         self._sub = rospy.Subscriber(topic, OccupancyGrid,
                                      self._occ_grid_cb,
                                      queue_size=1)
@@ -39,7 +46,7 @@ class OccupancyGridManager(object):
                       "' initialized!")
         rospy.loginfo("Height (y / rows): " + str(self.height) +
                       ", Width (x / columns): " + str(self.width) +
-                      ", starting from bottom left corner of the grid. " + 
+                      ", starting from bottom left corner of the grid. " +
                       " Reference_frame: " + str(self.reference_frame) +
                       " origin: " + str(self.origin))
 
@@ -86,33 +93,58 @@ class OccupancyGridManager(object):
         data_np = np.array(data.data,
                            dtype=np.int8).reshape(data.height, data.width)
         self._grid_data[data.y:data.y +
-                        data.height, data.x:data.x + data.width] = data_np
+                               data.height, data.x:data.x + data.width] = data_np
         # print(self._grid_data)
 
-    def get_world_x_y(self, costmap_x, costmap_y):
-        world_x = costmap_x * self.resolution + self.origin.position.x
-        world_y = costmap_y * self.resolution + self.origin.position.y
-        return world_x, world_y
+    # def get_world_x_y(self, costmap_x, costmap_y):
+    #     world_x = costmap_x * self.resolution + self.origin.position.x
+    #     world_y = costmap_y * self.resolution + self.origin.position.y
+    #     return world_x, world_y
 
-    def get_costmap_x_y(self, world_x, world_y):
+    def get_local_x_y(self, costmap_x, costmap_y):
+        local_x = costmap_x * self.resolution + self.origin.position.x
+        local_y = costmap_y * self.resolution + self.origin.position.y
+        return local_x, local_y
+
+    def get_world_x_y(self, costmap_x, costmap_y):
+        if self._reference_frame == self._world_frame:
+            local_x, local_y = self.get_local_x_y(costmap_x, costmap_y)
+            return local_x, local_y
+        else:
+            pose = current_robot_pose(self._world_frame, self._base_frame)
+            yaw = get_yaw(pose.orientation)
+            cos_theta = math.cos(yaw)
+            sin_theta = math.sin(yaw)
+            local_x, local_y = self.get_local_x_y(costmap_x, costmap_y)
+            world_x = pose.position.x + (local_x * cos_theta - local_y * sin_theta)
+            world_y = pose.position.y + (local_x * sin_theta + local_y * cos_theta)
+            return world_x, world_y
+
+    def get_costmap_x_y(self, local_x, local_y):
         costmap_x = int(
-            round((world_x - self.origin.position.x) / self.resolution))
+            round((local_x - self.origin.position.x) / self.resolution))
         costmap_y = int(
-            round((world_y - self.origin.position.y) / self.resolution))
+            round((local_y - self.origin.position.y) / self.resolution))
         return costmap_x, costmap_y
 
     def get_cost_from_world_x_y(self, x, y):
-        cx, cy = self.get_costmap_x_y(x, y)
+        if self._reference_frame == self._world_frame:
+            cx, cy = self.get_costmap_x_y(x, y)
+        else:
+            point = [x, y, 0]
+            trans_point = convert_point(point, self._world_frame, self._base_frame)
+            cx, cy = self.get_costmap_x_y(trans_point[0], trans_point[1])
         try:
             return self.get_cost_from_costmap_x_y(cx, cy)
         except IndexError as e:
-            raise IndexError("Coordinates out of grid (in frame: {}) x: {}, y: {} must be in between: [{}, {}], [{}, {}]. Internal error: {}".format(
-                self.reference_frame, x, y,
-                self.origin.position.x,
-                self.origin.position.x + self.height * self.resolution,
-                self.origin.position.y,
-                self.origin.position.y + self.width * self.resolution,
-                e))
+            raise IndexError(
+                "Coordinates out of grid (in frame: {}) x: {}, y: {} must be in between: [{}, {}], [{}, {}]. Internal error: {}".format(
+                    self.reference_frame, x, y,
+                    self.origin.position.x,
+                    self.origin.position.x + self.height * self.resolution,
+                    self.origin.position.y,
+                    self.origin.position.y + self.width * self.resolution,
+                    e))
 
     def get_cost_from_costmap_x_y(self, x, y):
         if self.is_in_gridmap(x, y):
@@ -229,8 +261,47 @@ class OccupancyGridManager(object):
 
 if __name__ == '__main__':
     rospy.init_node('test_occ_grid')
-    ogm = OccupancyGridManager('/move_base_flex/global_costmap/costmap',
-                               subscribe_to_updates=True)
+    ogm = OccupancyGridManager('/semantics/costmap_generator/occupancy_grid',
+                               subscribe_to_updates=False,base_frame='ego_vehicle')
+    print(ogm.width)
+    print(ogm.height)
+    from geometry_msgs.msg import PoseArray, Pose
+
+    pose_arr_pub = rospy.Publisher("occ_check", PoseArray, queue_size=10)
+    while True:
+        pose_arr_msg = PoseArray()
+        pose_arr_msg.header.frame_id = "map"
+        cost_arr = []
+        # for i in range(ogm.width):
+        for j in range(ogm.height):
+            i = 10
+            pose = Pose()
+            x, y = ogm.get_world_x_y(j, i)
+            pose.position.x = x
+            pose.position.y = y
+            cost = ogm.get_cost_from_world_x_y(x,y)
+
+            if not ogm.get_cost_from_costmap_x_y(i,j) == cost:
+                print("not same")
+
+
+
+            cost_arr.append(cost)
+            # if cost == 100:
+            pose_arr_msg.poses.append(pose)
+        pose_arr_pub.publish(pose_arr_msg)
+        print(cost_arr)
+        print("published")
+
+        # # print(ogm.is_in_gridmap(100,500))
+        # print(ogm.origin)
+        # x,y = ogm.get_world_x_y(0,50)
+        # print(f"cost of x:{x},Y:{y}")
+
+        # print(f"cost of x:{x},Y:{y}: == {ogm.get_cost_from_world_x_y(x,y)}")
+        # time.sleep(0.2)
+
+    '''
     wx1, wy1 = ogm.get_world_x_y(0, 0)
     print("world from costmap coords  0 0: ")
     print((wx1, wy1))
@@ -287,3 +358,4 @@ if __name__ == '__main__':
             accum += str(ogm.get_cost_from_costmap_x_y(i, j)) + ' '
             # print(ogm.get_cost_from_costmap_x_y(i, 270))
         print (accum)
+'''
