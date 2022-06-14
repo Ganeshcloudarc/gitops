@@ -2,6 +2,7 @@
   <!-- node parameters -->
   <arg name="lidar_frame" default="ego_vehicle/lidar" />
   <arg name="map_frame" default="map" />
+  <arg name="base_frame" default="ego_vehicle"/>
   <arg name="grid_min_value" default="0.0" />
   <arg name="grid_max_value" default="1.0" />
   <arg name="grid_resolution" default="0.2" />
@@ -9,7 +10,7 @@
   <arg name="grid_length_y" default="30" />
   <arg name="grid_position_x" default="20" />
   <arg name="grid_position_y" default="0" />
-  <arg name="maximum_lidar_height_thres" default="10" />
+  <arg name="maximum_lidar_height_thres" default="1.5" />
   <arg name="minimum_lidar_height_thres" default="0.1" />
   <arg name="expand_polygon_size" default="1.0" />
   <arg name="size_of_expansion_kernel" default="9" />
@@ -25,6 +26,7 @@
   <node pkg="costmap_generator" type="costmap_generator" name="costmap_generator" output="screen">
     <param name="lidar_frame" value="$(arg lidar_frame)" />
     <param name="map_frame" value="$(arg map_frame)" />
+    <param name="base_frame" value="$(arg base_frame)"/>
     <param name="grid_min_value" value="$(arg grid_min_value)" />
     <param name="grid_max_value" value="$(arg grid_max_value)" />
     <param name="grid_resolution" value="$(arg grid_resolution)" />

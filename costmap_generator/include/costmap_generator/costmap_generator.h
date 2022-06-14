@@ -81,6 +81,7 @@ private:
 
   std::string lidar_frame_;
   std::string map_frame_;
+  std::string base_frame_;
   double grid_min_value_;
   double grid_max_value_;
   double grid_resolution_;

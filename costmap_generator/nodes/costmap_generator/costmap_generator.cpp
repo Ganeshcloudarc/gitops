@@ -52,6 +52,7 @@ void CostmapGenerator::init()
 {
   private_nh_.param<std::string>("lidar_frame", lidar_frame_, "velodyne");
   private_nh_.param<std::string>("map_frame", map_frame_, "map");
+  private_nh_.param<std::string>("base_frame", base_frame_, "base_link");
   private_nh_.param<double>("grid_min_value", grid_min_value_, 0.0);
   private_nh_.param<double>("grid_max_value", grid_max_value_, 1.0);
   private_nh_.param<double>("grid_resolution", grid_resolution_, 0.2);
@@ -91,11 +92,14 @@ void CostmapGenerator::sensorPointsCallback(const sensor_msgs::PointCloud2::Cons
   tf::TransformListener listener;
   tf::StampedTransform transform;
   // tf::TransformListener listener;
-  ros::Time now = ros::Time::now();
+//  ros::Time now = ros::Time::now();
+
+//  camTfListener->waitForTransform(REF_FRAME, SOURCE_FRAME, ros::Time(0), ros::Duration(10.0),
+//                                    ros::Duration(0.01), &error_msg);
 
   try{
-        listener.waitForTransform("/ego_vehicle", "/ego_vehicle/lidar", now, ros::Duration(3.0));
-        listener.lookupTransform("/ego_vehicle", "/ego_vehicle/lidar", now, transform);
+        listener.waitForTransform(base_frame_, lidar_frame_, ros::Time(0), ros::Duration(10.0));
+        listener.lookupTransform(base_frame_, lidar_frame_, ros::Time(0), transform);
         }
   catch (tf::TransformException ex){
       ROS_WARN("%s",ex.what());}
