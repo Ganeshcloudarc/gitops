@@ -1,0 +1,29 @@
+path_publisher:
+  minimum_dis_btw_points : 0.5 # meters
+  radius_of_curvature_min : 1
+  radius_of_curvature_max : 5 # should be similar to vehicle min turing
+  distance_to_slowdown_on_ends : 3 # m
+
+
+patrol:
+  path_topic           : "odom_path"
+  wait_time_on_mission_complete  : 20  # secs
+  google_map_center_always : true
+  max_forward_speed : 1.2
+  min_forward_speed : 0.3
+  max_backward_speed : -1.2
+  min_backward_speed : -0.3
+
+pure_pursuit:
+  min_look_ahead_dis : 3 # meters
+  max_look_ahead_dis : 6 # meters
+  speed_to_lookahead_ratio : 1
+  speed_curvature_ratio : 2
+
+stanley:
+  control_gain : 0.1 # meters
+  softening_gain : 1 # meters
+
+carla_sim:
+  speed : 0.3
+
