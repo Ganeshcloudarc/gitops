@@ -3,9 +3,6 @@ try:
     import rospy
     import rospkg
     from nav_msgs.msg import Odometry, Path
-    from geometry_msgs.msg import PoseStamped, Quaternion
-    from sensor_msgs.msg import NavSatFix, MagneticField, Imu
-    from ackermann_msgs.msg import AckermannDrive
     import math
     import sys
     import time
@@ -33,38 +30,24 @@ def get_poses_slope(pose1, pose2):
     return math.atan2(delta_y, delta_x)
 
 
-class PurePursuit:
+class LocalPlanner:
     def __init__(self):
+        self.max_dis_on_gp = rospy.get_param('max_dis_on_gp', 10)  # max global path distance in meters to look for
+        self.car_tip_margin = rospy.get_param('car_tip_margin', 0.5)
+        self.roll_in = rospy.get_param('car_tip_margin', 3)
 
-        self.home_gps_location = {
-            'latitude': 0.0,
-            'longitude': 0.0,
-            'altitude': 0.0
-        }
-        # parameters
-        self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.2)
-        self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
-        self.max_backward_speed = rospy.get_param("/patrol/max_backward_speed", -1.2)
-        self.min_forward_speed = rospy.get_param("/patrol/min_backward_speed", -0.3)
+        self.roll_out_density = rospy.get_param('roll_out_density', 0.5)
 
-        self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
-        self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
-
-        self.path_topic = rospy.get_param("/patrol/path_topic", 'odom_path')
-        self.odom_topic = rospy.get_param("/patrol/odom_topic", '/mavros/local_position/odom')
-        self.wait_time_on_mission_complete = rospy.get_param("/patrol/wait_time_on_mission_complete", 10)
-        self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
-        self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
-        self.base_frame = rospy.get_param("/patrol/base_frame", "base_link")
-        self.carla_sim = rospy.get_param("/carla_sim/activate", False)
-
+        self.n_rollouts = rospy.get_param('number_of_roll_outs', 5)
+        self.global_path_topic = rospy.get_param('global_path_topic', "odom_path")
+        self.base_frame = rospy.get_param('robot_base_frame', "base_link")
+        self.map_frame = rospy.get_param('map_frame', "map")
         if self.carla_sim:
-            self.cmd_topic = "pure_pursuit/cmd_drive"
-            self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 0.3)
-            self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.03)
+            self.base_frame = 'ego_vehicle'
 
-        else:
-            self.cmd_topic = "vehicle/cmd_drive_safe"
+
+
+
 
         # Publishers
         self.ackermann_publisher = rospy.Publisher(self.cmd_topic, AckermannDrive, queue_size=10)
@@ -362,7 +345,7 @@ class PurePursuit:
                 alpha = slope - get_yaw(robot_pose.orientation)
                 delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
                 delta_degrees = math.degrees(delta)
-                steering_angle = -np.clip(delta_degrees, -30, 30)
+                steering_angle = np.clip(delta_degrees, -30, 30)
                 speed = self.compute_velocity_at_index(target_idx)
                 rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
 

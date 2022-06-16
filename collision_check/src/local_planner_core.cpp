@@ -1,36 +1,8 @@
-/*
- *  Copyright (c) 2018, Nagoya University
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions are met:
- *
- *  * Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
- *
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- *  * Neither the name of Autoware nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- *  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- *  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- *  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- *  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- *  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- *  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- ********************/
+
 
 // headers in local directory
 // #include "object_map/object_map_utils.hpp"
-#include "costmap_generator/costmap_generator.h"
+#include "collision_check/local_planner.h"
 
 // Constructor
 CostmapGenerator::CostmapGenerator()
@@ -103,7 +75,7 @@ void CostmapGenerator::sensorPointsCallback(const sensor_msgs::PointCloud2::Cons
         }
   catch (tf::TransformException ex){
       ROS_WARN("%s",ex.what());}
-  
+
   // std::cout<<transform;
 
 
@@ -158,7 +130,7 @@ void CostmapGenerator::sensorPointsCallback(const sensor_msgs::PointCloud2::Cons
   // in_sensor_points_msg->header->frame_id = "base_link";
   std_msgs::Header in_header;
   // = in_sensor_points_msg->header;
-  in_header.frame_id =base_frame_;
+  in_header.frame_id ="ego_vehicle";
   in_header.stamp = ros::Time::now();
   // in_header->header -
   publishRosMsg(costmap_, in_header);

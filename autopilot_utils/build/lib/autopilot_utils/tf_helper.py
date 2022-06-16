@@ -1,6 +1,5 @@
 # Helper Functions for interfacing with TF2
 # Stolen from the ACRV 2017 Amazon Robotics Challenge
-import geometry_msgs.msg
 import rospy
 import geometry_msgs.msg as gmsg
 import tf2_ros

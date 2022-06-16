@@ -6,21 +6,19 @@ from nav_msgs.msg import OccupancyGrid
 from map_msgs.msg import OccupancyGridUpdate
 import numpy as np
 from itertools import product
-from tf_helper import current_robot_pose, get_yaw, convert_point
+from .tf_helper import current_robot_pose, get_yaw, convert_point
 import math
-
-## extras
 
 """
 Class to deal with OccupancyGrid in Python
 as in local / global costmaps.
 
-Author: Sammy Pfeiffer <Sammy.Pfeiffer at student.uts.edu.au>
+Author: Ramana ramanab@bosonmotors.com
 """
 
 
 class OccupancyGridManager(object):
-    def __init__(self, topic, subscribe_to_updates=False, base_frame='base_link',world_frame="map"):
+    def __init__(self, topic, subscribe_to_updates=False, base_frame='base_link', world_frame="map"):
         # OccupancyGrid starts on lower left corner
         self._grid_data = None
         self._occ_grid_metadata = None
@@ -262,7 +260,7 @@ class OccupancyGridManager(object):
 if __name__ == '__main__':
     rospy.init_node('test_occ_grid')
     ogm = OccupancyGridManager('/semantics/costmap_generator/occupancy_grid',
-                               subscribe_to_updates=False,base_frame='ego_vehicle')
+                               subscribe_to_updates=False, base_frame='ego_vehicle')
     print(ogm.width)
     print(ogm.height)
     from geometry_msgs.msg import PoseArray, Pose
@@ -279,12 +277,10 @@ if __name__ == '__main__':
             x, y = ogm.get_world_x_y(j, i)
             pose.position.x = x
             pose.position.y = y
-            cost = ogm.get_cost_from_world_x_y(x,y)
+            cost = ogm.get_cost_from_world_x_y(x, y)
 
-            if not ogm.get_cost_from_costmap_x_y(i,j) == cost:
+            if not ogm.get_cost_from_costmap_x_y(i, j) == cost:
                 print("not same")
-
-
 
             cost_arr.append(cost)
             # if cost == 100:
