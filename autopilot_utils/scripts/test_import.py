@@ -1,3 +1,5 @@
+import rospy
+from autopilot_utils.occ_grid_helper import OccupancyGridManager
 if __name__ == '__main__':
     rospy.init_node('test_occ_grid')
     ogm = OccupancyGridManager('/semantics/costmap_generator/occupancy_grid',

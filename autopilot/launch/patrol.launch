@@ -51,6 +51,8 @@
     <node name="bag_record" pkg="rosbag" type="record"
         args="record -o $(env HOME)/.bags/boson -a" if="$(eval record)"/>
 <!--        if="$(eval is_record_velodyne or is_record_odom)"/>-->
+    
+     <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include>
 </launch>
 
 

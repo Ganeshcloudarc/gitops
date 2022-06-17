@@ -6,7 +6,10 @@ from nav_msgs.msg import OccupancyGrid
 from map_msgs.msg import OccupancyGridUpdate
 import numpy as np
 from itertools import product
-from tf_helper import current_robot_pose, get_yaw, convert_point
+import sys
+# sys.path.append('/')
+from .tf_helper import current_robot_pose, get_yaw, convert_point
+# from autopilot_utils.tf_helper import current_robot_pose, get_yaw, convert_point
 import math
 
 ## extras
@@ -20,7 +23,7 @@ Author: Sammy Pfeiffer <Sammy.Pfeiffer at student.uts.edu.au>
 
 
 class OccupancyGridManager(object):
-    def __init__(self, topic, subscribe_to_updates=False, base_frame='base_link',world_frame="map"):
+    def __init__(self, topic, subscribe_to_updates=False, base_frame='base_link', world_frame="map"):
         # OccupancyGrid starts on lower left corner
         self._grid_data = None
         self._occ_grid_metadata = None
@@ -262,7 +265,7 @@ class OccupancyGridManager(object):
 if __name__ == '__main__':
     rospy.init_node('test_occ_grid')
     ogm = OccupancyGridManager('/semantics/costmap_generator/occupancy_grid',
-                               subscribe_to_updates=False,base_frame='ego_vehicle')
+                               subscribe_to_updates=False, base_frame='ego_vehicle')
     print(ogm.width)
     print(ogm.height)
     from geometry_msgs.msg import PoseArray, Pose
@@ -272,23 +275,21 @@ if __name__ == '__main__':
         pose_arr_msg = PoseArray()
         pose_arr_msg.header.frame_id = "map"
         cost_arr = []
-        for i in range(ogm.width):
-            # for j in range(ogm.height):
-                j = 75
-                pose = Pose()
-                x, y = ogm.get_world_x_y(i, j)
-                pose.position.x = x
-                pose.position.y = y
-                cost = ogm.get_cost_from_world_x_y(x,y)
+        # for i in range(ogm.width):
+        for j in range(ogm.height):
+            i = 10
+            pose = Pose()
+            x, y = ogm.get_world_x_y(j, i)
+            pose.position.x = x
+            pose.position.y = y
+            cost = ogm.get_cost_from_world_x_y(x, y)
 
-                if not ogm.get_cost_from_costmap_x_y(i,j) == cost:
-                    print("not same")
+            if not ogm.get_cost_from_costmap_x_y(i, j) == cost:
+                print("not same")
 
-
-
-                cost_arr.append(cost)
-                # if cost == 100:
-                pose_arr_msg.poses.append(pose)
+            cost_arr.append(cost)
+            # if cost == 100:
+            pose_arr_msg.poses.append(pose)
         pose_arr_pub.publish(pose_arr_msg)
         print(cost_arr)
         print("published")

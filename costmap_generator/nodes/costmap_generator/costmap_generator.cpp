@@ -158,7 +158,7 @@ void CostmapGenerator::sensorPointsCallback(const sensor_msgs::PointCloud2::Cons
   // in_sensor_points_msg->header->frame_id = "base_link";
   std_msgs::Header in_header;
   // = in_sensor_points_msg->header;
-  in_header.frame_id ="ego_vehicle";
+  in_header.frame_id =base_frame_;
   in_header.stamp = ros::Time::now();
   // in_header->header -
   publishRosMsg(costmap_, in_header);

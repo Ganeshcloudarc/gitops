@@ -64,7 +64,7 @@ class PurePursuit:
             self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.03)
 
         else:
-            self.cmd_topic = "pure_pursuit/cmd_drive"
+            self.cmd_topic = "vehicle/cmd_drive_safe"
 
         # Publishers
         self.ackermann_publisher = rospy.Publisher(self.cmd_topic, AckermannDrive, queue_size=10)
@@ -362,7 +362,7 @@ class PurePursuit:
                 alpha = slope - get_yaw(robot_pose.orientation)
                 delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
                 delta_degrees = math.degrees(delta)
-                steering_angle = np.clip(delta_degrees, -30, 30)
+                steering_angle = -np.clip(delta_degrees, -30, 30)
                 speed = self.compute_velocity_at_index(target_idx)
                 rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
 
