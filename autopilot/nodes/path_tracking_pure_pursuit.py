@@ -42,8 +42,8 @@ class PurePursuit:
             'altitude': 0.0
         }
         # parameters
-        self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.2)
-        self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
+        self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
+        self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
         self.max_backward_speed = rospy.get_param("/patrol/max_backward_speed", -1.2)
         self.min_forward_speed = rospy.get_param("/patrol/min_backward_speed", -0.3)
 
@@ -169,8 +169,10 @@ class PurePursuit:
         robot_speed = abs(self.robot_state.twist.twist.linear.x)
         if robot_speed > self.max_forward_speed:
             lhd = (robot_speed * self.min_look_ahead_dis) / self.max_forward_speed
-            if lhd <= self.min_look_ahead_dis:
+            if self.min_look_ahead_dis <= lhd <= self.max_look_ahead_dis:
                 return lhd
+            elif lhd <= self.min_look_ahead_dis:
+                return self.min_look_ahead_dis
             else:
                 return self.max_look_ahead_dis
         else:
