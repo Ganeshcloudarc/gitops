@@ -9,11 +9,17 @@ project(autopilot)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   ackermann_msgs
+  nav_msgs
   dynamic_reconfigure
   geometry_msgs
   roscpp
   rospy
   sensor_msgs
+  jsk_rviz_plugins
+  mavros
+  mavros_extras
+  geographic_msgs
+  rosbridge_server
   )
 
 catkin_package(
