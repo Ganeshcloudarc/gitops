@@ -29,43 +29,43 @@ COG_position:
 
 robot_origin_frame: "base_link" # name of link at rear wheel
 
+sensors: 
+  # sensor info and locations from front_wheel axle center
+  fcu:
+    model: "pixhawk4"
+    sensor_frame: "fcu_link"
+    position :
+      - 0.2
+      - 0
+      - 0    # [X, Y, Z] distances from front wheel axle center to fcu
+    orientation:
+      - 0
+      - 0
+      - 0 # [row, pitch, yaw] of fcu in radians wrt front wheel axle center
 
-# sensor info and locations
-fcu:
-  model: "pixhawk4"
-  sensor_frame: "fcu_link"
-  position :
-    - 0.2
-    - 0
-    - 0    # [X, Y, Z] distances from front wheel axle center to fcu
-  orientation:
-    - 0
-    - 0
-    - 0 # [row, pitch, yaw] of fcu in radians wrt front wheel axle center
+  zed_camera:
+    model : "zed2i"
+    sensor_frame : "zed2i_base_link"
+    position:
+        - 0.4
+        - 0
+        - 0.4    # [X, Y, Z] distances from front wheel axle center to camera_center
+    orientation:
+        - 0
+        - 0
+        - 0 # [row, pitch, yaw] of zed camera in radians wrt front wheel axle center
 
-zed_camera:
-  model : "zed2i"
-  sensor_frame : "zed2i_base_link"
-  position:
+  lidar:
+    model: "rs_lidar"
+    sensor_frame : "rs_lidar"
+    position:
       - 0.4
       - 0
-      - 0.4    # [X, Y, Z] distances from front wheel axle center to camera_center
-  orientation:
+      - 0.2    # [X, Y, Z] distances from front wheel axle center to lidar
+    orientation:
       - 0
       - 0
-      - 0 # [row, pitch, yaw] of zed camera in radians wrt front wheel axle center
-
-lidar:
-  model: "rs_lidar"
-  sensor_frame : "rs_lidar"
-  position:
-    - 0.4
-    - 0
-    - 0.2    # [X, Y, Z] distances from front wheel axle center to lidar
-  orientation:
-    - 0
-    - 0
-    - 0 # [row, pitch, yaw] of lidar in radians wrt front wheel axle center
+      - 0 # [row, pitch, yaw] of lidar in radians wrt front wheel axle center
 
 
 
