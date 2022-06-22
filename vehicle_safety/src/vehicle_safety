@@ -69,6 +69,7 @@ class VehicleSafety():
         self.mavros_heading = None
         self.position_covariance = None
         self.prev_lat_cov = [[1,0,0],[0,1,0],[0,0,1]]
+        self.ignore_heading = [0,45,90,135,180,225,270,315,360]
         # To be Params
         self.CTE_THR = 1 # cte threshold in meters
         self.HEAD_TH = 10
@@ -129,7 +130,6 @@ class VehicleSafety():
             
              if (x == 0 and (self.li[-2] or self.li[-1] or self.li[-3] or self.li[-4]) == 90) or x == 90 or x == 45 or x == 180 or x == 135 or x == 270 or x == 315 or x == 225:
                  self.calc_heading = 0
-                 
              else:
                  pass
         
@@ -187,7 +187,7 @@ class VehicleSafety():
             stat.summary(ERROR, "Heading None")
             stat.add("Heading Value",self.mavros_heading)
         else:
-            if self.mavros_heading in range(self.calc_heading-self.HEAD_TH,self.calc_heading+self.HEAD_TH):
+            if self.mavros_heading in range(self.calc_heading-self.HEAD_TH,self.calc_heading+self.HEAD_TH) or self.calc_heading in self.ignore_heading:
                 stat.summary(OK, "Heading OK")
                 stat.add("mavros heading",self.mavros_heading)
                 stat.add("Calculated heading",self.calc_heading)
