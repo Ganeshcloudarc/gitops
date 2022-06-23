@@ -1,7 +1,7 @@
 path_publisher:
   minimum_dis_btw_points : 0.5 # meters
   radius_of_curvature_min : 1
-  radius_of_curvature_max : 5 # should be similar to vehicle min turing
+  radius_of_curvature_max : 10 # should be similar to vehicle min turing
   distance_to_slowdown_on_ends : 3 # m
 
 
