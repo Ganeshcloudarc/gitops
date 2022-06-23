@@ -5,6 +5,7 @@ find_package(catkin REQUIRED
     rospy
     message_generation
     std_msgs
+    geometry_msgs
     )
 
 ## Generate messages in the 'msg' folder
@@ -13,8 +14,11 @@ add_message_files(
   FILES
   FloatKeyValue.msg
   ControllerDiagnose.msg
+  TrajectoryPoint.msg
+  Trajectory.msg
  )
  generate_messages(
   DEPENDENCIES
   std_msgs
+  geometry_msgs
 )
