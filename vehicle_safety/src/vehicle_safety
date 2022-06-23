@@ -199,11 +199,12 @@ class VehicleSafety():
         return stat
     
     def emergency_diagnostics(self,stat):
-        stat.summary(WARN, "Emergency Stop Status")
         if self.emergency_stop:
+            stat.summary(WARN, "Emergency Stop Status")
             stat.add("Status","STOP")
         else:
-            stat.add("Status", "START")
+            stat.summary(OK, "Emergency Stop Status")
+            stat.add("Status", "RUN")
         return stat
 if __name__ == '__main__':
     rospy.init_node('Vehicle_safety')
