@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+
+from curses import ERR
+import math
+import rospy
+from std_msgs.msg import Float32, Float64, Bool
+from ackermann_msgs.msg import AckermannDrive
+from mavros_msgs.msg import GPSRAW
+from sensor_msgs.msg import NavSatFix
+from autopilot_msgs.msg import ControllerDiagnose
+import diagnostic_updater
+from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
+import numpy as np
+
+"""
+# This message holds the status of an individual component of the robot.
+# 
+
+# Possible levels of operations
+byte OK=0
+byte WARN=1
+byte ERROR=2
+byte STALE=3
+
+byte level # level of operation enumerated above 
+string name # a description of the test/component reporting
+string message # a description of the status
+string hardware_id # a hardware unique string
+KeyValue[] values # an array of values associated with the status
+
+"""
+
+OK = DiagnosticStatus.OK
+ERROR = DiagnosticStatus.ERROR
+WARN = DiagnosticStatus.WARN
+
+class VehicleSafety():
+
+    def __init__(self):
+
+        rospy.Subscriber('/mavros/gpsstatus/gps1/raw', GPSRAW, self.heading_failsafe)
+        rospy.Subscriber("/mavros/gpsstatus/gps2/raw", GPSRAW, self.gps_failsafe)
+        rospy.Subscriber("/mavros/global_position/compass_hdg",Float64,self.mavros_heading)
+        rospy.Subscriber("/pure_pursuit_diagnose", ControllerDiagnose, self.path_track_diagnose_callback)
+        rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.global_gps_callback)
+        try:
+            emergency_stop_topic = rospy.get_param('/failsafe/emergency_stop_topic')
+            rospy.Subscriber(emergency_stop_topic, Bool, self.emergency_callback)
+        except KeyError as K:
+            pass
+        self.ack_msg = AckermannDrive()
+        self.heading = 0
+        self.declination = -0.01745
+        self.prev_coordinates_lat = 0
+        self.prev_coordinates_long = 0
+        self.curr_coordinates_lat = 0
+        self.curr_coordinates_long = 0
+        self.gps_curr_lat = 0
+        self.gps_curr_long = 0
+        self.calc_heading = 0
+        self.cte = None
+        self.prev_compass = 0
+        self.curr_compass = 0
+        self.gps1_fix = None
+        self.gps2_fix = None
+        self.gps_accuracy = None
+        self.li = []
+        self.emergency_stop = False
+        self.mavros_heading = None
+        self.position_covariance = None
+        self.prev_lat_cov = [[1,0,0],[0,1,0],[0,0,1]]
+        self.ignore_heading = [0,45,90,135,180,225,270,315,360]
+        # To be Params
+        self.CTE_THR = 1 # cte threshold in meters
+        self.HEAD_TH = 10
+
+    def sensor_accuracy(self,cov):
+        '''
+        Give sensor covariance data as input and 
+        this function will give % of accuracy
+        '''
+        if cov is not None:
+            self.cov_data = cov
+            self.curr_lat_cov = [[self.cov_data[0],self.cov_data[1],self.cov_data[2]],[self.cov_data[3],self.cov_data[4],self.cov_data[5]],[self.cov_data[6],self.cov_data[7],self.cov_data[8]]]
+            self.accuracy = np.transpose(self.prev_lat_cov) @ np.linalg.inv(self.curr_lat_cov) @ self.prev_lat_cov
+            self.prev_lat_cov = self.curr_lat_cov
+            # print(100 - float(np.linalg.det(self.accuracy)))
+            self.accuracy = 100 - float(np.linalg.det(self.accuracy))
+        else:
+            self.accuracy = None
+        return self.accuracy
+
+    def global_gps_callback(self,data):
+        self.position_covariance = data.position_covariance
+
+    def emergency_callback(self, data):
+        self.emergency_stop = data.data
+
+    def gps_failsafe(self,data):
+      self.gps2_fix = data.fix_type
+
+    def mavros_heading(self,data):
+        """
+        heading publishing from Dual GPS configuration
+        """
+        self.mavros_heading = int(data.data)
+    
+    def heading_failsafe(self, data):
+        self.gps1_fix = data.fix_type
+        self.prev_compass = self.curr_compass
+        self.prev_coordinates_lat = self.curr_coordinates_lat
+        self.prev_coordinates_long = self.curr_coordinates_long
+
+        self.gps_curr_lat = data.lat
+        self.gps_curr_long = data.lon
+
+        self.curr_coordinates_lat = self.gps_curr_lat
+        self.curr_coordinates_long = self.gps_curr_long
+        
+        self.calc_heading = math.atan2(self.curr_coordinates_lat - self.prev_coordinates_lat, \
+        self.curr_coordinates_long - self.prev_coordinates_long)
+
+        self.calc_heading *= 180 / 3.14159
+        self.calc_heading = (450 - int(self.calc_heading)) % 360
+       
+        self.li.append(self.calc_heading)
+        
+        if len(self.li) >= 5:
+             x = abs(self.li[-2] - self.li[-1])
+            
+             if (x == 0 and (self.li[-2] or self.li[-1] or self.li[-3] or self.li[-4]) == 90) or x == 90 or x == 45 or x == 180 or x == 135 or x == 270 or x == 315 or x == 225:
+                 self.calc_heading = 0
+             else:
+                 pass
+        
+    def path_track_diagnose_callback(self, data):
+        self.pp_diagnose_data = data
+        self.cte = data.cte
+    
+    def gps_diagnostics(self,stat):
+        """
+        Published GPS ACCURACY, GPS FIX State.
+        For now, accuracy is independent of "GPS FIX OK" message
+        """
+        self.gps_accuracy = self.sensor_accuracy(self.position_covariance)
+        if self.gps_accuracy is not None:
+            if(self.gps_accuracy < 0 or self.gps_accuracy > 100):
+                stat.add("GPS ACCURACY LOW",self.gps_accuracy)
+            else:
+                stat.add("GPS ACCURACY HIGH",self.gps_accuracy)
+        else:
+            stat.add("GPS ACCURACY NONE",self.gps_accuracy)
+            
+        if self.gps1_fix and self.gps2_fix == 6:
+            stat.summary(OK, "GPS FIX OK")
+            stat.add("BOTH GPS Fix Type",6)
+        else:
+            stat.summary(ERROR, "GPS FIX LOST")
+            stat.add("GPS1 Fix Type",self.gps1_fix)
+            stat.add("GPS2_FIX_TYPE",self.gps2_fix)
+        (self.gps1_fix,self.gps2_fix,self.position_covariance) = None,None,None
+        return stat
+    
+    def cte_diagnostics(self,stat):
+        
+        if self.cte is None:
+            stat.summary(ERROR, "CTE None")
+            stat.add("CTE Value",self.cte)
+        else:
+            if self.cte > self.CTE_THR: #if cte is > 1meter
+                stat.summary(ERROR, "HIGH CTE")
+                stat.add("CTE Value",self.cte)
+            else:
+                stat.summary(OK, "CTE OK")
+                stat.add("CTE Value",self.cte)
+        self.cte = None
+        return stat
+    
+    def heading_diagnostics(self,stat):
+        """
+        Compares mavros heading and calculated heading.
+        Publishes diagnositcs. 
+        # TODO
+        Handle false positives when vehicle not moving
+        """
+        if self.mavros_heading is None:
+            stat.summary(ERROR, "Heading None")
+            stat.add("Heading Value",self.mavros_heading)
+        else:
+            if self.mavros_heading in range(self.calc_heading-self.HEAD_TH,self.calc_heading+self.HEAD_TH) or self.calc_heading in self.ignore_heading:
+                stat.summary(OK, "Heading OK")
+                stat.add("mavros heading",self.mavros_heading)
+                stat.add("Calculated heading",self.calc_heading)
+            else:
+                stat.summary(ERROR, "Heading Error")
+                stat.add("mavros heading",self.mavros_heading)
+                stat.add("Calculated heading",self.calc_heading)
+            (self.mavros_heading,self.calc_heading) = (None,None)
+        return stat
+    
+    def emergency_diagnostics(self,stat):
+        if self.emergency_stop:
+            stat.summary(WARN, "Emergency Stop Status")
+            stat.add("Status","STOP")
+        else:
+            stat.summary(OK, "Emergency Stop Status")
+            stat.add("Status", "RUN")
+        return stat
+if __name__ == '__main__':
+    rospy.init_node('Vehicle_safety')
+    updater = diagnostic_updater.Updater()
+    updater.setHardwareID("Zekrom-v1")
+    vs = VehicleSafety()
+    updater.add("GPS", vs.gps_diagnostics)
+    updater.add("CTE",vs.cte_diagnostics)
+    updater.add("Heading", vs.heading_diagnostics)
+    updater.add("Emergency", vs.emergency_diagnostics)
+    updater.force_update()
+    while not rospy.is_shutdown():
+        # S = VehicleSafety()
+        updater.update()
+        # rospy.spin()

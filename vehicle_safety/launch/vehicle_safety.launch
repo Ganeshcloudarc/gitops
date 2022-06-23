@@ -1,0 +1,5 @@
+<launch>
+  <node name="vehicle_safety_diagnostics" pkg="vehicle_safety" type="vehicle_safety">
+  <remap from="diagnostics" to="/vehicle_safety_diagnostics"/>
+  </node>
+</launch>
