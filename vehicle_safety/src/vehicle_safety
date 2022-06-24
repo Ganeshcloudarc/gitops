@@ -11,6 +11,7 @@ from autopilot_msgs.msg import ControllerDiagnose
 import diagnostic_updater
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
 import numpy as np
+import time
 
 """
 # This message holds the status of an individual component of the robot.
@@ -64,15 +65,18 @@ class VehicleSafety():
         self.gps1_fix = None
         self.gps2_fix = None
         self.gps_accuracy = None
+        self.start_time = None
         self.li = []
         self.emergency_stop = False
         self.mavros_heading = None
         self.position_covariance = None
         self.prev_lat_cov = [[1,0,0],[0,1,0],[0,0,1]]
         self.ignore_heading = [0,45,90,135,180,225,270,315,360]
-        # To be Params
-        self.CTE_THR = 1 # cte threshold in meters
-        self.HEAD_TH = 10
+        self.GPS_ACC_IDEAL = 99.99999999999999
+        self.GPS_ACC_THR = 0.00000000000383
+        self.CTE_THR = rospy.get_param('/vehicle_safety/CTE_THR')
+        self.HEAD_THR = rospy.get_param('/vehicle_safety/HEAD_THR')
+        self.GPS_FIX_THR = rospy.get_param('/vehicle_safety/GPS_FIX_THR')
 
     def sensor_accuracy(self,cov):
         '''
@@ -147,20 +151,34 @@ class VehicleSafety():
             if(self.gps_accuracy < 0 or self.gps_accuracy > 100):
                 stat.add("GPS ACCURACY LOW",self.gps_accuracy)
             else:
-                stat.add("GPS ACCURACY HIGH",self.gps_accuracy)
+                if abs(self.GPS_ACC_IDEAL - self.gps_accuracy) < self.GPS_ACC_THR:
+                    stat.add("GPS ACCURACY HIGH",self.gps_accuracy)
+                else:
+                    stat.add("GPS ACCURACY LOW",self.gps_accuracy)
         else:
             stat.add("GPS ACCURACY NONE",self.gps_accuracy)
             
         if self.gps1_fix and self.gps2_fix == 6:
             stat.summary(OK, "GPS FIX OK")
+            # rospy.loginfo("GPS FIX OK")
             stat.add("BOTH GPS Fix Type",6)
+            self.start_time = None
         else:
-            stat.summary(ERROR, "GPS FIX LOST")
-            stat.add("GPS1 Fix Type",self.gps1_fix)
-            stat.add("GPS2_FIX_TYPE",self.gps2_fix)
+            if self.start_time == None:
+                self.start_time = time.time()
+            if time.time() - self.start_time > self.GPS_FIX_THR:
+                # rospy.loginfo("ERROR: GPS FIX LOST")
+                stat.summary(ERROR, "ERROR: GPS FIX LOST")
+                stat.add("GPS1 Fix Type",self.gps1_fix)
+                stat.add("GPS2_FIX_TYPE",self.gps2_fix)
+            else:
+                # rospy.loginfo("WARN: GPS FIX LOST")
+                stat.summary(WARN, "WARN: GPS FIX LOST")
+                stat.add("GPS1 Fix Type",self.gps1_fix)
+                stat.add("GPS2_FIX_TYPE",self.gps2_fix)
         (self.gps1_fix,self.gps2_fix,self.position_covariance) = None,None,None
         return stat
-    
+
     def cte_diagnostics(self,stat):
         
         if self.cte is None:
@@ -179,15 +197,13 @@ class VehicleSafety():
     def heading_diagnostics(self,stat):
         """
         Compares mavros heading and calculated heading.
-        Publishes diagnositcs. 
-        # TODO
-        Handle false positives when vehicle not moving
+        Publishes diagnositcs.
         """
         if self.mavros_heading is None:
             stat.summary(ERROR, "Heading None")
             stat.add("Heading Value",self.mavros_heading)
         else:
-            if self.mavros_heading in range(self.calc_heading-self.HEAD_TH,self.calc_heading+self.HEAD_TH) or self.calc_heading in self.ignore_heading:
+            if self.mavros_heading in range(self.calc_heading-self.HEAD_THR,self.calc_heading+self.HEAD_THR) or self.calc_heading in self.ignore_heading:
                 stat.summary(OK, "Heading OK")
                 stat.add("mavros heading",self.mavros_heading)
                 stat.add("Calculated heading",self.calc_heading)
