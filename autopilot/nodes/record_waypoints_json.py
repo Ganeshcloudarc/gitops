@@ -71,7 +71,7 @@ class SaveWayPoints:
         self.min_dis_between_waypoints = rospy.get_param('/patrol/min_dis_between_waypoints', 0.1)
         gps_topic = rospy.get_param('/patrol/gps_topic', "/mavros/global_position/global")
         imu_topic = rospy.get_param('/patrol/imu_topic', "/mavros/imu/data")
-        odom_topic = rospy.get_param('/patrol/odom_topic', "/mavros/local_position/odom")
+        odom_topic = rospy.get_param('/patrol/odom_topic', "/mavros/global_position/local")
         data = None
         # TODO
         # wait for odom
