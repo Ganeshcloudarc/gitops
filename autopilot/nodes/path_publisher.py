@@ -5,6 +5,7 @@ try:
     import rospkg
     from nav_msgs.msg import Path
     from geographic_msgs.msg import GeoPointStamped
+    from mavros_msgs.msg import HomePosition
     from geometry_msgs.msg import Pose, PoseStamped, Quaternion
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
     from std_msgs.msg import Float32MultiArray, Int32MultiArray, Bool, Int16, String, Int8, UInt16
@@ -91,6 +92,8 @@ class PathPubGps:
         odom_path_pub = rospy.Publisher('/odom_path', Path, queue_size=10, latch=True)
         starting_point_pub = rospy.Publisher('/mavros/global_position/set_gp_origin', GeoPointStamped,
                                              queue_size=10, latch=True)
+        home_position_pub = rospy.Publisher('/mavros/global_position/home', HomePosition,
+                                                          queue_size=10, latch=True)
         curvature_pub = rospy.Publisher('/curvature_profile', Float32MultiArray, queue_size=10, latch=True)
         velocities_pub = rospy.Publisher('/velocity_profile', Float32MultiArray, queue_size=10, latch=True)
         curvature_velocities_pub = rospy.Publisher('/curvature_velocity_profile', Float32MultiArray, queue_size=10,
@@ -117,6 +120,9 @@ class PathPubGps:
         geo_point.position.longitude = home_long
         geo_point.position.altitude = data['gps_coordinates'][0]['altitude']
         starting_point_pub.publish(geo_point)
+        home_position_msg = HomePosition()
+        home_position_msg.geo = geo_point.position
+        home_position_pub.publish(home_position_msg)
         rospy.loginfo('Origin point set')
         time.sleep(0.5)
 
