@@ -197,9 +197,7 @@ class VehicleSafety():
     def heading_diagnostics(self,stat):
         """
         Compares mavros heading and calculated heading.
-        Publishes diagnositcs. 
-        # TODO
-        Handle false positives when vehicle not moving
+        Publishes diagnositcs.
         """
         if self.mavros_heading is None:
             stat.summary(ERROR, "Heading None")
