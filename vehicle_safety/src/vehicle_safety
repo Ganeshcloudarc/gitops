@@ -11,7 +11,7 @@ from autopilot_msgs.msg import ControllerDiagnose
 import diagnostic_updater
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
 import numpy as np
-import threading
+import time
 
 """
 # This message holds the status of an individual component of the robot.
@@ -65,13 +65,13 @@ class VehicleSafety():
         self.gps1_fix = None
         self.gps2_fix = None
         self.gps_accuracy = None
+        self.start_time = None
         self.li = []
         self.emergency_stop = False
         self.mavros_heading = None
         self.position_covariance = None
         self.prev_lat_cov = [[1,0,0],[0,1,0],[0,0,1]]
         self.ignore_heading = [0,45,90,135,180,225,270,315,360]
-        self.gps_timeout = False
         self.GPS_ACC_IDEAL = 99.99999999999999
         self.GPS_ACC_THR = 0.00000000000383
         self.CTE_THR = rospy.get_param('/vehicle_safety/CTE_THR')
@@ -162,16 +162,11 @@ class VehicleSafety():
             stat.summary(OK, "GPS FIX OK")
             # rospy.loginfo("GPS FIX OK")
             stat.add("BOTH GPS Fix Type",6)
-            self.gps_timeout = False
-            try:
-                self.timer.cancel()
-            except Exception as e:
-                # rospy.loginfo(e)
-                pass
+            self.start_time = None
         else:
-            self.timer = threading.Timer(self.GPS_FIX_THR, self.check_gps_fail_time)
-            self.timer.start()
-            if self.gps_timeout == True:
+            if self.start_time == None:
+                self.start_time = time.time()
+            if time.time() - self.start_time > self.GPS_FIX_THR:
                 # rospy.loginfo("ERROR: GPS FIX LOST")
                 stat.summary(ERROR, "ERROR: GPS FIX LOST")
                 stat.add("GPS1 Fix Type",self.gps1_fix)
@@ -183,9 +178,6 @@ class VehicleSafety():
                 stat.add("GPS2_FIX_TYPE",self.gps2_fix)
         (self.gps1_fix,self.gps2_fix,self.position_covariance) = None,None,None
         return stat
-    
-    def check_gps_fail_time(self):
-        self.gps_timeout = True
 
     def cte_diagnostics(self,stat):
         
