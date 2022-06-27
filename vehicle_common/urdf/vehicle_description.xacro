@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+
+<robot name="boson_vehicle" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:property name="M_PI"     value="3.1415926535897931" />
+  <xacro:property name="yaml_file" value="$(find vehicle_common)/params/vehicle_config.yaml" />
+  <xacro:property name="vehicle_data" value="${load_yaml(yaml_file)}"/>
+
+<!--  <xacro:property name="val1" value="${props['val1']}" />-->
+<!--  <xacro:property name="gps_link_origin_xyz" value="${vehicle_data['fcu']['orientation'][0]} ${vehicle_data['fcu']['orientation'][1]} ${vehicle_data['fcu']['orientation'][2]}" />-->
+<!--  <xacro:property name="gps_link_origin_rpy" value="${vehicle_data['fcu']['orientation']}" />-->
+<!--  <xacro:property name="gps_link" value="${vehicle_data['robot_origin_frame']} " />-->
+
+  <link name="base_link"/>
+
+  <link name="gps_link"/>
+  <joint name="gps_joint" type="fixed">
+    <origin xyz="2 0 0.1" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="gps_link" />
+  </joint>
+
+  <link name="zed_camera"/>
+  <joint name="zed_camera_link" type="fixed">
+    <origin xyz="2.8 0 0.5" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="zed_camera" />
+  </joint>
+
+  <link name="rslidar"/>
+  <joint name="lidar_link" type="fixed">
+    <origin xyz="2.8 0 0.2" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="rslidar" />
+  </joint>
+
+</robot>
