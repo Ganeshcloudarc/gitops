@@ -156,7 +156,7 @@ class PathPubGps:
             odom_path_msg.poses.append(odom_pose)
             # Velocity driven
             velocity = data['odometry'][i]['twist']['twist']['linear']['x']
-            velocity_msg.data.append(velocity)
+            velocity_msg.data.append(abs(velocity))
 
             # velocity calculation based of curvature
             values = [0.1, 0.2, 0.4, 0.2, 0.1]  # weight values for neighbouring points circum radius

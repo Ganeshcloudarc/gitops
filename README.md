@@ -4,7 +4,7 @@ These are set of packages for patrolling application on boson vehicles.
 
 ## Getting started
 
-- TODO
+- TODO 
 
 ### Build the repository
 Open a terminal, clone the repository, update the dependencies and build the packages:
