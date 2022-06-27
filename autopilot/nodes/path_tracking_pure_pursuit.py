@@ -192,8 +192,8 @@ class PurePursuit:
         if self.updated_vel:
             return self.updated_vel[index]
         else:
-            final_vel = min(self.velocity_profile[index], self.curvature_velocity[index])
-            final_vel = max(self.min_forward_speed, final_vel)
+            # final_vel = min(self.velocity_profile[index], self.curvature_velocity[index])
+            final_vel = max(self.min_forward_speed, self.curvature_velocity[index])
             return final_vel
 
         # # add obstacle velocity_profile.
