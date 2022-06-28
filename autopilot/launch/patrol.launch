@@ -6,10 +6,10 @@
     <arg name = 'rc_control' default="false"/>
     <arg name ='rviz' default = 'true'/>
     <arg name="record" default="false"/>
+    <arg name="failsafe_enable" default="false"/>
 
     <arg name="carla" default="false"/>
     <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
-
 
     <group if="$(eval arg('carla'))">
         <param name='/patrol/gps_topic' value = '/carla/ego_vehicle/gnss'/>
@@ -35,7 +35,7 @@
     <param name="patrol/mission_continue" value ="$(arg mission_continue)"/>
 
     <param name="/patrol/rc_control" value="$(arg rc_control)" />
-
+    
     <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />
     <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
     <node name="control_mode_selector" pkg="autopilot" type="control_mode_selector.py"  if = "$(eval arg('rc_control'))" output = 'screen'/>
@@ -43,16 +43,24 @@
 
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/path.rviz" if = "$(eval arg('rviz'))"/>
     <node pkg = "autopilot" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
-    <node pkg = "autopilot" type = "odom_path_plotter.py" name = "odom_path_plotter_node"/>
-    <node pkg = "autopilot" type = "gps_fail_safe.py" name = "gps_fail_safe_node" />
-    <node pkg ='autopilot' type = 'zed_object_detect.py' name = 'zed_object_node'  if = "$(eval arg('zed_od_enable'))" />
-<!--    <node pkg="autopilot" type="failsafe_manager.py"  name="failsafe_manager_node" />-->
+    <node pkg = "autopilot" type = "odom_path_plotter.py" name = "odom_path_plotter_node">
+        <param name="max_list_append" value="300" />
+    </node>
+    
 
     <node name="bag_record" pkg="rosbag" type="record"
         args="record -o $(env HOME)/.bags/boson -a" if="$(eval record)"/>
-<!--        if="$(eval is_record_velodyne or is_record_odom)"/>-->
     
-     <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include>
+    <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include>
+
+    <group if="$(eval arg('failsafe_enable'))">
+        <include file="$(find autopilot)/launch/failsafe_manager.launch">
+            <arg name="use_zed_camera"         value="true" />
+            <arg name="use_oak_camera"            value="true" />
+            <arg name="vehicle_safety_diagnostics" value="true"/>
+            <arg name="use_emergeny_stop" value ="true"/>
+        </include>
+    </group>
 </launch>
 
 

@@ -20,7 +20,7 @@ from std_msgs.msg import Float32
 class OdomPathPlotter:
     def __init__(self):
 
-        self.path_pub = rospy.Publisher('/Vehicle_travelled_path', Path, queue_size=10)
+        self.path_pub = rospy.Publisher('/vehicle_travelled_path', Path, queue_size=10)
         self.heading_pub = rospy.Publisher('/yaw', Float32, queue_size=10)
         carla_status = rospy.get_param("/carla_sim/activate", False)
         self.max_append_path = rospy.get_param("/max_list_append", 200)
@@ -30,7 +30,7 @@ class OdomPathPlotter:
         if carla_status:
             odom_topic = '/carla/ego_vehicle/odometry'
         else:
-            odom_topic = '/mavros/local_position/odom'
+            odom_topic = rospy.get_param("patrol/cmd_topic", "/mavros/local_position/odom")
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
         self.prev_x, self.prev_y = 0.0, 0.0
         self.count = 0

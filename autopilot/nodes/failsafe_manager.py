@@ -2,102 +2,84 @@
 """
 A node which manages failsafe, and stops the vehicle
 """
+from diagnostic_msgs.msg import DiagnosticStatus, KeyValue, DiagnosticArray
 import rospy
 from std_msgs.msg import Bool
-from zed_interfaces.msg import ObjectsStamped
 from ackermann_msgs.msg import AckermannDrive
-from mavros_msgs.msg import GPSRAW
-from sensor_msgs.msg import NavSatFix
-from nav_msgs.msg import Odometry
-from zed_interfaces.msg import ObjectsStamped
-from std_msgs.msg import Bool
-from autopilot_msgs.msg import ControllerDiagnose
-import rosnode
-
-# rosnode.get_node_names()
-'''
-
-gps failsafe
-cte failsafe
-emergency stop
-object detection
-sensor update and fault monitoring
-heading failsafe
-speed failsafe
-
-ERROR CODES
-
-## NEXT
-Nodes nomonitoring: ensuring proper kill and exit from the launch files
-ros without network
-NRU memory handling
-
-'''
+import time
+OK = DiagnosticStatus.OK
+ERROR = DiagnosticStatus.ERROR
+WARN = DiagnosticStatus.WARN
 
 
 class FailSafeAutoPilot:
     def __init__(self):
-        # defining subscribers for all the nessesary topics
-        self.emergency_stop = None
-        self.pp_diagnose_data = None
-        self.odom_data = None
-        self.main_gps_data = None
-        self.gps2_data = None
-        self.gps1_data = None
-        rospy.Subscriber("/mavros/gpsstatus/gps1/raw", GPSRAW, self.gps1_callback)  # to see fix type
-        rospy.Subscriber("/mavros/gpsstatus/gps2/raw", GPSRAW, self.gps2_callback)  # to see fix type
-        rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.main_callback)  # to see covariance
-        cam_name = rospy.get_param("camera_name", "zed2i")
-        # rospy.Subscriber(f"{cam_name}/zed_node/obj_det/objects", ObjectsStamped, self.obj_callback)
-        rospy.Subscriber("/mavros/local_position/odom", Odometry, self.odom_cb)
-        rospy.Subscriber("/pure_pursuit_diagnose", ControllerDiagnose, self.path_track_diagnose_callback)
-        emergency_stop_topic = rospy.get_param('/failsafe/emergency_stop_topic')
-        rospy.Subscriber(emergency_stop_topic, Bool, self.emergency_callback)
+        self.time_on_obj = None
+        self.time_to_wait_after_obstacle = rospy.get_param("time_to_wait_after_obstacle", 5) # in secs
+        # publishers
+        pilot_cmd_in = rospy.get_param("/patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
+        self.cmd_pulisher = rospy.Publisher(pilot_cmd_in, AckermannDrive, queue_size=1)
 
-        self.main_loop()
 
-    # callback functions
-    def gps1_callback(self, data):
-        self.gps1_data = data
+        # subscribers
+        cmd_topic = rospy.get_param("patrol/cmd_topic","pure_pursuit/cmd_drive")
+        rospy.Subscriber(cmd_topic, AckermannDrive, self.vehicle_cmd_cb)
+        self.status_dict = {}
+        use_zed = rospy.get_param("/failsafe_manager/use_zed_camera", True)
+        if use_zed:
+            self.status_dict['zed_obstacle_exist_status'] = False
+            rospy.Subscriber("/zed_obj_status", Bool, self.zed_obstacle_status_cb, 'zed_obstacle_exist_status')
+            
 
-    def gps2_callback(self, data):
-        self.gps2_data = data
+        use_oak = rospy.get_param("/failsafe_manager/use_oak_camera", False)
+        if use_oak:
+            self.status_dict['oak_obstacle_exist_status'] = False
+            rospy.Subscriber("/ock_obj_status", Bool, self.oak_obstacle_status_cb, 'oak_obstacle_exist_status')
+        use_vehicle_safety = rospy.get_param("/failsafe_manager/vehicle_safety_diagnostics", True) 
+        if use_vehicle_safety:
+            self.status_dict['vehicle_safety_status'] = False
+            rospy.Subscriber("/vehicle_safety_diagnostics", DiagnosticArray, self.vehicle_safety_diagnose_cb, 'vehicle_safety_status')
 
-    def main_callback(self, data):
-        self.main_gps_data = data
 
-    def odom_callback(self, data):
-        self.odom_data = data
+    def vehicle_safety_diagnose_cb(self, data, key):
+        RTK_fail_status, emergency_stop_pressed = None, None
+        for field in data.status:
+            if field.name == "vehicle_safety_diagnostics: GPS":
+                if field.level == OK or field.level == WARN:
+                    RTK_fail_status = False
+                else:
+                    RTK_fail_status = True
+            if field.name == "vehicle_safety_diagnostics: Emergency":
+                if field.level == OK:
+                    emergency_stop_pressed = False
+                else:
+                    emergency_stop_pressed = True
+        if RTK_fail_status or emergency_stop_pressed:
+            self.status_dict[key] = True
+        else:
+            self.status_dict[key] = False
 
-    def path_track_diagnose_callback(self, data):
-        self.pp_diagnose_data = data
 
-    def emergency_callback(self, data):
-        self.emergency_stop = data.data
+    def zed_obstacle_status_cb(self, data, key):
+        self.status_dict[key] = data.data
+    
+    def oak_obstacle_status_cb(self, data, key):
+        self.status_dict[key] = data.data
 
-    # failsafe functions
-    def gps_failsafe(self):
-        pass
+        
+    def vehicle_cmd_cb(self, data):
+        if True in self.status_dict.values():
+            rospy.logwarn("vehicle stop command sent")
+            rospy.logwarn(self.status_dict)
+            self.cmd_pulisher.publish(AckermannDrive(jerk=1))
+        else:
+            rospy.loginfo("Forwarding the commands")
+            rospy.loginfo(self.status_dict)
+            self.cmd_pulisher.publish(data)
 
-    def rtk_failsafe(self):
-        pass
 
-    def cte_failsafe(self):
-        pass
-
-    def emergency_stop_failsafe(self):
-        pass
-
-    def sensor_update_fault_monitoring(self):
-        pass
-
-    def object_detection_failsafe(self):
-        pass
-
-    def heading_failsafe(self):
-        pass
-
-    def main_loop(self):
-        rate = rospy.Rate(30)
-        while not rospy.is_shutdown():
-            pass
+if __name__ == "__main__":
+    rospy.init_node('failsafe_intigator')
+    fs = FailSafeAutoPilot()
+    rospy.spin()
+    
