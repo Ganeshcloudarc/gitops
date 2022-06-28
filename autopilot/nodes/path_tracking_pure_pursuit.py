@@ -45,7 +45,7 @@ class PurePursuit:
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
         self.max_backward_speed = rospy.get_param("/patrol/max_backward_speed", -1.2)
-        self.min_forward_speed = rospy.get_param("/patrol/min_backward_speed", -0.3)
+        self.min_backward_speed = rospy.get_param("/patrol/min_backward_speed", -0.3)
 
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
