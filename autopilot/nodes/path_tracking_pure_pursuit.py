@@ -363,8 +363,8 @@ class PurePursuit:
                 slope = get_poses_slope(self.path[target_idx].pose, robot_pose)
                 alpha = slope - get_yaw(robot_pose.orientation)
                 delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
-                delta_degrees = math.degrees(delta)
-                steering_angle = -np.clip(delta_degrees, -30, 30)
+                delta_degrees = -math.degrees(delta)
+                steering_angle = np.clip(delta_degrees, -30, 30)
                 speed = self.compute_velocity_at_index(target_idx)
                 rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
 
