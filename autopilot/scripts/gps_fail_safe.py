@@ -63,7 +63,7 @@ class GpsFixMonitor:
                 diagnose_status_msg.level = diagnose_status_msg.OK
                 diagnose_status_msg.name = "gps_fix_monitor"
                 diagnose_status_msg.message = "Both RTK FIX"
-                rospy.logwarn("Both RTK FIX")
+                rospy.loginfo("Both RTK FIX")
                 gps1_keyval = KeyValue()
                 gps1_keyval.key = "GPS1"
                 gps1_keyval.value = self.GPS_FIX_TYPE[self.gps1_fix]

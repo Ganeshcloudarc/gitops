@@ -51,7 +51,7 @@ class PurePursuit:
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
 
         self.path_topic = rospy.get_param("/patrol/path_topic", 'odom_path')
-        self.odom_topic = rospy.get_param("/patrol/odom_topic", '/mavros/local_position/odom')
+        self.odom_topic = rospy.get_param("/patrol/odom_topic", '/mavros/global_position/local')
         self.wait_time_on_mission_complete = rospy.get_param("/patrol/wait_time_on_mission_complete", 10)
         self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
