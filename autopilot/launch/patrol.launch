@@ -56,7 +56,7 @@
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">
             <arg name="use_zed_camera"         value="true" />
-            <arg name="use_oak_camera"            value="true" />
+            <arg name="use_oak_camera"            value="false" />
             <arg name="vehicle_safety_diagnostics" value="true"/>
             <arg name="use_emergeny_stop" value ="true"/>
         </include>

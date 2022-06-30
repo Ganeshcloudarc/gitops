@@ -29,12 +29,12 @@ class FailSafeAutoPilot:
         if use_zed:
             self.status_dict['zed_obstacle_exist_status'] = False
             rospy.Subscriber("/zed_obj_status", Bool, self.zed_obstacle_status_cb, 'zed_obstacle_exist_status')
-            
 
         use_oak = rospy.get_param("/failsafe_manager/use_oak_camera", False)
         if use_oak:
             self.status_dict['oak_obstacle_exist_status'] = False
             rospy.Subscriber("/oak_obj_status", Bool, self.oak_obstacle_status_cb, 'oak_obstacle_exist_status')
+
         use_vehicle_safety = rospy.get_param("/failsafe_manager/vehicle_safety_diagnostics", True) 
         if use_vehicle_safety:
             self.status_dict['vehicle_safety_status'] = False

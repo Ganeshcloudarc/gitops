@@ -4,7 +4,7 @@ from std_msgs.msg import Bool
 from zed_interfaces.msg import ObjectsStamped
 from ackermann_msgs.msg import AckermannDrive
 
-
+# def distance_2d(p1)
 class ZedObjectDetect:
     def __init__(self):
         cam_name = rospy.get_param("camera_name", "zed2i")
@@ -29,10 +29,10 @@ class ZedObjectDetect:
         count = 0
         if len(objects) > 0:
             for obj in objects:
-                if (obj.position[0] <= self.obstace_stop_distance
-                        and abs(obj.position[1]) < self.y_stop
-                ):
-                    count += 1
+                for corner in obj.bounding_box_3d.corners:
+                    if (corner.kp[0] <= self.obstace_stop_distance
+                            and abs(corner.kp[1]) < self.y_stop):
+                        count += 1
             rospy.logdebug("obstacles in range: %s",str(count))
             if count > 0:
                 self.object_in_range = True
