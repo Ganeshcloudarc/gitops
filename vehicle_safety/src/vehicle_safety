@@ -158,7 +158,7 @@ class VehicleSafety():
         else:
             stat.add("GPS ACCURACY NONE",self.gps_accuracy)
             
-        if self.gps1_fix and self.gps2_fix == 6:
+        if self.gps1_fix == 6 and self.gps2_fix == 6:
             stat.summary(OK, "GPS FIX OK")
             # rospy.loginfo("GPS FIX OK")
             stat.add("BOTH GPS Fix Type",6)
