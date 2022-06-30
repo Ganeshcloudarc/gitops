@@ -20,7 +20,7 @@ def ackremann_callback(data):
         carla_msg.brake = 1
     if data.jerk:
         carla_msg.brake = data.jerk
-    carla_msg.steer = -math.radians(data.steering_angle)
+    carla_msg.steer = math.radians(data.steering_angle)
     # carla_msg.brake = data.jerk
     carla_msg_pub.publish(carla_msg)
 

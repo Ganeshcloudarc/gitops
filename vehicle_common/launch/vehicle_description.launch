@@ -4,7 +4,7 @@
     <arg name="odom_pub" default="true"/>
 
     <param name ="/base_frame" value ="base_link"/>
-    <param name ='odometry_in' value ="/mavros/local_position/odom" />
+    <param name ='/odometry_in' value ="/mavros/global_position/local" />
     <param name="/send_odom" value="$(arg odom_pub)" />
     <param name="/send_footprint" value="$(arg footprint_pub)" />
     <param name="/odometry_out" value="/vehicle/odom" />

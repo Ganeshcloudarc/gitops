@@ -45,13 +45,13 @@ class PurePursuit:
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
         self.max_backward_speed = rospy.get_param("/patrol/max_backward_speed", -1.2)
-        self.min_forward_speed = rospy.get_param("/patrol/min_backward_speed", -0.3)
+        self.min_backward_speed = rospy.get_param("/patrol/min_backward_speed", -0.3)
 
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
 
         self.path_topic = rospy.get_param("/patrol/path_topic", 'odom_path')
-        self.odom_topic = rospy.get_param("/patrol/odom_topic", '/mavros/local_position/odom')
+        self.odom_topic = rospy.get_param("/patrol/odom_topic", '/mavros/global_position/local')
         self.wait_time_on_mission_complete = rospy.get_param("/patrol/wait_time_on_mission_complete", 10)
         self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
@@ -343,8 +343,8 @@ class PurePursuit:
                 slope = get_poses_slope(self.path[target_idx].pose, robot_pose)
                 alpha = slope - get_yaw(robot_pose.orientation)
                 delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
-                delta_degrees = math.degrees(delta)
-                steering_angle = -np.clip(delta_degrees, -30, 30)
+                delta_degrees = -math.degrees(delta)
+                steering_angle = np.clip(delta_degrees, -30, 30)
                 speed = self.compute_velocity_at_index(target_idx)
                 rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
 

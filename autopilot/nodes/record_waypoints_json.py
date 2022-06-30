@@ -7,6 +7,7 @@ try:
     from sensor_msgs.msg import NavSatFix, MagneticField, Imu
     from nav_msgs.msg import Odometry
     from geographic_msgs.msg import GeoPointStamped
+    from mavros_msgs.msg import HomePosition
     from json import dump
     from geojson import LineString
     import numpy as np
@@ -70,7 +71,7 @@ class SaveWayPoints:
         self.min_dis_between_waypoints = rospy.get_param('/patrol/min_dis_between_waypoints', 0.1)
         gps_topic = rospy.get_param('/patrol/gps_topic', "/mavros/global_position/global")
         imu_topic = rospy.get_param('/patrol/imu_topic', "/mavros/imu/data")
-        odom_topic = rospy.get_param('/patrol/odom_topic', "/mavros/local_position/odom")
+        odom_topic = rospy.get_param('/patrol/odom_topic', "/mavros/global_position/local")
         data = None
         # TODO
         # wait for odom
@@ -85,6 +86,8 @@ class SaveWayPoints:
                 rospy.Subscriber(imu_topic, Imu, self.imu_callback)
                 rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
                 self.starting_point_pub = rospy.Publisher('/mavros/global_position/set_gp_origin', GeoPointStamped,
+                                                          queue_size=10, latch=True)
+                self.home_position_pub = rospy.Publisher('/mavros/global_position/home', HomePosition,
                                                           queue_size=10, latch=True)
                 break
         # time.sleep(1)
@@ -143,6 +146,10 @@ class SaveWayPoints:
                         geo_point.position.longitude = self.gps_data_msg.longitude
                         geo_point.position.altitude = self.gps_data_msg.altitude  # 29 # change it to actual latitude
                         self.starting_point_pub.publish(geo_point)
+                        home_position_msg = HomePosition()
+                        home_position_msg.geo = geo_point.position
+                        self.home_position_pub.publish(home_position_msg)
+
                         rospy.loginfo('Origin point set')
                         rospy.loginfo('Home location was saved, drive the vehicle')
                         self.is_first_point = False

@@ -30,7 +30,7 @@ class OdomPathPlotter:
         if carla_status:
             odom_topic = '/carla/ego_vehicle/odometry'
         else:
-            odom_topic = rospy.get_param("patrol/cmd_topic", "/mavros/local_position/odom")
+            odom_topic = '/vehicle/odom'
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
         self.prev_x, self.prev_y = 0.0, 0.0
         self.count = 0
