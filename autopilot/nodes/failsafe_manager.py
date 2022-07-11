@@ -71,7 +71,7 @@ class FailSafeAutoPilot:
         if True in self.status_dict.values():
             rospy.logwarn("vehicle stop command sent")
             rospy.logwarn(self.status_dict)
-            self.cmd_pulisher.publish(AckermannDrive(jerk=1))
+            self.cmd_pulisher.publish(AckermannDrive(steering_angle =data.steering_angle,jerk=1))
         else:
             rospy.loginfo("Forwarding the commands")
             rospy.loginfo(self.status_dict)
