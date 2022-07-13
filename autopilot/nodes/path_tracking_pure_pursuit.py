@@ -59,13 +59,11 @@ class PurePursuit:
         self.carla_sim = rospy.get_param("/carla_sim/activate", False)
 
         if self.carla_sim:
-            self.cmd_topic = "pure_pursuit/cmd_drive"
             self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 0.3)
             self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.03)
 
-        else:
-            self.cmd_topic = "vehicle/cmd_drive_safe"
-
+        self.cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
+        
         # Publishers
         self.ackermann_publisher = rospy.Publisher(self.cmd_topic, AckermannDrive, queue_size=10)
         self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
@@ -196,27 +194,9 @@ class PurePursuit:
             final_vel = max(self.min_forward_speed, self.curvature_velocity[index])
             return final_vel
 
-        # # add obstacle velocity_profile.
-        # rospy.loginfo("curvature %s", curvature)
-        # try:
-        #     circum_radius = (1 / curvature)
-        # except:
-        #     circum_radius = 10000
-        # rospy.loginfo("circum radius %s", circum_radius)
-        # curvature_vel = circum_radius * self.config.curvature_speed_ratio
-        # rospy.loginfo("curvature_vel: %s velocity_at_index: %s max_speed: %s", curvature_vel, velocity_at_index,
-        #                self.config.max_speed)
-        # final_vel = min(self.config.max_speed, velocity_at_index, curvature_vel)
-        # final_vel = max(final_vel, self.config.min_speed)
-        # return final_vel
+
 
     def find_close_point(self, robot_pose, old_close_index):
-        # n = min(100, len(range(index_old, self.path_end_index)))
-        # distance_list = [self.calc_distance(robot, ind) for ind in range(index_old, index_old + n)]
-        # ind = np.argmin(distance_list)
-        # final = ind + index_old
-        # dis = distance_list[ind]
-        # return final, dis
         close_dis = self.calc_distance(robot_pose, old_close_index)
         for ind in range(old_close_index + 1, self.path_end_index):
             dis = self.calc_distance(robot_pose, ind)
