@@ -1,0 +1,10 @@
+<launch>
+<param name ='max_stop_distance_x' value="3"/>
+<param name ='max_stop_distance_y' value="1"/>
+<param name ='camera_name' value="zed2i"/>
+
+<include file="$(find zed_wrapper)/launch/zed2i.launch"> </include>
+
+<node pkg='autopilot' name='zed_obstacle_status_pub_node' type="zed_object_detect.py" output="log"  />
+
+</launch>

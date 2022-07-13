@@ -1,0 +1,26 @@
+<launch>
+    <arg name="use_zed_camera" default="true"/>
+    <arg name="use_oak_camera" default="false"/>
+    <arg name="vehicle_safety_diagnostics" default="true"/>
+    <arg name="use_emergeny_stop" default="true"/>
+
+    <param name="failsafe_manager/use_zed_camera" value= "$(arg use_zed_camera)"/>
+    <param name="failsafe_manager/use_oak_camera" value= "$(arg use_oak_camera)"/>
+    <param name="failsafe_manager/vehicle_safety_diagnostics" value= "$(arg vehicle_safety_diagnostics)"/>
+    <param name="/failsafe/emergency_stop_topic" value= "vehicle_emergency_stop" if = "$(eval arg('use_emergeny_stop'))" />
+
+    <group if="$(eval arg('use_zed_camera'))">
+         <include file="$(find autopilot)/launch/zed_object_detection.launch"> </include>
+    </group>
+    <group if="$(eval arg('vehicle_safety_diagnostics'))">
+        <include file="$(find vehicle_safety)/launch/vehicle_safety.launch"> </include>
+    </group>
+    <!-- TODO
+    <group if="$(eval arg('use_oak_camera'))">
+        <include file="$(find vehicle_safety)/launch/vehicle_safety.launch"> </include>
+    </group> 
+    -->
+    
+    <node pkg="autopilot" name="failsafe_manager_autopilot_node" type="failsafe_manager.py" output="log"/>
+
+</launch>   
