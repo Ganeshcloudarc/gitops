@@ -8,6 +8,8 @@
     <arg name="record" default="false"/>
     <arg name="failsafe_enable" default="false"/>
 
+    
+
     <arg name="carla" default="false"/>
     <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
 
@@ -30,6 +32,7 @@
 
     </group>
 
+    <param name="/patrol/failsafe_enable" value ="$(arg failsafe_enable)"/>
     <param name = "/carla_sim/activate" value = "$(arg carla)"/>
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
     <param name="patrol/mission_continue" value ="$(arg mission_continue)"/>

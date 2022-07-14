@@ -42,19 +42,26 @@ class FailSafeAutoPilot:
 
 
     def vehicle_safety_diagnose_cb(self, data, key):
-        RTK_fail_status, emergency_stop_pressed = None, None
+        RTK_fail_status, emergency_stop_pressed, out_of_geofence = None, None, None
         for field in data.status:
             if field.name == "vehicle_safety_diagnostics: GPS":
-                if field.level == OK or field.level == WARN:
-                    RTK_fail_status = False
-                else:
+                if field.level == ERROR:
                     RTK_fail_status = True
-            if field.name == "vehicle_safety_diagnostics: Emergency":
-                if field.level == OK:
-                    emergency_stop_pressed = False
                 else:
+                    RTK_fail_status = False
+            if field.name == "vehicle_safety_diagnostics: Emergency":
+                if field.level == ERROR:
                     emergency_stop_pressed = True
-        if RTK_fail_status or emergency_stop_pressed:
+                else:
+                    emergency_stop_pressed = False
+            if field.name == "vehicle_safety_diagnostics: GeoFence":
+                if field.level == ERROR:
+                    out_of_geofence = True
+                else:
+                    out_of_geofence = False
+
+                    
+        if RTK_fail_status or emergency_stop_pressed or out_of_geofence:
             self.status_dict[key] = True
         else:
             self.status_dict[key] = False
