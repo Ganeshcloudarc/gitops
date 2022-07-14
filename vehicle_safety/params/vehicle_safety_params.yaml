@@ -2,6 +2,7 @@ vehicle_safety:
   CTE_THR : 1 # cte threshold in meters
   HEAD_THR : 10 # Heading Threshold in degrees(+/-)
   GPS_FIX_THR : 10.0 #GPS FIX Threshold time in seconds
+  use_geo_fence : True
   geo_fence_coordinates: [
     [13.584927310648094,79.96143747121096],
     [13.584685821553478,79.96227599680424],

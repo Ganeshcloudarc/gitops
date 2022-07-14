@@ -77,6 +77,7 @@ class VehicleSafety():
         self.CTE_THR = rospy.get_param('/vehicle_safety/CTE_THR')
         self.HEAD_THR = rospy.get_param('/vehicle_safety/HEAD_THR')
         self.GPS_FIX_THR = rospy.get_param('/vehicle_safety/GPS_FIX_THR')
+        self.use_geo_fence = rospy.get_param('/vehicle_safety/use_geo_fence')
         self.geo_fence_coordinates = rospy.get_param('/vehicle_safety/geo_fence_coordinates')
         self.geo_fence = Polygon([[i, j] for i,j in self.geo_fence_coordinates])
         self.is_inside_geo_fence = True
@@ -205,12 +206,16 @@ class VehicleSafety():
         '''
         Raises error if Vehicle is outside of Geofence
         '''
-        if self.is_inside_geo_fence:
-            stat.summary(OK, "OK: Vehicle is inside geofence")
-            stat.add("Status","OK")
+        if self.use_geo_fence:
+            if self.is_inside_geo_fence:
+                stat.summary(OK, "OK: Vehicle is inside geofence")
+                stat.add("Status","OK")
+            else:
+                stat.summary(ERROR, "ERROR: Vehicle is outside of geofence")
+                stat.add("Status","STOP")
         else:
-            stat.summary(ERROR, "ERROR: Vehicle is outside of geofence")
-            stat.add("Status","STOP")
+            stat.summary(WARN, "WARN: GeoFence is not in Use")
+            stat.add("Status","WARN")
         return stat
     def heading_diagnostics(self,stat):
         """
