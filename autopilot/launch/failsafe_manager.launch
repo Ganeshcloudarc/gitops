@@ -3,6 +3,7 @@
     <arg name="use_oak_camera" default="false"/>
     <arg name="vehicle_safety_diagnostics" default="true"/>
     <arg name="use_emergeny_stop" default="true"/>
+    <arg name='use_zed_laser_scan' default="true"/>
 
     <param name="failsafe_manager/use_zed_camera" value= "$(arg use_zed_camera)"/>
     <param name="failsafe_manager/use_oak_camera" value= "$(arg use_oak_camera)"/>
@@ -20,6 +21,10 @@
         <include file="$(find vehicle_safety)/launch/vehicle_safety.launch"> </include>
     </group> 
     -->
+
+    <group if="$(eval arg('use_zed_laser_scan'))">
+        <include file="$(find collision_check)/launch/vehicle_safety.launch"> </include>
+    </group>
     
     <node pkg="autopilot" name="failsafe_manager_autopilot_node" type="failsafe_manager.py" output="log"/>
 
