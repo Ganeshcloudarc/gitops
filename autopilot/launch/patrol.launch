@@ -49,7 +49,7 @@
     
 
     <node name="bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson -a" if="$(eval record)"/>
+        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*) " if="$(eval record)"/>
     
     <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include>
 

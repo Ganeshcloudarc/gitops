@@ -165,7 +165,7 @@ class PathPubGps:
             # 9440e62cf009d8/src/controller_node.cpp#L236
 
             for num, k in enumerate(range(-2, 3)):
-                cr, curvature = self.find_curvature_at_index(i + k)
+                cr, curvature = self.find_curvature_at_index(i + k*10)
                 if k == 0:
                     curvature_msg.data.append(curvature)
                     circum_radius_list.append(cr)
@@ -224,15 +224,15 @@ class PathPubGps:
             curvature (float)
         """
 
-        if i == 0 or i >= len(self.data['coordinates']) - 1:
+        if i <= 10  or i >= len(self.data['coordinates']) - 10:
             return 0, 0
         else:
-            x_vals = [self.data['odometry'][i - 1]['pose']['pose']['position']['x'],
+            x_vals = [self.data['odometry'][i - 10]['pose']['pose']['position']['x'],
                       self.data['odometry'][i]['pose']['pose']['position']['x'],
-                      self.data['odometry'][i + 1]['pose']['pose']['position']['x']]
-            y_vals = [self.data['odometry'][i - 1]['pose']['pose']['position']['y'],
+                      self.data['odometry'][i + 10]['pose']['pose']['position']['x']]
+            y_vals = [self.data['odometry'][i - 10]['pose']['pose']['position']['y'],
                       self.data['odometry'][i]['pose']['pose']['position']['y'],
-                      self.data['odometry'][i + 1]['pose']['pose']['position']['y']]
+                      self.data['odometry'][i + 10]['pose']['pose']['position']['y']]
             radius = circum_radius(x_vals, y_vals)
             if radius == 0:
                 return radius, inf
