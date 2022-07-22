@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 try:
-    from geonav_conversions import *
     import rospy
     import rospkg
     from nav_msgs.msg import Path
-    from geographic_msgs.msg import GeoPointStamped
+    from geographic_msgs.msg import GeoPointStamped, GeoPose
     from mavros_msgs.msg import HomePosition
     from geometry_msgs.msg import Pose, PoseStamped, Quaternion
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
@@ -16,6 +15,8 @@ try:
     import sys
     import numpy as np
     from vehicle_common.vehicle_common import VehicleData
+    from autopilot_msgs.msg import Trajectory, TrajectoryPoint
+    from autopilot_uitils.geonav_conversion import *
 
 except Exception as e:
     print("No module named", str(e))
@@ -35,6 +36,11 @@ def circum_radius(x_vals, y_vals):
         return 0
     radius = abs(num / den)
     return radius
+
+
+def distance_btw_poses(pose1, pose2):
+    """2d distance between two poses"""
+    return math.hypot(pose1.position.x - pose2.position.x, pose1.position.y - pose2.position.y)
 
 
 class PathPubGps:
@@ -88,12 +94,13 @@ class PathPubGps:
             rospy.logwarn("No gps coordinates and Odometry fields are  in  mission file")
             sys.exit('No gps coordinates and Odometry fields are  in  mission file')
 
+        global_trajectory_pub = rospy.Publisher('global_gps_trajectory', Trajectory, queue_size=10, latch=True)
         gps_path_pub = rospy.Publisher('/gps_path', Path, queue_size=10, latch=True)
         odom_path_pub = rospy.Publisher('/odom_path', Path, queue_size=10, latch=True)
         starting_point_pub = rospy.Publisher('/mavros/global_position/set_gp_origin', GeoPointStamped,
                                              queue_size=10, latch=True)
         home_position_pub = rospy.Publisher('/mavros/global_position/home', HomePosition,
-                                                          queue_size=10, latch=True)
+                                            queue_size=10, latch=True)
         curvature_pub = rospy.Publisher('/curvature_profile', Float32MultiArray, queue_size=10, latch=True)
         velocities_pub = rospy.Publisher('/velocity_profile', Float32MultiArray, queue_size=10, latch=True)
         curvature_velocities_pub = rospy.Publisher('/curvature_velocity_profile', Float32MultiArray, queue_size=10,
@@ -104,6 +111,8 @@ class PathPubGps:
         velocity_msg = Float32MultiArray()
         curvature_velocity_msg = Float32MultiArray()
         marker_arr_msg = MarkerArray()
+        trajectory_msg = Trajectory()
+        trajectory_msg.header.frame_id = "map"
 
         # msgs
         gps_path_msg = Path()
@@ -126,9 +135,15 @@ class PathPubGps:
         rospy.loginfo('Origin point set')
         time.sleep(0.5)
 
+        trajectory_msg.home_position.position.latitude = home_lat
+        trajectory_msg.home_position.position.longitude = home_long
+        trajectory_msg.home_position.position.altitude = data['gps_coordinates'][0]['altitude']
+
         circum_radius_list = []
         vel_list = []
 
+        accumulated_distance = 0
+        prev_pose = Pose()
         for i in range(len(data['coordinates'])):
             # gps_based path
             lon, lat = data['coordinates'][i][0], data['coordinates'][i][1]
@@ -165,7 +180,7 @@ class PathPubGps:
             # 9440e62cf009d8/src/controller_node.cpp#L236
 
             for num, k in enumerate(range(-2, 3)):
-                cr, curvature = self.find_curvature_at_index(i + k*10)
+                cr, curvature = self.find_curvature_at_index(i + k * 10)
                 if k == 0:
                     curvature_msg.data.append(curvature)
                     circum_radius_list.append(cr)
@@ -198,6 +213,18 @@ class PathPubGps:
                                                  odom_orientation['w'])
             marker.pose.position.x, marker.pose.position.y = odom_position['x'], odom_position['y']
             marker_arr_msg.markers.append(marker)
+            dis = distance_btw_poses(odom_pose.pose, prev_pose)
+            accumulated_distance = accumulated_distance + dis
+            prev_pose = odom_pose.pose
+            # Trajectory msg filling
+            traj_pt_msg = TrajectoryPoint()
+            traj_pt_msg.pose = odom_pose.pose
+            traj_pt_msg.gps_pose.position.latitude = lat
+            traj_pt_msg.gps_pose.position.longitude = lon
+            traj_pt_msg.longitudinal_velocity_mps = vel
+            traj_pt_msg.index = i
+            traj_pt_msg.accumulated_distance_m = accumulated_distance
+            trajectory_msg.points.append(traj_pt_msg)
 
         curvature_velocity_msg.data = vel_list
         gps_path_pub.publish(gps_path_msg)
@@ -212,6 +239,8 @@ class PathPubGps:
         rospy.loginfo('Curvature profile is published')
         velocity_marker_pub.publish(marker_arr_msg)
         rospy.loginfo("Velocity markers are published")
+        global_trajectory_pub.publish(trajectory_msg)
+        rospy.loginfo("Trajectory are published")
         rospy.loginfo('Details of ' + str(i) + " are published from file " + str(mission_file))
 
     def find_curvature_at_index(self, i):
@@ -224,7 +253,7 @@ class PathPubGps:
             curvature (float)
         """
 
-        if i <= 10  or i >= len(self.data['coordinates']) - 10:
+        if i <= 10 or i >= len(self.data['coordinates']) - 10:
             return 0, 0
         else:
             x_vals = [self.data['odometry'][i - 10]['pose']['pose']['position']['x'],
