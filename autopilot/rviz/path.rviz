@@ -60,7 +60,7 @@ Visualization Manager:
         Z: 0
       Plane: XY
       Plane Cell Count: 100
-      Reference Frame: ego_vehicle
+      Reference Frame: base_link
       Value: true
     - Alpha: 1
       Axes Length: 1
@@ -163,7 +163,7 @@ Visualization Manager:
       Marker Topic: /carla/markers
       Name: MarkerArray
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -301,35 +301,33 @@ Visualization Manager:
         All Enabled: true
         base_link:
           Value: true
-        ego_vehicle:
-          Value: true
-        ego_vehicle/collision:
-          Value: true
-        ego_vehicle/depth_front:
-          Value: true
-        ego_vehicle/dvs_front:
-          Value: true
-        ego_vehicle/gnss:
-          Value: true
-        ego_vehicle/imu:
-          Value: true
-        ego_vehicle/lidar:
-          Value: true
-        ego_vehicle/radar_front:
-          Value: true
-        ego_vehicle/rgb_front:
-          Value: true
-        ego_vehicle/rgb_view:
-          Value: true
-        ego_vehicle/semantic_lidar:
-          Value: true
-        ego_vehicle/semantic_segmentation_front:
+        base_link_frd:
           Value: true
         gps_link:
           Value: true
         map:
           Value: true
+        map_ned:
+          Value: true
+        odom:
+          Value: true
+        odom_ned:
+          Value: true
         rslidar:
+          Value: true
+        zed2i_base_link:
+          Value: true
+        zed2i_camera_center:
+          Value: true
+        zed2i_imu_link:
+          Value: true
+        zed2i_left_camera_frame:
+          Value: true
+        zed2i_left_camera_optical_frame:
+          Value: true
+        zed2i_right_camera_frame:
+          Value: true
+        zed2i_right_camera_optical_frame:
           Value: true
         zed_camera:
           Value: true
@@ -341,29 +339,26 @@ Visualization Manager:
       Show Names: true
       Tree:
         map:
-          ego_vehicle:
-            ego_vehicle/collision:
+          base_link:
+            base_link_frd:
               {}
-            ego_vehicle/depth_front:
+            gps_link:
               {}
-            ego_vehicle/dvs_front:
+            rslidar:
               {}
-            ego_vehicle/gnss:
-              {}
-            ego_vehicle/imu:
-              {}
-            ego_vehicle/lidar:
-              {}
-            ego_vehicle/radar_front:
-              {}
-            ego_vehicle/rgb_front:
-              {}
-            ego_vehicle/rgb_view:
-              {}
-            ego_vehicle/semantic_lidar:
-              {}
-            ego_vehicle/semantic_segmentation_front:
-              {}
+            zed_camera:
+              zed2i_base_link:
+                zed2i_camera_center:
+                  zed2i_left_camera_frame:
+                    zed2i_imu_link:
+                      {}
+                    zed2i_left_camera_optical_frame:
+                      {}
+                  zed2i_right_camera_frame:
+                    zed2i_right_camera_optical_frame:
+                      {}
+          map_ned:
+            {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -406,7 +401,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 65.42162322998047
+      Distance: 10.21434497833252
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -414,17 +409,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 3.8248190879821777
-        Y: 0.10623717308044434
+        X: 3.5385193824768066
+        Y: -1.4179961681365967
         Z: 0
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.4247963428497314
-      Target Frame: ego_vehicle
-      Yaw: 2.6403894424438477
+      Pitch: 1.5697963237762451
+      Target Frame: base_link
+      Yaw: 2.8953945636749268
     Saved: ~
 Window Geometry:
   Displays:

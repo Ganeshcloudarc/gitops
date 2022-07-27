@@ -137,7 +137,10 @@ class PurePursuitController:
             steering_angle = np.clip(delta_degrees, -30, 30)
             speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
-            self.send_ack_msg(steering_angle, speed, 0)
+            if speed <= 0 :
+                self.send_ack_msg(steering_angle, speed, 1)
+            else:
+                self.send_ack_msg(steering_angle, speed, 0)
 
             # fill the control diagnose topic
             diagnostic_msg.level = diagnostic_msg.OK

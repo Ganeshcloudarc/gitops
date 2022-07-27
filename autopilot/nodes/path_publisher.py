@@ -16,8 +16,8 @@ try:
     import numpy as np
     from vehicle_common.vehicle_common import VehicleData
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
-    from autopilot_uitils.geonav_conversion import *
-
+    from autopilot_utils.geonav_conversions import *
+# /home/boson/costmap_ws/src/autopilot_boson/autopilot_utils/src/autopilot_utils/geonav_conversions.py
 except Exception as e:
     print("No module named", str(e))
     exit()

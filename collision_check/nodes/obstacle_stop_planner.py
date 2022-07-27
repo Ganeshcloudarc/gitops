@@ -61,6 +61,7 @@ class ObstacleStopPlanner:
         self.index_old = None
         self.traj_in = None
         self.laser_data_in_time = None
+        self.scan_data_received = None
         self.pc_np = None
         self.tree = None
         self.laser_geo_obj = LaserProjection()
@@ -68,8 +69,8 @@ class ObstacleStopPlanner:
         # ros parameters for Obstacle stop planner
         self.max_slow_down_velocity = rospy.get_param('max_slow_down_velocity', 1.5)
         self.min_slow_down_velocity = rospy.get_param('min_slow_down_velocity', 0.8)
-        self.stop_margin = rospy.get_param('stop_margin', 9)
-        self.slow_down_margin = rospy.get_param("slow_down_margin", 7)
+        self.stop_margin = rospy.get_param('stop_margin', 3)
+        self.slow_down_margin = rospy.get_param("slow_down_margin", 5)
         self.radial_off_set_to_vehicle_width = rospy.get_param("radial_off_set_to_vehicle_width", 0.5)
         self.trajectory_resolution = rospy.get_param("trajectory_resolution", 0.5)
         self.lookup_collision_distance = rospy.get_param("lookup_collision_distance", 10)
@@ -81,7 +82,7 @@ class ObstacleStopPlanner:
         global_traj_topic = rospy.get_param("obstacle_stop_planner/traj_in", "global_gps_trajectory")
         scan_topic = rospy.get_param("obstacle_stop_planner/scan_in", "zed/laser_scan")
         rospy.Subscriber(global_traj_topic, Trajectory, self.global_traj_callback)
-        rospy.Subscriber(scan_topic, LaserScan, self.scan_callback)
+        rospy.Subscriber(scan_topic, LaserScan, self.scan_callback, queue_size=1)
 
         # ros publishers
         self.local_traj_publisher = rospy.Publisher('local_gps_trajectory', Trajectory, queue_size=10)
@@ -92,7 +93,7 @@ class ObstacleStopPlanner:
         rate = rospy.Rate(100)
         while not rospy.is_shutdown():
             robot_pose = current_robot_pose("map", self.robot_base_frame)
-            if self.tree and self.traj_in and robot_pose:
+            if self.scan_data_received and self.traj_in and robot_pose:
                 rospy.loginfo("scan data, global path and robot_pose  are received")
                 break
             else:
@@ -101,7 +102,14 @@ class ObstacleStopPlanner:
 
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
+            # continue
             robot_pose = current_robot_pose("map", self.robot_base_frame)
+            try:
+                self.tree = KDTree(self.pc_np, leaf_size=2)
+            except:
+                rospy.logwarn("no proper laser scan data")
+                continue
+
             if not robot_pose:
                 rospy.logwarn("No TF between %s and %s", "map", self.robot_base_frame)
                 rate.sleep()
@@ -179,7 +187,9 @@ class ObstacleStopPlanner:
         points = self.laser_geo_obj.projectLaser(data)
         tf_points = transform_cloud(points, self.robot_base_frame, "map")
         self.pc_np = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=True)
-        self.tree = KDTree(self.pc_np, leaf_size=2)
+        self.scan_data_received = True
+        # self.publish_points(self.pc_np)
+        # self.collision_points_publisher.publish(tf_points)
 
     def global_traj_callback(self, data):
         self.traj_in = data
@@ -222,14 +232,17 @@ class ObstacleStopPlanner:
         return ind, dis, heading_ok
 
     def publish_points(self, collision_points_index):
+        try:
 
-        a = np.take(self.pc_np, list(collision_points_index), 0)
-        header = Header()
-        header.stamp = rospy.Time.now()
-        header.frame_id = "map"
-        scaled_polygon_pcl = pcd2.create_cloud_xyz32(header, a)
-        rospy.loginfo("happily publishing sample pointcloud.. !")
-        self.collision_points_publisher.publish(scaled_polygon_pcl)
+            a = np.take(self.pc_np, list(collision_points_index), 0)
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "map"
+            scaled_polygon_pcl = pcd2.create_cloud_xyz32(header, a)
+            rospy.loginfo("happily publishing sample pointcloud.. !")
+            self.collision_points_publisher.publish(scaled_polygon_pcl)
+        except Exception as e:
+            rospy.logwarn("not able publish collision points")
 
     def publish_velocity_marker(self, trajectory):
         marker_arr_msg = MarkerArray()
