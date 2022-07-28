@@ -63,10 +63,9 @@
         </include>
     </group>
 
-    <include file="$(find collision_check)/launch/obstacle_stop_planner.launch">
+    <include file="$(find obstacle_stop_planner)/launch/obstacle_stop_planner.launch">
         <arg name="carla"         value="$(arg carla)" />
     </include>
-
 
 
 </launch>

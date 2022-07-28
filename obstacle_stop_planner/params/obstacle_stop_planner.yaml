@@ -1,0 +1,16 @@
+obstacle_stop_planner:
+  stop_margin : 7 # meters
+  slow_down_margin : 10 # meters
+
+  radial_off_set_to_vehicle_width : 0.3 # offset search radius to add vehicle width.
+  trajectory_resolution : 0.5 # the minimum distance between the points in trajectory
+
+  lookup_collision_distance : 20 # the distance to look for obstacle from vehicle location on the path.
+
+  traj_in  : "global_gps_trajectory"
+  scan_in  : "zed/laser_scan"
+  traj_out : "local_gps_trajectory"
+
+  max_slow_down_velocity : 1.5 # m/s
+  min_slow_down_velocity : 0.8 # m/s
+  
