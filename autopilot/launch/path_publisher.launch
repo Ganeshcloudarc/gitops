@@ -1,0 +1,11 @@
+<launch>
+<arg name="mission_file" default="default.json"/>
+<arg name ="mission_continue" default="true"/>
+
+
+<param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
+<param name= "/patrol/mission_continue" value = "$(arg mission_continue)"/>
+
+<node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" output="screen" />
+
+</launch>

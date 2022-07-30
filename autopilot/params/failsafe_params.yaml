@@ -1,5 +1,0 @@
-failsafe:
-  emergency_stop_topic : "/vehicle/emergency_stop" # true- stop, false - to continue
-   gps_failsafe     : false # doc="true - to stop vehicle when lost GPS RTK"/>
-   cte_failsafe     : false # doc="true - to stop vehicle when cross-track-error is more than a threshold (3m)"/>
-   emergency_stop   : true # doc="To have a topic for emergency stop with emergency_stop_topic  topic"/>

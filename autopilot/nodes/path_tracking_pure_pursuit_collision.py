@@ -24,7 +24,7 @@ try:
 
     # autopilot related imports
     from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud
-    from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, get_poses_slope
+    from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
     from autopilot_msgs.msg import ControllerDiagnose
@@ -130,7 +130,7 @@ class PurePursuitController:
             target_pose.pose = self.trajectory_data.points[target_point_ind].pose
             target_pose_pub.publish(target_pose)
 
-            slope = get_poses_slope(self.trajectory_data.points[target_point_ind].pose, robot_pose)
+            slope = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
             alpha = slope - get_yaw(robot_pose.orientation)
             delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
             delta_degrees = -math.degrees(delta)

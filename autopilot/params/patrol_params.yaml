@@ -1,8 +1,9 @@
 path_publisher:
-  minimum_dis_btw_points : 0.5 # meters
-  radius_of_curvature_min : 1
-  radius_of_curvature_max : 6 # should be similar to vehicle min turing
-  distance_to_slowdown_on_ends : 3 # m
+  max_dis_btw_points : 0.5 # meters
+  distance_to_slowdown_on_ends : 3
+  path_resolution : 0.1 # 10 cms
+  steering_limits_to_slow_down : 10 # if steering angle is more than this value, its associated speed reduces.
+
 
 
 patrol:

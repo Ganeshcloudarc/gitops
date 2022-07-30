@@ -1,6 +1,6 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
-    <arg name="mission_continue" default="false"/>
+    <arg name="mission_continue" default="true"/>
     <arg name="zed_od_enable" default="false"/>
 
     <arg name = 'rc_control' default="false"/>
@@ -37,9 +37,14 @@
 
     <param name="/patrol/rc_control" value="$(arg rc_control)" />
 
-    <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />
-    <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
+    <include file="$(find autopilot)/launch/path_publisher.launch">
+         <arg name="mission_file"         value= "$(arg mission_file)" />
+         <arg name="mission_continue"         value="$(arg mission_continue)"/>
+    </include>
 
+
+<!--    <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />-->
+    <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
 
 
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/path.rviz" if = "$(eval arg('rviz'))"/>
