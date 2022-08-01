@@ -74,6 +74,7 @@ class ObstacleStopPlanner:
         self.lookup_collision_distance = rospy.get_param("obstacle_stop_planner/lookup_collision_distance", 10)
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
         self.mission_repeat = rospy.get_param("obstacle_stop_planner/mission_repeat", False)
+        time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
         time_out_from_laser = 2  # in secs
         radius_to_search = vehicle_data.dimensions.overall_width / 2 + self.radial_off_set_to_vehicle_width
 
@@ -99,7 +100,7 @@ class ObstacleStopPlanner:
             else:
                 rospy.logwarn("waiting for scan data or global path or robot_pose ")
                 rate.sleep()
-
+        count= 0
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             robot_pose = current_robot_pose("map", self.robot_base_frame)
@@ -128,8 +129,14 @@ class ObstacleStopPlanner:
                 continue
             if self.index_old >= self.path_end_index:
                 if self.mission_repeat:
-                    self.index_old = 0
-
+                    rospy.logwarn("mission count %s", str(count))
+                    count = count + 1
+                    rospy.logwarn("waiting for %s seconds", str(time_to_wait_at_ends))
+                    time.sleep(time_to_wait_at_ends)
+                    self.index_old = 1
+                else:
+                    rospy.logwarn("mission completed")
+                    sys.exit("mission completed")
 
             collision_points_list = []
             trajectory_msg = Trajectory()
@@ -245,8 +252,8 @@ class ObstacleStopPlanner:
             scaled_polygon_pcl = pcd2.create_cloud_xyz32(header, a)
             rospy.loginfo("happily publishing sample pointcloud.. !")
             self.collision_points_publisher.publish(scaled_polygon_pcl)
-        except Exception as e:
-            rospy.logwarn("not able publish collision points")
+        except Exception as error:
+            rospy.logwarn("not able publish collision points %s", str(error))
 
     def publish_velocity_marker(self, trajectory):
         marker_arr_msg = MarkerArray()

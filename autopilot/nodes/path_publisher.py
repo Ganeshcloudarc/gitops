@@ -79,7 +79,7 @@ class PathPubGps:
         trajectory_msg = Trajectory()
         trajectory_msg.header.frame_id = "map"
         trajectory_msg.header.stamp = rospy.Time.now()
-        trajectory_msg.home_position = geo_point.position
+        trajectory_msg.home_position.position = geo_point.position
 
         # Filling the Trajectory_msg
         accumulated_distance = 0

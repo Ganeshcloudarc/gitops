@@ -4,11 +4,9 @@ path_publisher:
   path_resolution : 0.1 # 10 cms
   steering_limits_to_slow_down : 10 # if steering angle is more than this value, its associated speed reduces.
 
-
-
 patrol:
   path_topic           : "odom_path"
-  cmd_topic            : "/vehicle/cmd_drive_safe" # 
+  cmd_topic            : "/pure_pursuit/cmd_drive"
   pilot_cmd_in         : "/vehicle/cmd_drive_safe"
   wait_time_on_mission_complete  : 20  # secs
   google_map_center_always : true

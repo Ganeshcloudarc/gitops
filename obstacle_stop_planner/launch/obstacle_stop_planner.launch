@@ -1,6 +1,5 @@
 <launch>
-
-    <arg name="carla" default="true"/>
+    <arg name="carla" default="false"/>
     <arg name="mission_repeat" default="false"/>
 
      <param name = "/obstacle_stop_planner/mission_repeat" value = "$(arg mission_repeat)"/>
@@ -15,12 +14,14 @@
     </group>
     <group unless="$(arg carla)">
         <param name="robot_base_frame" value ="base_link"/>
+        <include file="$(find zed_wrapper)/launch/zed2i.launch"> </include>
         <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
             <arg name="cloud_in"         value="/zed2i/zed_node/point_cloud/cloud_registered" />
             <arg name="target_frame"            value="base_link" />
             <arg name="laser_out_topic" value="zed/laser_scan"/>
         </include>
     </group>
+
 
     <rosparam command="load" file="$(find obstacle_stop_planner)/params/obstacle_stop_planner.yaml"/>
     <node pkg="obstacle_stop_planner" type="obstacle_stop_planner.py" name="obstacle_stop_planner_node" />

@@ -52,11 +52,18 @@ class PurePursuitController:
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
         self.time_out_from_input_trajectory = rospy.get_param("/pure_pursuit/time_out", 3)
-        cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
         trajectory_in_topic = rospy.get_param("/trajectory_in", "/local_gps_trajectory")
         odom_topic = rospy.get_param("/patrol/odom_topic", "/mavros/global_position/local")
         gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/local")
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
+
+        failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
+
+        if failsafe_enable:
+            cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
+        else:
+            cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
+
         # Publishers
         self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10)
         target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
@@ -100,6 +107,13 @@ class PurePursuitController:
                     sys.exit('tf frames of path and odometry are not same"')
                     rate.sleep()
         time.sleep(1)
+        while not rospy.is_shutdown():
+            if self.trajectory_data and self.robot_state and self.gps_robot_state:
+                rospy.loginfo("trajectory_data and robot_state and gps_robot_state are avilable")
+                break
+            else:
+                rospy.loginfo("waiting for trajectory_data or robot_state or gps_robot_state")
+                rate.sleep()
 
         diagnostic_msg = ControllerDiagnose()
         diagnostic_msg.name = "Pure Pursuit Node"
