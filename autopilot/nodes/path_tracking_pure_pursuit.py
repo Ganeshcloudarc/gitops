@@ -62,10 +62,19 @@ class PurePursuit:
             self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 0.3)
             self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.03)
 
-        self.cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
+        # self.cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
+
+
+        failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
+
+        if failsafe_enable:
+            cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
+        else:
+            cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
+
         
         # Publishers
-        self.ackermann_publisher = rospy.Publisher(self.cmd_topic, AckermannDrive, queue_size=10)
+        self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10)
         self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
         self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2)
         self.controller_diagnose_pub = rospy.Publisher("pure_pursuit_diagnose", ControllerDiagnose, queue_size=2)

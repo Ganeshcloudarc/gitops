@@ -7,7 +7,7 @@ path_publisher:
 
 patrol:
   path_topic           : "odom_path"
-  pure_pursuit/cmd_drive            : "pure_pursuit/cmd_drive" # 
+  cmd_topic            : "pure_pursuit/cmd_drive" 
   pilot_cmd_in         : "/vehicle/cmd_drive_safe"
   wait_time_on_mission_complete  : 20  # secs
   google_map_center_always : true
