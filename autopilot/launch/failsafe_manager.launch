@@ -22,9 +22,9 @@
     </group> 
     -->
 
-    <group if="$(eval arg('use_zed_laser_scan'))">
+    <!-- <group if="$(eval arg('use_zed_laser_scan'))">
         <include file="$(find collision_check)/launch/vehicle_safety.launch"> </include>
-    </group>
+    </group> -->
     
     <node pkg="autopilot" name="failsafe_manager_autopilot_node" type="failsafe_manager.py" output="log"/>
 
