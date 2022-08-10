@@ -42,7 +42,7 @@ class FailSafeAutoPilot:
 
 
     def vehicle_safety_diagnose_cb(self, data, key):
-        RTK_fail_status, emergency_stop_pressed, out_of_geofence = None, None, None
+        RTK_fail_status, emergency_stop_pressed, out_of_geofence, CTE_fail_status = None, None, None, None
         for field in data.status:
             if field.name == "vehicle_safety_diagnostics: GPS":
                 if field.level == ERROR:
@@ -59,13 +59,17 @@ class FailSafeAutoPilot:
                     out_of_geofence = True
                 else:
                     out_of_geofence = False
-
+            if field.name == "vehicle_safety_diagnostics: CTE":
+                if field.level == ERROR:
+                    CTE_fail_status = True
+                    rospy.logerr("CTE_fail_status")
+                else:
+                    CTE_fail_status = False
                     
-        if RTK_fail_status or emergency_stop_pressed or out_of_geofence:
+        if RTK_fail_status or emergency_stop_pressed or out_of_geofence or CTE_fail_status:
             self.status_dict[key] = True
         else:
             self.status_dict[key] = False
-
 
     def zed_obstacle_status_cb(self, data, key):
         self.status_dict[key] = data.data
@@ -83,7 +87,6 @@ class FailSafeAutoPilot:
             rospy.loginfo("Forwarding the commands")
             rospy.loginfo(self.status_dict)
             self.cmd_pulisher.publish(data)
-
 
 if __name__ == "__main__":
     rospy.init_node('failsafe_intigator')
