@@ -31,6 +31,7 @@
         <param name='/patrol/odom_topic' value = '/mavros/global_position/local'/>
 
     </group>
+    <param name="/patrol/failsafe_enable" value="$(arg failsafe_enable)"/>
 
     <param name="/patrol/failsafe_enable" value ="$(arg failsafe_enable)"/>
     <param name = "/carla_sim/activate" value = "$(arg carla)"/>
