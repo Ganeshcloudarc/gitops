@@ -118,11 +118,13 @@ class PathPubGps:
         i = i + 1
         if self.mission_continue:
             distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[1].pose)
-            rospy.logdebug("distance between first and last way point %s", str(distance))
+            rospy.loginfo("distance between first and last way point %s", str(distance))
             if distance > self.avg_lhd:
                 rospy.logwarn("path's end and start points are %s meters apart , Interpolating them ", str(distance))
                 n_points = distance // self.path_resolution
-                angle = angle_btw_poses(trajectory_msg.points[0].pose, trajectory_msg.points[-1].pose)
+                angle = angle_btw_poses(trajectory_msg.points[1].pose, trajectory_msg.points[-1].pose)
+                # print()
+                print("angle", angle)
                 for j in range(0, int(n_points)):
                     # odom path
                     px = trajectory_msg.points[-1].pose.position.x

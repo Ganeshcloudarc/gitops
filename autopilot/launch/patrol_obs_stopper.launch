@@ -1,6 +1,7 @@
 <launch>
     <arg name="carla" default="false"/>
     <arg name="rviz" default="true"/>
+    <arg name="mission_continue" default="true"/>
     <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
 
     <group if="$(eval arg('rviz'))">
@@ -11,6 +12,7 @@
 
     <include file="$(find obstacle_stop_planner)/launch/obstacle_stop_planner.launch">
         <arg name="carla"         value="$(arg carla)" />
+        <arg name="mission_continue" value="$(arg mission_continue)"/>
     </include>
 
 </launch>

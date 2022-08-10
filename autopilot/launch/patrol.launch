@@ -22,7 +22,7 @@
         <param name='/patrol/odom_topic' value = '/carla/ego_vehicle/odometry'/>
         <param name="robot_base_frame" value ="ego_vehicle"/>
         <param name ='/patrol/max_forward_speed' value="0.3"/>
-        <param name ='/patrol/min_forward_speed' value="0.01"/>
+        <param name ='/patrol/min_forward_speed' value="0.1"/>
         <param name ='/patrol/max_backward_speed' value="0.3"/>
         <param name ='/patrol/min_backward_speed' value="0.01"/>
 
@@ -46,6 +46,7 @@
         <include file="$(find autopilot)/launch/patrol_obs_stopper.launch">
             <arg name="carla"         value="$(arg carla)" />
             <arg name="rviz"          value="$(arg rviz)"/>
+            <arg name="mission_continue"          value="$(arg mission_continue)"/>
         </include>
     </group>
 

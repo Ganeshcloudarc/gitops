@@ -73,7 +73,7 @@ class ObstacleStopPlanner:
         self.trajectory_resolution = rospy.get_param("obstacle_stop_planner/trajectory_resolution", 0.5)
         self.lookup_collision_distance = rospy.get_param("obstacle_stop_planner/lookup_collision_distance", 10)
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
-        self.mission_repeat = rospy.get_param("obstacle_stop_planner/mission_repeat", False)
+        self.mission_repeat = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
         time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
         time_out_from_laser = 2  # in secs
         radius_to_search = vehicle_data.dimensions.overall_width / 2 + self.radial_off_set_to_vehicle_width

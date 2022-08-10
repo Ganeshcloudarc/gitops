@@ -1,8 +1,8 @@
 <launch>
     <arg name="carla" default="false"/>
-    <arg name="mission_repeat" default="false"/>
+    <arg name="mission_continue" default="false"/>
 
-     <param name = "/obstacle_stop_planner/mission_repeat" value = "$(arg mission_repeat)"/>
+     <param name = "/obstacle_stop_planner/mission_continue" value = "$(arg mission_continue)"/>
 
     <group if="$(eval arg('carla'))">
         <param name="robot_base_frame" value ="ego_vehicle"/>
@@ -24,6 +24,6 @@
 
 
     <rosparam command="load" file="$(find obstacle_stop_planner)/params/obstacle_stop_planner.yaml"/>
-    <node pkg="obstacle_stop_planner" type="obstacle_stop_planner.py" name="obstacle_stop_planner_node" />
+    <node pkg="obstacle_stop_planner" type="obstacle_stop_planner.py" name="obstacle_stop_planner_node" output="screen" />
 
 </launch>
