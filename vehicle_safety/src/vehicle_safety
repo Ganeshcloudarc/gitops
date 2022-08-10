@@ -108,7 +108,7 @@ class VehicleSafety():
         self.emergency_stop = data.data
 
     def gps_failsafe(self,data):
-      self.gps2_fix = data.fix_type
+        self.gps2_fix = data.fix_type
 
     def mavros_heading(self,data):
         """
@@ -193,7 +193,6 @@ class VehicleSafety():
         return stat
 
     def cte_diagnostics(self,stat):
-        
         if self.cte is None:
             stat.summary(ERROR, "CTE None")
             stat.add("CTE Value",self.cte)
