@@ -80,7 +80,7 @@ class VehicleSafety():
         self.use_geo_fence = rospy.get_param('/vehicle_safety/use_geo_fence')
         self.geo_fence_coordinates = rospy.get_param('/vehicle_safety/geo_fence_coordinates')
         self.geo_fence = Polygon([[i, j] for i,j in self.geo_fence_coordinates])
-        self.is_inside_geo_fence = True
+        self.is_inside_geo_fence = False
     def sensor_accuracy(self,cov):
         '''
         Give sensor covariance data as input and 
