@@ -127,7 +127,7 @@ class ObstacleStopPlanner:
                 rospy.logwarn("Close point heading and vehicle are not on same side")
                 rate.sleep()
                 continue
-            if self.index_old >= self.path_end_index:
+            if self.index_old >= self.path_end_index- 10:
                 if self.mission_repeat:
                     rospy.logwarn("mission count %s", str(count))
                     count = count + 1

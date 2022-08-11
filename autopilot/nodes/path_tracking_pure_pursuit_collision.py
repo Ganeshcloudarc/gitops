@@ -139,6 +139,10 @@ class PurePursuitController:
 
             close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
             target_point_ind, lhd = self.target_index(robot_pose, close_point_ind)
+            if target_point_ind >= len(self.trajectory_data.points) -1:
+            	rate.sleep()
+            	rospy.logwarn("last point reached")
+            	continue
             target_pose = PoseStamped()
             target_pose.header.frame_id = "map"
             target_pose.pose = self.trajectory_data.points[target_point_ind].pose
@@ -192,7 +196,7 @@ class PurePursuitController:
             path_acc_distance = self.trajectory_data.points[ind].accumulated_distance_m - close_dis
             if path_acc_distance > lhd:
                 return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
-        return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
+        return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind-1].pose)
 
     def calc_nearest_ind(self, robot_pose):
         """
