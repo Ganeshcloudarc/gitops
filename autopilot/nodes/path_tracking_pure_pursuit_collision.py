@@ -138,11 +138,26 @@ class PurePursuitController:
                 continue
 
             close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
-            target_point_ind, lhd = self.target_index(robot_pose, close_point_ind)
-            if target_point_ind >= len(self.trajectory_data.points) -1:
-            	rate.sleep()
-            	rospy.logwarn("last point reached")
-            	continue
+            if close_point_ind == -1:
+                self.send_ack_msg(0, 0, 0)
+                rospy.loginfo("Reached end of local trajectory")
+                diagnostic_msg.level = diagnostic_msg.WARN
+                diagnostic_msg.message = "Reached end of local trajectory"
+                diagnostic_msg.stamp = rospy.Time.now()
+                controller_diagnose_pub.publish(diagnostic_msg)
+                rate.sleep()
+                continue
+            else:
+                target_point_ind, lhd = self.target_index(robot_pose, close_point_ind)
+            if target_point_ind == -1:
+                self.send_ack_msg(0, 0, 0)
+                rospy.loginfo("Lhd is less than min_look_ahead distance, reached end of local_traj")
+                diagnostic_msg.level = diagnostic_msg.WARN
+                diagnostic_msg.message = "Lhd is less than min_look_ahead distance, reached end of local_traj"
+                diagnostic_msg.stamp = rospy.Time.now()
+                controller_diagnose_pub.publish(diagnostic_msg)
+                rate.sleep()
+                continue
             target_pose = PoseStamped()
             target_pose.header.frame_id = "map"
             target_pose.pose = self.trajectory_data.points[target_point_ind].pose
@@ -196,7 +211,11 @@ class PurePursuitController:
             path_acc_distance = self.trajectory_data.points[ind].accumulated_distance_m - close_dis
             if path_acc_distance > lhd:
                 return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
-        return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind-1].pose)
+
+        if distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose) < self.min_look_ahead_dis:
+            return -1, -1
+        else:
+            return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind-1].pose)
 
     def calc_nearest_ind(self, robot_pose):
         """
@@ -209,7 +228,10 @@ class PurePursuitController:
         distance_list = [distance_btw_poses(robot_pose, point.pose) for point in self.trajectory_data.points]
         ind = np.argmin(distance_list)
         dis = distance_list[ind]
-        return ind, dis
+        if ind == len(self.trajectory_data.points)-1:
+            return -1, -1
+        else:
+            return ind, dis
 
     def trajectory_callback(self, data):
         self.trajectory_data = data

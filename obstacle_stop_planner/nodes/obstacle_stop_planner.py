@@ -52,7 +52,6 @@ def min_distance_to_object(pose, corners):
     return min(dist_list)
 
 
-
 class ObstacleStopPlanner:
     def __init__(self):
         self.path_end_index = None
@@ -75,6 +74,7 @@ class ObstacleStopPlanner:
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
         self.mission_repeat = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
         time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
+        self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         time_out_from_laser = 2  # in secs
         radius_to_search = vehicle_data.dimensions.overall_width / 2 + self.radial_off_set_to_vehicle_width
 
@@ -100,7 +100,7 @@ class ObstacleStopPlanner:
             else:
                 rospy.logwarn("waiting for scan data or global path or robot_pose ")
                 rate.sleep()
-        count= 0
+        count = 0
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             robot_pose = current_robot_pose("map", self.robot_base_frame)
@@ -127,13 +127,15 @@ class ObstacleStopPlanner:
                 rospy.logwarn("Close point heading and vehicle are not on same side")
                 rate.sleep()
                 continue
-            if self.index_old >= self.path_end_index- 10:
+            if self.traj_in.points[-1].accumulated_distance_m - \
+                    self.traj_in.points[self.index_old].accumulated_distance_m < self.min_look_ahead_dis:
                 if self.mission_repeat:
                     rospy.logwarn("mission count %s", str(count))
                     count = count + 1
                     rospy.logwarn("waiting for %s seconds", str(time_to_wait_at_ends))
                     time.sleep(time_to_wait_at_ends)
                     self.index_old = 1
+                    continue
                 else:
                     rospy.logwarn("mission completed")
                     sys.exit("mission completed")
