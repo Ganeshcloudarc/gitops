@@ -34,6 +34,7 @@
         <param name='/patrol/odom_topic' value = '/mavros/global_position/local'/>
         <param name="/robot_base_frame" value ="base_link"/>
     </group>
+    <param name="/patrol/failsafe_enable" value="$(arg failsafe_enable)"/>
 
 
     <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />
