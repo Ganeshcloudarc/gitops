@@ -2,6 +2,7 @@
     <arg name="mission_file" default="default.json"/>
     <arg name='min_dis' default='0.1'/>
     <arg name="carla" default="false"/>
+    <arg name="record" default="true"/>
     <group if="$(eval arg('carla'))">
         <param name='/patrol/gps_topic' value = '/carla/ego_vehicle/gnss'/>
         <param name='/patrol/imu_topic' value = '/carla/ego_vehicle/imu'/>
@@ -17,5 +18,6 @@
     <param name="/patrol/min_dis_between_waypoints" value="$(arg min_dis)"/>
     <node pkg="autopilot" type="record_waypoints_json.py" name="waypoints_recorder_node" output='screen' />
     <node pkg = "autopilot" type = "gps_fail_safe.py" name = "gps_fail_safe_node"/>
-
+    <node name="save_path_bag_record" pkg="rosbag" type="record"
+        args="record -o $(env HOME)/.bags/boson_save_path -a -x /zed2i/(.*) " if="$(eval record)"/>
 </launch>
