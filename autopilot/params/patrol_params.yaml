@@ -9,7 +9,7 @@ patrol:
   path_topic           : "odom_path"
   cmd_topic            : "pure_pursuit/cmd_drive" 
   pilot_cmd_in         : "/vehicle/cmd_drive_safe"
-  wait_time_on_mission_complete  : 20  # secs
+  wait_time_on_mission_complete  : 2  # secs
   google_map_center_always : true
   max_forward_speed : 2.5
   min_forward_speed : 0.8

@@ -1,12 +1,12 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
-    <arg name="mission_continue" default="false"/>
-    <arg name="zed_od_enable" default="false"/>
+    <arg name="mission_continue" default="true"/>
+    <!-- <arg name="zed_od_enable" default="false"/> -->
 
-    <arg name = 'rc_control' default="false"/>
+    <arg name = 'rc_control' default="fal/se"/>
     <arg name ='rviz' default = 'true'/>
-    <arg name="record" default="false"/>
-    <arg name="failsafe_enable" default="false"/>
+    <arg name="record" default="true"/>
+    <arg name="failsafe_enable" default="true"/>
 
     
 
@@ -59,7 +59,7 @@
 
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">
-            <arg name="use_zed_camera"         value="true" />
+            <arg name="use_zed_camera"         value="false" />
             <arg name="use_oak_camera"            value="false" />
             <arg name="vehicle_safety_diagnostics" value="true"/>
             <arg name="use_emergeny_stop" value ="true"/>
