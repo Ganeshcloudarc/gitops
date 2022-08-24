@@ -171,24 +171,35 @@ class VehicleSafety():
             stat.add("BOTH GPS Fix Type",6)
             self.start_time = None
         elif self.gps1_fix == 5 and self.gps2_fix == 6:
-            # rospy.loginfo("WARN: GPS FIX LOST")
-            stat.summary(WARN, "WARN: GPS FIX LOST")
-            stat.add("GPS1 Fix Type",self.gps1_fix)
-            stat.add("GPS2_FIX_TYPE",self.gps2_fix)
-            self.start_time = None      
-        else:
+            # rospy.loginfo("WARN: GPS FIX LOST"
             if self.start_time == None:
                 self.start_time = time.time()
-            if time.time() - self.start_time > self.GPS_FIX_THR:
-                # rospy.loginfo("ERROR: GPS FIX LOST")
-                stat.summary(ERROR, "ERROR: GPS FIX LOST")
+            if (time.time() - self.start_time) > self.GPS_FIX_THR:
+                stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT")
                 stat.add("GPS1 Fix Type",self.gps1_fix)
                 stat.add("GPS2_FIX_TYPE",self.gps2_fix)
             else:
-                # rospy.loginfo("WARN: GPS FIX LOST")
+                # rospy.loginfo("threshold not reached")
                 stat.summary(WARN, "WARN: GPS FIX LOST")
                 stat.add("GPS1 Fix Type",self.gps1_fix)
                 stat.add("GPS2_FIX_TYPE",self.gps2_fix)
+        else:
+            stat.summary(ERROR, "ERROR: GPS FIX LOST")
+            stat.add("GPS1 Fix Type",self.gps1_fix)
+            stat.add("GPS2_FIX_TYPE",self.gps2_fix)
+        # else:
+        #     if self.start_time == None:
+        #         self.start_time = time.time()
+        #     if time.time() - self.start_time > self.GPS_FIX_THR:
+        #         # rospy.loginfo("ERROR: GPS FIX LOST")
+        #         stat.summary(ERROR, "ERROR: GPS FIX LOST")
+        #         stat.add("GPS1 Fix Type",self.gps1_fix)
+        #         stat.add("GPS2_FIX_TYPE",self.gps2_fix)
+        #     else:
+        #         # rospy.loginfo("WARN: GPS FIX LOST")
+        #         stat.summary(WARN, "WARN: GPS FIX LOST")
+        #         stat.add("GPS1 Fix Type",self.gps1_fix)
+        #         stat.add("GPS2_FIX_TYPE",self.gps2_fix)
         (self.gps1_fix,self.gps2_fix,self.position_covariance) = None,None,None
         return stat
 
