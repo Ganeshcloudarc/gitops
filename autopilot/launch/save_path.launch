@@ -2,8 +2,8 @@
     <arg name="mission_file" default="default.json"/>
     <arg name='min_dis' default='0.1'/>
     <arg name="carla" default="false"/>
-    <arg name="vehicle_safety_diagnostics" default="true"/>
-    
+    <arg name="failsafe_enable" default="true"/>
+
     <group if="$(eval arg('carla'))">
         <param name='/patrol/gps_topic' value = '/carla/ego_vehicle/gnss'/>
         <param name='/patrol/imu_topic' value = '/carla/ego_vehicle/imu'/>
@@ -20,7 +20,7 @@
     <node pkg="autopilot" type="record_waypoints_json.py" name="waypoints_recorder_node" output='screen' />
     <node pkg = "autopilot" type = "gps_fail_safe.py" name = "gps_fail_safe_node"/>
 
-    <group if="$(eval arg('vehicle_safety_diagnostics'))">
+    <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find vehicle_safety)/launch/vehicle_safety.launch"> </include>
     </group>
 

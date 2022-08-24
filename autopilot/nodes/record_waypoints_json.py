@@ -91,7 +91,11 @@ class SaveWayPoints:
                 rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
                 rospy.Subscriber(imu_topic, Imu, self.imu_callback)
                 rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
-                rospy.Subscriber("/vehicle_safety_diagnostics", DiagnosticArray, self.vehicle_safety_diagnose_cb)
+                failsafe_enable = rospy.get_param("/failsafe_enable", True) 
+                if failsafe_enable:
+                    rospy.Subscriber("/vehicle_safety_diagnostics", DiagnosticArray, self.vehicle_safety_diagnose_cb)
+                else:
+                    self.RTK_fail_status = False
                 self.starting_point_pub = rospy.Publisher('/mavros/global_position/set_gp_origin', GeoPointStamped,
                                                           queue_size=10, latch=True)
                 self.home_position_pub = rospy.Publisher('/mavros/global_position/home', HomePosition,
