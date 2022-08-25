@@ -26,11 +26,49 @@ def get_yaw(orientation):
         [orientation.x, orientation.y, orientation.z, orientation.w])
     return yaw
 
+def distance_btw_poses(pose1, pose2):
+    """
+    Calculates distance between poses.
+        Parameters:
+            pose1(geometry_msgs/Pose.msg): pose one.
+            pose2(geometry_msgs/Pose.msg): pose two.
+        Returns:
+            distance(float): distance between the poses
+    """
+    distance = math.hypot(pose1.position.x - pose2.position.x, pose1.position.y - pose2.position.y)
+    return distance
+
+def normalize_angle(angle):
+    """
+        Normalize an angle to [-pi, pi].
+
+        :param angle: (float)
+        :return: (float) Angle in radian in [-pi, pi]
+    """
+    while angle > np.pi:
+        angle -= 2.0 * np.pi
+
+    while angle < -np.pi:
+        angle += 2.0 * np.pi
+
+    return angle
 
 def get_poses_slope(pose1, pose2):
     delta_x = pose1.position.x - pose2.position.x
     delta_y = pose1.position.y - pose2.position.y
     return math.atan2(delta_y, delta_x)
+
+
+def heading_check(robot_orientation, path_orientation):
+    robot_heading = normalize_angle(get_yaw(robot_orientation))
+    path_heading = normalize_angle(get_yaw(path_orientation))
+    # print(robot_heading- path_heading)
+    if abs(robot_heading- path_heading) > math.radians(90):
+        rospy.logwarn("Headings are %s apart ", str(abs(robot_heading - path_heading)))
+        heading_ok = False
+    else:
+        heading_ok = True
+    return heading_ok
 
 
 class PurePursuit:
@@ -49,6 +87,7 @@ class PurePursuit:
 
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
+        self.avg_look_ahead = (self.min_look_ahead_dis +self.max_look_ahead_dis)/2
 
         self.path_topic = rospy.get_param("/patrol/path_topic", 'odom_path')
         self.odom_topic = rospy.get_param("/patrol/odom_topic", '/mavros/global_position/local')
@@ -57,6 +96,7 @@ class PurePursuit:
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.base_frame = rospy.get_param("/patrol/base_frame", "base_link")
         self.carla_sim = rospy.get_param("/carla_sim/activate", False)
+        self.search_point_distance = 5 
 
         if self.carla_sim:
             self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 0.3)
@@ -206,6 +246,7 @@ class PurePursuit:
 
 
     def find_close_point(self, robot_pose, old_close_index):
+
         close_dis = self.calc_distance(robot_pose, old_close_index)
         for ind in range(old_close_index + 1, self.path_end_index):
             dis = self.calc_distance(robot_pose, ind)
@@ -215,6 +256,23 @@ class PurePursuit:
                 # print("find close", index_old, ind)
                 return ind - 1, close_dis
         return self.path_end_index, 0
+
+
+    def find_close_point_by_distance(self, robot_pose, old_close_index):
+        distance_list = []
+        acc_dis = 0
+        for ind in range(old_close_index, self.path_end_index):
+            acc_dis += self.distance_to_next_index(ind)
+            if acc_dis < self.search_point_distance:
+                dis = self.calc_distance(robot_pose, ind)
+                distance_list.append(dis)
+            else:
+                break
+        ind = np.argmin(distance_list)
+        dis = distance_list[ind]
+        return old_close_index + ind, dis
+
+
 
     def target_index(self, robot_pose):
         """
@@ -226,10 +284,10 @@ class PurePursuit:
         """
         # important condition check the
         if self.index_old is None:
-            self.index_old, cross_track_dis = self.calc_nearest_ind(robot_pose)
+            self.index_old, cross_track_dis = self.find_first_close_point(robot_pose)
 
         else:
-            self.index_old, cross_track_dis = self.find_close_point(robot_pose, self.index_old)
+            self.index_old, cross_track_dis = self.find_close_point_by_distance(robot_pose, self.index_old)
         # The following implementation was inspired from
         # http://dyros.snu.ac.kr/wp-content/uploads/2021/02/Ahn2021_Article_AccuratePathTrackingByAdjustin-1.pdf
         sum_dis = 0
@@ -252,7 +310,11 @@ class PurePursuit:
         return math.hypot(robot_pose.position.x - self.path[ind].pose.position.x, robot_pose.position.y -
                           self.path[ind].pose.position.y)
 
-    def calc_distance_idx(self, close, next_id):
+    # def calc_distance_idx(self, close, next_id):
+    #     # print(self.path[0])
+    #     return math.hypot(self.path[inclosed].pose.position.x - self.path[ind].pose.position.x, robot_pose.position.y -
+    #                       self.path[ind].pose.position.y)
+
         return math.hypot(self.path[close][0] - self.path[next_id][0], self.path[close][1] - self.path[next_id][1])
 
     def calc_nearest_ind(self, robot_pose):
@@ -268,6 +330,35 @@ class PurePursuit:
         self.index_old = ind
         dis = distance_list[ind]
         return ind, dis
+
+    def find_first_close_point(self, robot_pose):
+        index_list = []
+        for ind in range(len(self.path)):
+            dis = self.calc_distance(robot_pose, ind)
+            print("dis", dis)
+            if dis < self.avg_look_ahead:
+                heading_ok = heading_check(robot_pose.orientation, self.path[ind].pose.orientation)
+                print("heading_ok", heading_ok)
+                # exit()
+                if heading_ok:
+                    
+                    return ind, dis
+                    
+                else:
+                    index_list.append(ind)
+        if len(index_list) > 0:
+            distance_list = [self.calc_distance(robot_pose, ind) for ind in
+                             index_list]
+            ind = np.argmin(distance_list)
+            close_index = index_list[ind]
+            dis = distance_list[ind]
+            return close_index, dis
+        else:
+            close_index, dis = self.calc_nearest_ind(robot_pose)
+            return close_index, dis
+
+
+        
 
     def main_loop(self):
         r = rospy.Rate(1)
@@ -290,17 +381,22 @@ class PurePursuit:
         r = rospy.Rate(50)
         diagnostic_msg = ControllerDiagnose()
         diagnostic_msg.name = "Pure Pursuit Node"
+        prev_close_id = None
+        prev_robot_pose = None
         while not rospy.is_shutdown():
             robot_pose = current_robot_pose("map", self.base_frame)
             if robot_pose is None:
-                diagnostic_msg.level = diagnostic_msg.WARN
+                diagnostic_msg.level = diagnostic_msg.ERROR
                 diagnostic_msg.message = 'Time out from tf'
                 diagnostic_msg.speed = 0
                 diagnostic_msg.steering_angle = 0
                 self.controller_diagnose_pub.publish(diagnostic_msg)
+                r.sleep()
                 continue
 
             close_idx, target_idx, lhd, cross_track_error = self.target_index(robot_pose)
+
+
             rospy.loginfo("close index %s , target point index %s, lookahead dis %s, ctc %s",
                           str(close_idx), str(target_idx), str(lhd), str(cross_track_error))
 
