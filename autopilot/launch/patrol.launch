@@ -1,14 +1,9 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
     <arg name="mission_continue" default="true"/>
-    <!-- <arg name="zed_od_enable" default="false"/> -->
-
-    <arg name = 'rc_control' default="fal/se"/>
     <arg name ='rviz' default = 'true'/>
     <arg name="record" default="true"/>
     <arg name="failsafe_enable" default="true"/>
-
-    
 
     <arg name="carla" default="false"/>
     <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
@@ -38,11 +33,9 @@
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
     <param name="patrol/mission_continue" value ="$(arg mission_continue)"/>
 
-    <param name="/patrol/rc_control" value="$(arg rc_control)" />
     
     <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />
     <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
-    <node name="control_mode_selector" pkg="autopilot" type="control_mode_selector.py"  if = "$(eval arg('rc_control'))" output = 'screen'/>
 
 
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/path.rviz" if = "$(eval arg('rviz'))"/>

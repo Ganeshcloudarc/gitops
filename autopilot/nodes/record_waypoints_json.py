@@ -74,7 +74,7 @@ class SaveWayPoints:
         self.RTK_fail_status  = None
 
         # IMP PARAMS
-        self.min_dis_between_waypoints = rospy.get_param('/patrol/min_dis_between_waypoints', 0.1)
+        self.min_dis_between_waypoints = rospy.get_param('/save_path/min_dis_between_waypoints', 0.1)
         gps_topic = rospy.get_param('/patrol/gps_topic', "/mavros/global_position/global")
         imu_topic = rospy.get_param('/patrol/imu_topic', "/mavros/imu/data")
         odom_topic = rospy.get_param('/patrol/odom_topic', "/mavros/global_position/local")
@@ -91,7 +91,7 @@ class SaveWayPoints:
                 rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
                 rospy.Subscriber(imu_topic, Imu, self.imu_callback)
                 rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
-                failsafe_enable = rospy.get_param("/failsafe_enable", True) 
+                failsafe_enable = rospy.get_param("/save_path/failsafe_enable", True) 
                 if failsafe_enable:
                     rospy.Subscriber("/vehicle_safety_diagnostics", DiagnosticArray, self.vehicle_safety_diagnose_cb)
                 else:
@@ -205,6 +205,7 @@ class SaveWayPoints:
                             pass
                 else:
                     rospy.logwarn("NO RTK, not saving PATH")
+                    rospy.logwarn("Stop the vehicle, untill RTK comes")
                 r.sleep()
         except Exception as e:
             print('exception', e)
@@ -213,12 +214,12 @@ class SaveWayPoints:
 
 if __name__ == "__main__":
     rospy.init_node('way_point_saver_node')
-    mission_file = rospy.get_param('/patrol/mission_file', 'default.json')
+    mission_file = rospy.get_param('/save_path/mission_file', 'default.json')
     if '.json' in mission_file:
         pass
     else:
         mission_file = mission_file + '.json'
-        rospy.set_param('/patrol/mission_file', mission_file)
+        rospy.set_param('/save_path/mission_file', mission_file)
     try:
         ros_pack = rospkg.RosPack()
         mission_file_dir = ros_pack.get_path('autopilot') + "/mission_files/" + str(mission_file)
