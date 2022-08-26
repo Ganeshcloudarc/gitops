@@ -259,14 +259,14 @@ class VehicleSafety():
                         stat.summary(ERROR, self.pp_diagnose_data.message)
                     elif self.pp_diagnose_data.level == WARN:
                             stat.summary(WARN, self.pp_diagnose_data.message)
-                            stat.add("CTE Value",self.cte)
+                            stat.add("CTE Value",self.pp_diagnose_data.cte)
                     else:
                         if self.pp_diagnose_data.cte > self.CTE_THR: #if cte is > 1meter
                             stat.summary(ERROR, "HIGH CTE")
-                            stat.add("CTE Value",self.cte)
+                            stat.add("CTE Value",self.pp_diagnose_data.cte)
                         else:
                             stat.summary(OK, "CTE OK")
-                            stat.add("CTE Value",self.cte)
+                            stat.add("CTE Value",self.pp_diagnose_data.cte)
                 else:
                     stat.summary(ERROR, "No update on Tracking Controller")
 
