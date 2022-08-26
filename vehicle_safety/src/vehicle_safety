@@ -67,6 +67,7 @@ class VehicleSafety():
         self.gps_curr_long = 0
         self.calc_heading = 0
         self.pp_diagnose_data = None
+        self.time_on_tracking_cb = None
         self.cte = None
         self.prev_compass = 0
         self.curr_compass = 0
@@ -82,6 +83,7 @@ class VehicleSafety():
         self.ignore_heading = [0,45,90,135,180,225,270,315,360]
         self.GPS_ACC_IDEAL = 99.99999999999999
         self.GPS_ACC_THR = 0.00000000000383
+        self.TRACKING_CONTROLLER_TIMEOUT = 5 
         self.CTE_THR = rospy.get_param('/vehicle_safety/CTE_THR')
         self.HEAD_THR = rospy.get_param('/vehicle_safety/HEAD_THR')
         self.GPS_FIX_THR = rospy.get_param('/vehicle_safety/GPS_FIX_THR')
@@ -189,8 +191,9 @@ class VehicleSafety():
                  pass
         
     def path_track_diagnose_callback(self, data):
+        self.time_on_tracking_cb = time.time()
         self.pp_diagnose_data = data
-        self.cte = data.cte
+        # self.cte = data.cte
     
     def gps_diagnostics(self,stat):
         """
@@ -248,24 +251,30 @@ class VehicleSafety():
         return stat
 
     def cte_diagnostics(self,stat):
-        if self.pp_diagnose_data:
-            if self.pp_diagnose_data.level == ERROR:
-                stat.summary(ERROR, self.pp_diagnose_data.message)
-            elif self.pp_diagnose_data.level == WARN:
-                    stat.summary(WARN, self.pp_diagnose_data.message)
-                    stat.add("CTE Value",self.cte)
-            else:
-                if self.cte > self.CTE_THR: #if cte is > 1meter
-                    stat.summary(ERROR, "HIGH CTE")
-                    stat.add("CTE Value",self.cte)
+        if self.time_on_tracking_cb:
+            if time.time() - self.time_on_tracking_cb < self.TRACKING_CONTROLLER_TIMEOUT:
+                if self.pp_diagnose_data:
+                    if self.pp_diagnose_data.level == ERROR:
+                        stat.summary(ERROR, self.pp_diagnose_data.message)
+                    elif self.pp_diagnose_data.level == WARN:
+                            stat.summary(WARN, self.pp_diagnose_data.message)
+                            stat.add("CTE Value",self.cte)
+                    else:
+                        if self.pp_diagnose_data.cte > self.CTE_THR: #if cte is > 1meter
+                            stat.summary(ERROR, "HIGH CTE")
+                            stat.add("CTE Value",self.cte)
+                        else:
+                            stat.summary(OK, "CTE OK")
+                            stat.add("CTE Value",self.cte)
                 else:
-                    stat.summary(OK, "CTE OK")
-                    stat.add("CTE Value",self.cte)
-            # self.cte = None
-            return stat
+                    stat.summary(ERROR, "No update on Tracking Controller")
+
+            else:
+                stat.summary(ERROR, "No update on Tracking Controller from last :" + str(time.time() - self.time_on_tracking_cb) + " secs")
         else:
-            stat.summary(WARN, "waiting for data")
-            return stat
+            stat.summary(WARN, "Waiting for Tracking Controller diagnose")
+        self.pp_diagnose_data = None
+        return stat
 
     
 
