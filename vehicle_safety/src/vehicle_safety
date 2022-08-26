@@ -37,6 +37,7 @@ KeyValue[] values # an array of values associated with the status
 OK = DiagnosticStatus.OK
 ERROR = DiagnosticStatus.ERROR
 WARN = DiagnosticStatus.WARN
+STALE = DiagnosticStatus.STALE
 
 class VehicleSafety():
 
@@ -272,7 +273,7 @@ class VehicleSafety():
             else:
                 stat.summary(ERROR, "No update on Tracking Controller from last :" + str(time.time() - self.time_on_tracking_cb) + " secs")
         else:
-            stat.summary(WARN, "Waiting for Tracking Controller diagnose")
+            stat.summary(STALE, "Waiting for Tracking Controller diagnose")
         self.pp_diagnose_data = None
         return stat
 
