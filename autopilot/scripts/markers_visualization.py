@@ -41,6 +41,6 @@ if __name__ == "__main__":
     rospy.loginfo("visualization_marker_pure_pursuit Node started ")
     rospy.Subscriber("/close_pose", PoseStamped, vehicle_pose_callback)
     rospy.Subscriber("/target_pose", PoseStamped, target_pose_callback)
-    vehicle_pose_marker = rospy.Publisher("/vehicle_pose_marker", Marker, queue_size=2)
+    vehicle_pose_marker = rospy.Publisher("/close_pose_marker", Marker, queue_size=2)
     target_pose_marker = rospy.Publisher("/target_pose_marker", Marker, queue_size=2)
     rospy.spin()
