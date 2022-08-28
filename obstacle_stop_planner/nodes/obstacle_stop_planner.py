@@ -68,11 +68,14 @@ class ObstacleStopPlanner:
         self.min_slow_down_velocity = rospy.get_param('obstacle_stop_planner/min_slow_down_velocity', 0.8)
         self.stop_margin = rospy.get_param('obstacle_stop_planner/stop_margin', 3)
         self.slow_down_margin = rospy.get_param("obstacle_stop_planner/slow_down_margin", 5)
-        self.radial_off_set_to_vehicle_width = rospy.get_param("obstacle_stop_planner/radial_off_set_to_vehicle_width", 0.5)
+        self.radial_off_set_to_vehicle_width = rospy.get_param("obstacle_stop_planner/radial_off_set_to_vehicle_width",
+                                                               0.5)
         self.trajectory_resolution = rospy.get_param("obstacle_stop_planner/trajectory_resolution", 0.5)
         self.lookup_collision_distance = rospy.get_param("obstacle_stop_planner/lookup_collision_distance", 10)
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
         self.mission_repeat = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
+        self.vis_collision_points = rospy.get_param("/obstacle_stop_planner/vis_collision_points", True)
+        self.vis_trajectory_rviz = rospy.get_param("/obstacle_stop_planner/vis_trajectory_rviz", True)
         time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         time_out_from_laser = 2  # in secs
@@ -101,16 +104,9 @@ class ObstacleStopPlanner:
                 rospy.logwarn("waiting for scan data or global path or robot_pose ")
                 rate.sleep()
         count = 0
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(20)
         while not rospy.is_shutdown():
             robot_pose = current_robot_pose("map", self.robot_base_frame)
-            try:
-                self.tree = KDTree(self.pc_np, leaf_size=2)
-            except:
-                rospy.logwarn("Could not fill KDtree")
-                rate.sleep()
-                continue
-
             if not robot_pose:
                 rospy.logwarn("No TF between %s and %s", "map", self.robot_base_frame)
                 rate.sleep()
@@ -145,16 +141,26 @@ class ObstacleStopPlanner:
             trajectory_msg.header.frame_id = "map"
             trajectory_msg.home_position = self.traj_in.home_position
             close_dis = self.traj_in.points[self.index_old].accumulated_distance_m
-
+            prev_processed_ind = self.index_old
             for ind in range(self.index_old, self.path_end_index):
                 path_acc_distance = self.traj_in.points[ind].accumulated_distance_m - close_dis
                 # print(path_acc_distance)
                 if path_acc_distance > self.lookup_collision_distance:
                     break
 
-                path_pose = self.traj_in.points[ind].pose
-                pose_xyz = np.array([[path_pose.position.x, path_pose.position.y, path_pose.position.z]])
-                collision_points = self.tree.query_radius(pose_xyz, r=radius_to_search)
+                collision_points = [np.array([])]
+                if self.traj_in.points[ind].accumulated_distance_m - \
+                        self.traj_in.points[prev_processed_ind].accumulated_distance_m > radius_to_search / 2:
+                    # print("distance added:", self.traj_in.points[ind].accumulated_distance_m -
+                    #       self.traj_in.points[prev_processed_ind].accumulated_distance_m)
+                    path_pose = self.traj_in.points[ind].pose
+                    pose_xyz = np.array([[path_pose.position.x, path_pose.position.y, path_pose.position.z]])
+                    try:
+                        collision_points = self.tree.query_radius(pose_xyz, r=radius_to_search)
+                        prev_processed_ind = ind
+                    except Exception as error:
+                        rospy.logwarn("could not query KD tree", str(error))
+
                 collision_points_list.extend(list(collision_points[0]))
                 trajectory_point_msg = TrajectoryPoint()
                 # print(len(list(collision_points[0])))
@@ -164,12 +170,13 @@ class ObstacleStopPlanner:
                     # print("stop_margin",self.stop_margin )
                     if self.stop_margin > path_acc_distance:
                         # return 0
+                        rospy.logwarn("collision detected in stop margin")
                         trajectory_point_msg = copy.deepcopy(self.traj_in.points[ind])
                         trajectory_point_msg.longitudinal_velocity_mps = 0
                         trajectory_msg.points.append(trajectory_point_msg)
 
                         # for i in range(ind, self.index_old-ind, -1):
-                        for k in range(len(trajectory_msg.points)-1, -1, -1):
+                        for k in range(len(trajectory_msg.points) - 1, -1, -1):
                             trajectory_msg.points[k].longitudinal_velocity_mps = 0
                     elif self.stop_margin < path_acc_distance < self.slow_down_margin:
                         # TODO: look for slow down margin and how to control velocity
@@ -188,14 +195,16 @@ class ObstacleStopPlanner:
                     trajectory_point_msg = copy.deepcopy(self.traj_in.points[ind])
 
                 trajectory_msg.points.append(trajectory_point_msg)
-
-            self.publish_points(collision_points_list)
-            self.publish_velocity_marker(trajectory_msg)
+            if self.vis_collision_points:
+                self.publish_points(collision_points_list)
+            if self.vis_trajectory_rviz:
+                self.publish_velocity_marker(trajectory_msg)
             self.local_traj_publisher.publish(trajectory_msg)
 
             rate.sleep()
 
     def scan_callback(self, data):
+        pass
         self.laser_data_in_time = time.time()
         points = self.laser_geo_obj.projectLaser(data)
         tf_points = transform_cloud(points, self.robot_base_frame, "map")
@@ -203,6 +212,10 @@ class ObstacleStopPlanner:
         self.scan_data_received = True
         # self.publish_points(self.pc_np)
         # self.collision_points_publisher.publish(tf_points)
+        try:
+            self.tree = KDTree(self.pc_np, leaf_size=2)
+        except:
+            rospy.logwarn("Could not fill KDtree")
 
     def global_traj_callback(self, data):
         self.traj_in = data
@@ -246,13 +259,12 @@ class ObstacleStopPlanner:
 
     def publish_points(self, collision_points_index):
         try:
-
             a = np.take(self.pc_np, list(collision_points_index), 0)
             header = Header()
             header.stamp = rospy.Time.now()
             header.frame_id = "map"
             scaled_polygon_pcl = pcd2.create_cloud_xyz32(header, a)
-            rospy.loginfo("happily publishing sample pointcloud.. !")
+            rospy.logdebug("happily publishing sample pointcloud.. !")
             self.collision_points_publisher.publish(scaled_polygon_pcl)
         except Exception as error:
             rospy.logwarn("not able publish collision points %s", str(error))

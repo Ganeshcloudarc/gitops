@@ -13,4 +13,7 @@ obstacle_stop_planner:
 
   max_slow_down_velocity : 1.5 # m/s
   min_slow_down_velocity : 0.8 # m/s
+
+  vis_collision_points : true
+  vis_trajectory_rviz  : true
   
