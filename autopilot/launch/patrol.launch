@@ -3,7 +3,7 @@
     <arg name="mission_continue" default="true"/>
     <!-- <arg name="zed_od_enable" default="false"/> -->
 
-    <arg name = 'rc_control' default="fal/se"/>
+    <arg name = 'rc_control' default="false"/>
     <arg name ='rviz' default = 'true'/>
     <arg name="record" default="true"/>
     <arg name="failsafe_enable" default="true"/>
