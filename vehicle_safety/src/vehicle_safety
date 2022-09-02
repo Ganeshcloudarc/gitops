@@ -38,18 +38,6 @@ WARN = DiagnosticStatus.WARN
 class VehicleSafety():
 
     def __init__(self):
-
-        rospy.Subscriber('/mavros/gpsstatus/gps1/raw', GPSRAW, self.heading_failsafe)
-        rospy.Subscriber("/mavros/gpsstatus/gps2/raw", GPSRAW, self.gps_failsafe)
-        rospy.Subscriber("/mavros/global_position/compass_hdg",Float64,self.mavros_heading)
-        rospy.Subscriber("/pure_pursuit_diagnose", ControllerDiagnose, self.path_track_diagnose_callback)
-        rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.global_gps_callback)
-        try:
-            emergency_stop_topic = rospy.get_param('/failsafe/emergency_stop_topic')
-            rospy.Subscriber(emergency_stop_topic, Bool, self.emergency_callback)
-        except KeyError as K:
-            pass
-        self.ack_msg = AckermannDrive()
         self.heading = 0
         self.declination = -0.01745
         self.prev_coordinates_lat = 0
@@ -81,6 +69,20 @@ class VehicleSafety():
         self.geo_fence_coordinates = rospy.get_param('/vehicle_safety/geo_fence_coordinates')
         self.geo_fence = Polygon([[i, j] for i,j in self.geo_fence_coordinates])
         self.is_inside_geo_fence = False
+        
+        # setting up subscribers
+        
+        rospy.Subscriber('/mavros/gpsstatus/gps1/raw', GPSRAW, self.heading_failsafe)
+        rospy.Subscriber("/mavros/gpsstatus/gps2/raw", GPSRAW, self.gps_failsafe)
+        rospy.Subscriber("/mavros/global_position/compass_hdg",Float64,self.mavros_heading)
+        rospy.Subscriber("/pure_pursuit_diagnose", ControllerDiagnose, self.path_track_diagnose_callback)
+        rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.global_gps_callback)
+        try:
+            emergency_stop_topic = rospy.get_param('/failsafe/emergency_stop_topic')
+            rospy.Subscriber(emergency_stop_topic, Bool, self.emergency_callback)
+        except KeyError as K:
+            pass
+        
     def sensor_accuracy(self,cov):
         '''
         Give sensor covariance data as input and 
