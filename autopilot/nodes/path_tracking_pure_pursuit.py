@@ -422,7 +422,7 @@ class PurePursuit:
             rospy.loginfo("close index %s , target point index %s, lookahead dis %s, ctc %s",
                           str(self.index_old), str(target_idx), str(lhd), str(cross_track_error))
 
-            if self.target_idx >= self.path_end_index-1:
+            if target_idx >= self.path_end_index-1:
                 self.count_mission_repeat += 1
                 rospy.loginfo(' MISSION COUNT %s ', self.count_mission_repeat)
                 self.mission_count_pub.publish(self.count_mission_repeat)
