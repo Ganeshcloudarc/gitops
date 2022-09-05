@@ -12,6 +12,9 @@ from diagnostic_msgs.msg import DiagnosticStatus
 import numpy as np
 import time
 from shapely.geometry import Polygon, Point
+from geographic_msgs.msg import GeoPointStamped
+from autopilot_utils.geonav_conversions import *
+import geometry_msgs.msg as gmsg
 
 """
 # This message holds the status of an individual component of the robot.
@@ -34,6 +37,7 @@ KeyValue[] values # an array of values associated with the status
 OK = DiagnosticStatus.OK
 ERROR = DiagnosticStatus.ERROR
 WARN = DiagnosticStatus.WARN
+STALE = DiagnosticStatus.STALE
 
 class VehicleSafety():
 
@@ -44,11 +48,15 @@ class VehicleSafety():
         rospy.Subscriber("/mavros/global_position/compass_hdg",Float64,self.mavros_heading)
         rospy.Subscriber("/pure_pursuit_diagnose", ControllerDiagnose, self.path_track_diagnose_callback)
         rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.global_gps_callback)
+        
         try:
             emergency_stop_topic = rospy.get_param('/failsafe/emergency_stop_topic')
             rospy.Subscriber(emergency_stop_topic, Bool, self.emergency_callback)
         except KeyError as K:
             pass
+         
+        self.home_gps_location = None
+        
         self.ack_msg = AckermannDrive()
         self.heading = 0
         self.declination = -0.01745
@@ -59,6 +67,8 @@ class VehicleSafety():
         self.gps_curr_lat = 0
         self.gps_curr_long = 0
         self.calc_heading = 0
+        self.pp_diagnose_data = None
+        self.time_on_tracking_cb = None
         self.cte = None
         self.prev_compass = 0
         self.curr_compass = 0
@@ -74,13 +84,23 @@ class VehicleSafety():
         self.ignore_heading = [0,45,90,135,180,225,270,315,360]
         self.GPS_ACC_IDEAL = 99.99999999999999
         self.GPS_ACC_THR = 0.00000000000383
+        self.TRACKING_CONTROLLER_TIMEOUT = 5 
         self.CTE_THR = rospy.get_param('/vehicle_safety/CTE_THR')
         self.HEAD_THR = rospy.get_param('/vehicle_safety/HEAD_THR')
         self.GPS_FIX_THR = rospy.get_param('/vehicle_safety/GPS_FIX_THR')
         self.use_geo_fence = rospy.get_param('/vehicle_safety/use_geo_fence')
+        if self.use_geo_fence:
+            self.geo_polygon_pub = rospy.Publisher('/geo_fence_polygon', gmsg.PolygonStamped,queue_size=1, latch=True)
+            rospy.Subscriber('/mavros/global_position/set_gp_origin', GeoPointStamped,
+                                     self.home_position_callback)
+
+
         self.geo_fence_coordinates = rospy.get_param('/vehicle_safety/geo_fence_coordinates')
         self.geo_fence = Polygon([[i, j] for i,j in self.geo_fence_coordinates])
         self.is_inside_geo_fence = False
+
+
+    
     def sensor_accuracy(self,cov):
         '''
         Give sensor covariance data as input and 
@@ -103,6 +123,33 @@ class VehicleSafety():
         self.global_longitude = data.longitude
         self.global_position = Point(self.global_latitude,self.global_longitude)
         self.is_inside_geo_fence = self.geo_fence.contains(self.global_position) #True if vehicle inside geo_fence i.e, safe.
+
+    def home_position_callback(self, data):
+        self.home_gps_location = {
+            'latitude': data.position.latitude,
+            'longitude': data.position.longitude,
+            'altitude': data.position.altitude
+        }
+        rospy.logdebug("home position data received %s", str(self.home_gps_location))
+    
+    def publish_geo_fence(self):
+        if not self.home_gps_location:
+            return False
+        else:
+            home_lat = self.home_gps_location['latitude']
+            home_long = self.home_gps_location['longitude']
+            polygon_st = gmsg.PolygonStamped()
+            polygon_st.header.frame_id = 'map'
+
+            for lat, lon in self.geo_fence_coordinates:
+                point = gmsg.Point()
+                point.x, point.y = ll2xy(lat, lon, home_lat, home_long)
+                polygon_st.polygon.points.append(point)
+            self.geo_polygon_pub.publish(polygon_st)
+            rospy.loginfo("geo fence is published")
+            return True
+
+            
 
     def emergency_callback(self, data):
         self.emergency_stop = data.data
@@ -145,8 +192,9 @@ class VehicleSafety():
                  pass
         
     def path_track_diagnose_callback(self, data):
+        self.time_on_tracking_cb = time.time()
         self.pp_diagnose_data = data
-        self.cte = data.cte
+        # self.cte = data.cte
     
     def gps_diagnostics(self,stat):
         """
@@ -204,18 +252,31 @@ class VehicleSafety():
         return stat
 
     def cte_diagnostics(self,stat):
-        if self.cte is None:
-            stat.summary(ERROR, "CTE None")
-            stat.add("CTE Value",self.cte)
-        else:
-            if self.cte > self.CTE_THR: #if cte is > 1meter
-                stat.summary(ERROR, "HIGH CTE")
-                stat.add("CTE Value",self.cte)
+        if self.time_on_tracking_cb:
+            if time.time() - self.time_on_tracking_cb < self.TRACKING_CONTROLLER_TIMEOUT:
+                if self.pp_diagnose_data:
+                    if self.pp_diagnose_data.level == ERROR:
+                        stat.summary(ERROR, self.pp_diagnose_data.message)
+                    elif self.pp_diagnose_data.level == WARN:
+                            stat.summary(WARN, self.pp_diagnose_data.message)
+                            stat.add("CTE Value",self.pp_diagnose_data.cte)
+                    else:
+                        if self.pp_diagnose_data.cte > self.CTE_THR: #if cte is > 1meter
+                            stat.summary(ERROR, "HIGH CTE")
+                            stat.add("CTE Value",self.pp_diagnose_data.cte)
+                        else:
+                            stat.summary(OK, "CTE OK")
+                            stat.add("CTE Value",self.pp_diagnose_data.cte)
+                else:
+                    stat.summary(ERROR, "No update on Tracking Controller")
+
             else:
-                stat.summary(OK, "CTE OK")
-                stat.add("CTE Value",self.cte)
-        self.cte = None
+                stat.summary(ERROR, "No update on Tracking Controller from last :" + str(time.time() - self.time_on_tracking_cb) + " secs")
+        else:
+            stat.summary(STALE, "Waiting for Tracking Controller diagnose")
+        self.pp_diagnose_data = None
         return stat
+
     
 
     def geo_fence_diagnostics(self,stat):
@@ -267,12 +328,17 @@ if __name__ == '__main__':
     updater.setHardwareID("Zekrom-v1")
     vs = VehicleSafety()
     updater.add("GPS", vs.gps_diagnostics)
-    updater.add("CTE",vs.cte_diagnostics)
+    updater.add("TrackingController",vs.cte_diagnostics)
     updater.add("Heading", vs.heading_diagnostics)
     updater.add("Emergency", vs.emergency_diagnostics)
     updater.add("GeoFence",vs.geo_fence_diagnostics)
     updater.force_update()
+    geo_fence_published = False
     while not rospy.is_shutdown():
         # S = VehicleSafety()
+        if vs.use_geo_fence:
+            if not geo_fence_published:
+                geo_fence_published = vs.publish_geo_fence()
+            
         updater.update()
         # rospy.spin()

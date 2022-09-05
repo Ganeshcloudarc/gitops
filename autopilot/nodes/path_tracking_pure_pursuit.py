@@ -26,11 +26,49 @@ def get_yaw(orientation):
         [orientation.x, orientation.y, orientation.z, orientation.w])
     return yaw
 
+def distance_btw_poses(pose1, pose2):
+    """
+    Calculates distance between poses.
+        Parameters:
+            pose1(geometry_msgs/Pose.msg): pose one.
+            pose2(geometry_msgs/Pose.msg): pose two.
+        Returns:
+            distance(float): distance between the poses
+    """
+    distance = math.hypot(pose1.position.x - pose2.position.x, pose1.position.y - pose2.position.y)
+    return distance
+
+def normalize_angle(angle):
+    """
+        Normalize an angle to [-pi, pi].
+
+        :param angle: (float)
+        :return: (float) Angle in radian in [-pi, pi]
+    """
+    while angle > np.pi:
+        angle -= 2.0 * np.pi
+
+    while angle < -np.pi:
+        angle += 2.0 * np.pi
+
+    return angle
 
 def get_poses_slope(pose1, pose2):
     delta_x = pose1.position.x - pose2.position.x
     delta_y = pose1.position.y - pose2.position.y
     return math.atan2(delta_y, delta_x)
+
+
+def heading_check(robot_orientation, path_orientation):
+    robot_heading = normalize_angle(get_yaw(robot_orientation))
+    path_heading = normalize_angle(get_yaw(path_orientation))
+    # print(robot_heading- path_heading)
+    if abs(robot_heading- path_heading) > math.radians(90):
+        rospy.logwarn("Headings are %s apart ", str(abs(robot_heading - path_heading)))
+        heading_ok = False
+    else:
+        heading_ok = True
+    return heading_ok
 
 
 class PurePursuit:
@@ -49,6 +87,7 @@ class PurePursuit:
 
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
+        self.avg_look_ahead = (self.min_look_ahead_dis +self.max_look_ahead_dis)/2
 
         self.path_topic = rospy.get_param("/patrol/path_topic", 'odom_path')
         self.odom_topic = rospy.get_param("/patrol/odom_topic", '/mavros/global_position/local')
@@ -57,6 +96,7 @@ class PurePursuit:
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.base_frame = rospy.get_param("/patrol/base_frame", "base_link")
         self.carla_sim = rospy.get_param("/carla_sim/activate", False)
+        self.search_point_distance = 5 
 
         if self.carla_sim:
             self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 0.3)
@@ -76,6 +116,7 @@ class PurePursuit:
         # Publishers
         self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10)
         self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
+        self.close_pose_pub = rospy.Publisher('/close_pose', PoseStamped, queue_size=2)
         self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2)
         self.controller_diagnose_pub = rospy.Publisher("pure_pursuit_diagnose", ControllerDiagnose, queue_size=2)
         self.target_pose_msg = PoseStamped()
@@ -93,7 +134,7 @@ class PurePursuit:
         self.present_look_ahead = None
         self.target_id = None
         self.close_idx, self.cross_track_dis = 0.0, 0.0
-        self.count_mission_repeat = 0
+        self.count_mission_repeat = 1
         self.odom_wait_time_limit = 1  # change it
         self.robot_state = None
 
@@ -206,6 +247,7 @@ class PurePursuit:
 
 
     def find_close_point(self, robot_pose, old_close_index):
+
         close_dis = self.calc_distance(robot_pose, old_close_index)
         for ind in range(old_close_index + 1, self.path_end_index):
             dis = self.calc_distance(robot_pose, ind)
@@ -216,7 +258,27 @@ class PurePursuit:
                 return ind - 1, close_dis
         return self.path_end_index, 0
 
-    def target_index(self, robot_pose):
+
+    def find_close_point_by_distance(self, robot_pose, old_close_index):
+        distance_list = []
+        acc_dis = 0
+        for ind in range(old_close_index, self.path_end_index):
+            acc_dis += self.distance_to_next_index(ind)
+            if acc_dis < self.search_point_distance:
+                dis = self.calc_distance(robot_pose, ind)
+                distance_list.append(dis)
+            else:
+                break
+        if len(distance_list) > 0:
+            i = np.argmin(distance_list)
+            dis = distance_list[i]
+            return old_close_index + i, dis
+        else:
+            return self.path_end_index, 0
+
+
+
+    def target_index(self, robot_pose, old_close_index):
         """
         search index of target point in the reference path.
         Args:
@@ -224,25 +286,21 @@ class PurePursuit:
         Returns:
             close_index, target_index, lookahead_distance, cross_track_dis,
         """
-        # important condition check the
-        if self.index_old is None:
-            self.index_old, cross_track_dis = self.calc_nearest_ind(robot_pose)
-
-        else:
-            self.index_old, cross_track_dis = self.find_close_point(robot_pose, self.index_old)
+  
+        new_close_index, cross_track_dis = self.find_close_point_by_distance(robot_pose, old_close_index)
         # The following implementation was inspired from
         # http://dyros.snu.ac.kr/wp-content/uploads/2021/02/Ahn2021_Article_AccuratePathTrackingByAdjustin-1.pdf
         sum_dis = 0
-        lhd = self.compute_lookahead_distance(self.index_old)
-        for ind in range(self.index_old, self.path_end_index):
+        lhd = self.compute_lookahead_distance(new_close_index)
+        for ind in range(new_close_index, self.path_end_index):
             sum_dis += self.distance_to_next_index(ind)
             # print(sum_dis)
             if sum_dis >= lhd:
                 lhd = self.calc_distance(robot_pose, ind)
-                return self.index_old, ind, lhd, cross_track_dis
+                return new_close_index, ind, lhd, cross_track_dis
             if ind >= self.path_end_index:
-                return ind, ind, 0, cross_track_dis
-        return self.path_end_index, self.path_end_index, 0, 0
+                return new_close_index, ind, 0, cross_track_dis
+        return new_close_index, self.path_end_index, self.calc_distance(robot_pose, ind), cross_track_dis
 
     def distance_to_next_index(self, ind):
         return math.hypot(self.path[ind].pose.position.x - self.path[ind + 1].pose.position.x,
@@ -252,7 +310,11 @@ class PurePursuit:
         return math.hypot(robot_pose.position.x - self.path[ind].pose.position.x, robot_pose.position.y -
                           self.path[ind].pose.position.y)
 
-    def calc_distance_idx(self, close, next_id):
+    # def calc_distance_idx(self, close, next_id):
+    #     # print(self.path[0])
+    #     return math.hypot(self.path[inclosed].pose.position.x - self.path[ind].pose.position.x, robot_pose.position.y -
+    #                       self.path[ind].pose.position.y)
+
         return math.hypot(self.path[close][0] - self.path[next_id][0], self.path[close][1] - self.path[next_id][1])
 
     def calc_nearest_ind(self, robot_pose):
@@ -268,6 +330,33 @@ class PurePursuit:
         self.index_old = ind
         dis = distance_list[ind]
         return ind, dis
+
+    def find_first_close_point(self, robot_pose):
+        index_list = []
+        for ind in range(len(self.path)):
+            dis = self.calc_distance(robot_pose, ind)
+            # print("dis", dis)
+            count = 0
+            if dis < self.avg_look_ahead:
+                heading_ok = heading_check(robot_pose.orientation, self.path[ind].pose.orientation)
+                print("heading_ok", heading_ok)
+                # exit()
+                if heading_ok:
+                    
+                    return heading_ok, "Heading is okay", ind, dis
+                    
+                else:
+                    index_list.append(ind)
+        if len(index_list) ==0:
+            return False, "No close point found", 0, 0
+        else:
+            return False, "Found "+str(len(index_list))+ "points are close, But No Heading is not okay for them", 0,0
+
+
+                    
+
+
+        
 
     def main_loop(self):
         r = rospy.Rate(1)
@@ -290,21 +379,50 @@ class PurePursuit:
         r = rospy.Rate(50)
         diagnostic_msg = ControllerDiagnose()
         diagnostic_msg.name = "Pure Pursuit Node"
+        prev_close_id = None
+        prev_robot_pose = None
         while not rospy.is_shutdown():
             robot_pose = current_robot_pose("map", self.base_frame)
             if robot_pose is None:
-                diagnostic_msg.level = diagnostic_msg.WARN
-                diagnostic_msg.message = 'Time out from tf'
-                diagnostic_msg.speed = 0
-                diagnostic_msg.steering_angle = 0
+                diagnostic_msg = ControllerDiagnose()
+                diagnostic_msg.name = "Pure Pursuit Node"
+                diagnostic_msg.level = diagnostic_msg.ERROR
+                diagnostic_msg.message = 'Time out from tf between /map and '+ self.base_frame
                 self.controller_diagnose_pub.publish(diagnostic_msg)
+                rospy.logerr('Time out from tf between /map and '+self.base_frame)
+                r.sleep()
                 continue
 
-            close_idx, target_idx, lhd, cross_track_error = self.target_index(robot_pose)
-            rospy.loginfo("close index %s , target point index %s, lookahead dis %s, ctc %s",
-                          str(close_idx), str(target_idx), str(lhd), str(cross_track_error))
+            if self.index_old is None:
+                id_heading_okay, reason, close_idx, cross_track_dis = self.find_first_close_point(robot_pose)
+                if id_heading_okay:
+                    diagnostic_msg = ControllerDiagnose()
+                    diagnostic_msg.name = "Pure Pursuit Node"
+                    diagnostic_msg.level = diagnostic_msg.OK
+                    diagnostic_msg.message = reason
+                    self.controller_diagnose_pub.publish(diagnostic_msg)
+                    self.index_old = close_idx
+                    rospy.logerr(reason)
+                    r.sleep()
+                    continue
+                else:
+                    diagnostic_msg = ControllerDiagnose()
+                    diagnostic_msg.name = "Pure Pursuit Node"
+                    diagnostic_msg.level = diagnostic_msg.ERROR
+                    diagnostic_msg.message = reason
+                    self.controller_diagnose_pub.publish(diagnostic_msg)
+                    self.index_old = None
+                    rospy.loginfo(reason)
+                    r.sleep()
+                    continue
+            else:
+                self.index_old, target_idx, lhd, cross_track_error = self.target_index(robot_pose, self.index_old)
 
-            if close_idx >= self.path_end_index:
+
+            rospy.loginfo("close index %s , target point index %s, lookahead dis %s, ctc %s",
+                          str(self.index_old), str(target_idx), str(lhd), str(cross_track_error))
+
+            if self.target_idx >= self.path_end_index-1:
                 self.count_mission_repeat += 1
                 rospy.loginfo(' MISSION COUNT %s ', self.count_mission_repeat)
                 self.mission_count_pub.publish(self.count_mission_repeat)
@@ -314,41 +432,46 @@ class PurePursuit:
                 self.controller_diagnose_pub.publish(diagnostic_msg)
                 if self.mission_continue:
                     if self.mission_trips == 0:
-                        rospy.loginfo('restarting the mission')
-                        diagnostic_msg.level = diagnostic_msg.OK
-                        diagnostic_msg.message = 'MISSION COMPLETED AND RESTARTING THE MISSION-' + str(
+                        rospy.logwarn('restarting the mission')
+                        diagnostic_msg.level = diagnostic_msg.WARN
+                        diagnostic_msg.message = 'Mission complated and restarting the plan' + str(
                             self.count_mission_repeat)
                         self.controller_diagnose_pub.publish(diagnostic_msg)
                         rospy.loginfo("waiting for %s", str(self.wait_time_on_mission_complete))
                         time.sleep(self.wait_time_on_mission_complete)
                         self.index_old = 1
+                        r.sleep()
                         continue
                     elif self.count_mission_repeat <= self.mission_trips:
                         rospy.loginfo('completed mission  %s and target is %s', self.count_mission_repeat,
                                       self.mission_trips)
-                        diagnostic_msg.level = diagnostic_msg.OK
-                        diagnostic_msg.message = "MISSION:" + str(self.count_mission_repeat) + " IS COMPLETED"
+                        diagnostic_msg.level = diagnostic_msg.WARN
+                        diagnostic_msg.message = 'completed mission '+str(self.count_mission_repeat) +'and target is'+ str(self.mission_trips)
                         self.controller_diagnose_pub.publish(diagnostic_msg)
                         rospy.loginfo("waiting for %s", str(self.wait_time_on_mission_complete))
                         time.sleep(self.wait_time_on_mission_complete)
                         self.index_old = 1
+                        r.sleep()
                         continue
                     else:
                         rospy.loginfo('completed mission')
-                        diagnostic_msg.level = diagnostic_msg.OK
+                        diagnostic_msg.level = diagnostic_msg.WARN
                         diagnostic_msg.message = "MISSION IS COMPLETED"
+                        rospy.loginfo("MISSION IS COMPLETED")
                         self.controller_diagnose_pub.publish(diagnostic_msg)
+                        r.sleep()
                         break
                 else:
                     self.send_ack_msg(0, 0, 0)
                     rospy.loginfo('completed mission')
-                    diagnostic_msg.level = diagnostic_msg.OK
+                    diagnostic_msg.level = diagnostic_msg.WARN
                     diagnostic_msg.message = "MISSION IS COMPLETED"
                     self.controller_diagnose_pub.publish(diagnostic_msg)
                     break
 
             else:
                 self.target_pose_pub.publish(self.path[target_idx])
+                self.close_pose_pub.publish(self.path[self.index_old])
                 slope = get_poses_slope(self.path[target_idx].pose, robot_pose)
                 alpha = slope - get_yaw(robot_pose.orientation)
                 delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
@@ -358,7 +481,10 @@ class PurePursuit:
                 rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
 
                 # diagnose msg
-                diagnostic_msg.level = diagnostic_msg.OK
+                if self.index_old ==1:
+                    diagnostic_msg.level = diagnostic_msg.WARN
+                else:
+                    diagnostic_msg.level = diagnostic_msg.OK
                 diagnostic_msg.message = 'Executing path'
                 diagnostic_msg.look_ahead = lhd
                 diagnostic_msg.cte = cross_track_error

@@ -1,6 +1,7 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
     <arg name="mission_continue" default="true"/>
+    <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a missiion repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
     <arg name="record" default="true"/>
     <arg name="failsafe_enable" default="true"/>
@@ -32,6 +33,9 @@
     <param name = "/carla_sim/activate" value = "$(arg carla)"/>
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
     <param name="patrol/mission_continue" value ="$(arg mission_continue)"/>
+    <param name="patrol/mission_trips" value ="$(arg mission_trips)"/>
+
+
 
     
     <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />

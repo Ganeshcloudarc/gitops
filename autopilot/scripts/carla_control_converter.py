@@ -29,7 +29,7 @@ if __name__ == "__main__":
     rospy.init_node('carla_control_converter')
     carla_msg_pub = rospy.Publisher("/carla/ego_vehicle/vehicle_control_cmd", CarlaEgoVehicleControl, queue_size=2)
     carla_msg = CarlaEgoVehicleControl()
-    cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
+    cmd_topic = "/vehicle/cmd_drive_safe" # rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
     rospy.Subscriber(cmd_topic, AckermannDrive, ackremann_callback)
     rospy.loginfo("carla_control_converter started ")
     rospy.spin()
