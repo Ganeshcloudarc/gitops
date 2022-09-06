@@ -2,7 +2,7 @@ vehicle_safety:
   CTE_THR : 8 # cte threshold in meters
   HEAD_THR : 10 # Heading Threshold in degrees(+/-)
   GPS_FIX_THR : 10.0 #GPS FIX Threshold time in seconds
-  WHITE_LIST : ["GPS","CTE","Emergency","GeoFence"] # vehicle will stop,if these errors came up
+  WHITE_LIST : ["GPS","TrackingController","Emergency","GeoFence"] # vehicle will stop,if these errors came up
   BLACK_LIST : ["Heading"] # vehcile will ignore and continue running, if the errors coming from these items.
   use_geo_fence : True
   geo_fence_coordinates: [
