@@ -2,6 +2,7 @@
     <arg name="carla" default="false"/>
     <arg name="rviz" default="true"/>
     <arg name="mission_continue" default="true"/>
+    <arg name="sensor_source" default="0" doc="0: Zed camera, 1: Rslidar, 2: carla"/>
     <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
 
     <group if="$(eval arg('rviz'))">
@@ -11,8 +12,9 @@
 
 
     <include file="$(find obstacle_stop_planner)/launch/obstacle_stop_planner.launch">
-        <arg name="carla"         value="$(arg carla)" />
+        <!-- <arg name="carla"         value="$(arg carla)" /> -->
         <arg name="mission_continue" value="$(arg mission_continue)"/>
+        <arg name="sensor_source" value="$(arg sensor_source)"/>
     </include>
 
 </launch>
