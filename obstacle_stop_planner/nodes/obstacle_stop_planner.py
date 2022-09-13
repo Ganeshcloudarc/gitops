@@ -207,7 +207,7 @@ class ObstacleStopPlanner:
         pass
         self.laser_data_in_time = time.time()
         points = self.laser_geo_obj.projectLaser(data)
-        tf_points = transform_cloud(points, self.robot_base_frame, "map")
+        tf_points = transform_cloud(points, data.header.frame_id, "map")
         self.pc_np = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=True)
         self.scan_data_received = True
         # self.publish_points(self.pc_np)
