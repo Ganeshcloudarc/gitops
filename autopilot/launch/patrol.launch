@@ -6,6 +6,7 @@
     <arg name="failsafe_enable" default="true"/>
     <arg name="obs_stop_planner" default="true"/>
     <arg name="carla" default="false"/>
+    <arg name="sensor_source" default='1' doc="1: Zed camera, 1: Rslidar, 2: carla"/>
 
 
     <param name = "/carla_sim/activate" value = "$(arg carla)"/>
@@ -48,10 +49,12 @@
             <arg name="carla"         value="$(arg carla)" />
             <arg name="rviz"          value="$(arg rviz)"/>
             <arg name="mission_continue"          value="$(arg mission_continue)"/>
+            <arg name="sensor_source" value ="$(arg sensor_source)"/>
         </include>
     </group>
 
     <group unless="$(eval arg('obs_stop_planner'))">
+
           <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
           <group if="$(eval arg('rviz'))">
                 <node name="carla_rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/carla-patrol.rviz" if = "$(eval arg('carla'))"/>
@@ -62,9 +65,10 @@
     
 
     <node name="patrol_bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*) " if="$(eval record)"/>
+        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
     
     <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include>
+
 
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">

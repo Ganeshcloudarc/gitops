@@ -8,7 +8,7 @@ obstacle_stop_planner:
   lookup_collision_distance : 20 # the distance to look for obstacle from vehicle location on the path.
 
   traj_in  : "global_gps_trajectory"
-  scan_in  : "zed/laser_scan"
+  scan_in  : "laser_scan"
   traj_out : "local_gps_trajectory"
 
   max_slow_down_velocity : 1.5 # m/s
