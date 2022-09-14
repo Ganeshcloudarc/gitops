@@ -59,13 +59,21 @@ Visualization Manager:
       Enabled: true
       Head Length: 0.30000001192092896
       Head Radius: 0.10000000149011612
-      Name: Target_pose
+      Name: TargetPose
       Queue Size: 10
       Shaft Length: 0.5
       Shaft Radius: 0.05000000074505806
       Shape: Arrow
       Topic: /target_pose
       Unreliable: false
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /target_pose_marker
+      Name: TargetPoseMarker
+      Namespaces:
+        "": true
+      Queue Size: 100
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -77,7 +85,7 @@ Visualization Manager:
       Length: 0.30000001192092896
       Line Style: Lines
       Line Width: 1.5
-      Name: GpsPath
+      Name: GPSPath
       Offset:
         X: 0
         Y: 0
@@ -101,7 +109,7 @@ Visualization Manager:
       Length: 0.30000001192092896
       Line Style: Billboards
       Line Width: 1.5
-      Name: Traversed_path
+      Name: VehilceFollowedPath
       Offset:
         X: 0
         Y: 0
@@ -155,7 +163,7 @@ Visualization Manager:
       Enabled: true
       Foreground Alpha: 0.800000011920929
       Foreground Color: 25; 255; 240
-      Name: String
+      Name: PilotStatus
       Overtake Color Properties: false
       Overtake Position Properties: true
       Topic: /pilot_status
@@ -293,8 +301,8 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0
-        Y: 0
+        X: -43.591461181640625
+        Y: -8.943068504333496
         Z: 0
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
