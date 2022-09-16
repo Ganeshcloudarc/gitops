@@ -105,8 +105,11 @@ class ObstacleStopPlanner:
                 rate.sleep()
         count = 0
         rate = rospy.Rate(20)
+        robot_pose = current_robot_pose("map", self.robot_base_frame)
+
         while not rospy.is_shutdown():
             robot_pose = current_robot_pose("map", self.robot_base_frame)
+
             if not robot_pose:
                 rospy.logwarn("No TF between %s and %s", "map", self.robot_base_frame)
                 rate.sleep()
@@ -201,7 +204,7 @@ class ObstacleStopPlanner:
                 self.publish_velocity_marker(trajectory_msg)
             self.local_traj_publisher.publish(trajectory_msg)
 
-            rate.sleep()
+            # rate.sleep()
 
     def scan_callback(self, data):
         pass

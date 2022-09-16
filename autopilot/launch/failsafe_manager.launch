@@ -1,5 +1,5 @@
 <launch>
-    <arg name="use_zed_camera" default="true"/>
+    <arg name="use_zed_camera" default="false"/>
     <arg name="use_oak_camera" default="false"/>
     <arg name="vehicle_safety_diagnostics" default="true"/>
     <arg name="use_emergeny_stop" default="true"/>

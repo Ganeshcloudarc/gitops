@@ -19,15 +19,16 @@ try:
     from geographic_msgs.msg import GeoPointStamped
     from ackermann_msgs.msg import AckermannDrive
     from sensor_msgs.msg import NavSatFix
+    from std_msgs.msg import Float32
 
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
     # autopilot related imports
     from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud
-    from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses
+    from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses, normalize_angle
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
-    from autopilot_msgs.msg import ControllerDiagnose
+    from autopilot_msgs.msg import ControllerDiagnose, FloatKeyValue
 
 except Exception as e:
     import rospy
@@ -37,10 +38,11 @@ except Exception as e:
 
 
 def heading_check(robot_orientation, path_orientation):
-    robot_heading = get_yaw(robot_orientation)
-    path_heading = get_yaw(path_orientation)
-    if abs(abs(robot_heading) - abs(path_heading)) > math.radians(90):
-        rospy.logwarn("Headings are %s apart ", str(abs(robot_heading - path_heading)))
+    robot_heading = normalize_angle(get_yaw(robot_orientation))
+    path_heading = normalize_angle(get_yaw(path_orientation))
+    # print(robot_heading- path_heading)
+    if abs(robot_heading - path_heading) > math.radians(90):
+        # rospy.logwarn("Headings are %s apart ", str(abs(robot_heading - path_heading)))
         heading_ok = False
     else:
         heading_ok = True
@@ -49,14 +51,12 @@ def heading_check(robot_orientation, path_orientation):
 
 class PurePursuitController:
     def __init__(self):
+        self.updated_odom_time = None
         self.trajectory_len = None
         self.gps_robot_state = None
         self.robot_state = None
         self.trajectory_data = None
         self.updated_traj_time = time.time()
-        prev_steering_angle = 0
-        prev_time = 0
-        prev_speed = 0
 
         # ros parameters
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
@@ -66,12 +66,13 @@ class PurePursuitController:
         self.avg_look_ahead = (self.min_look_ahead_dis + self.max_look_ahead_dis) / 2
         self.time_out_from_input_trajectory = rospy.get_param("/pure_pursuit/time_out", 3)
         trajectory_in_topic = rospy.get_param("/trajectory_in", "/global_gps_trajectory")
-        odom_topic = rospy.get_param("/patrol/odom_topic", "/mavros/global_position/local")
+        odom_topic = rospy.get_param("/patrol/odom_topic", "vehicle/odom")
         gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/local")
         self.robot_base_frame = rospy.get_param("robot_base_frame", "ego_vehicle")
-        wait_time_at_ends = rospy.get_param("/patrol/wait_time_on_mission_complete", 10)
-        mission_continue = rospy.get_param("/patrol/mission_continue", False)
-
+        self.wait_time_at_ends = rospy.get_param("/patrol/wait_time_on_mission_complete", 10)
+        self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
+        self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
+        self.search_point_distance = 5
         failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
 
         if failsafe_enable:
@@ -81,12 +82,16 @@ class PurePursuitController:
 
         # Publishers
         self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10)
-        target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
-        controller_diagnose_pub = rospy.Publisher("pure_pursuit_diagnose", ControllerDiagnose, queue_size=2)
+        self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
+        self.close_pose_pub = rospy.Publisher('/close_pose', PoseStamped, queue_size=2)
+        self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2, latch=True)
+        self.controller_diagnose_pub = rospy.Publisher("pure_pursuit_diagnose", ControllerDiagnose, queue_size=2)
 
-        # ros subscribers
+        # other utility variables
+        self.count_mission_repeat = 0
+        self.index_old = None
+        self.robot_speed = None
 
-        target_pose_msg = PoseStamped()
         self.ackermann_msg = AckermannDrive()
 
         trajectory_data, tf_data = None, None
@@ -109,7 +114,7 @@ class PurePursuitController:
                 else:
                     rospy.logdebug("TF data is available  between map and %s", self.robot_base_frame)
 
-            if trajectory_data and tf_data :
+            if trajectory_data and tf_data:
                 if trajectory_data.header.frame_id == "map":  # tf_data.header.frame_id:
                     rospy.Subscriber(trajectory_in_topic, Trajectory, self.trajectory_callback)
                     rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
@@ -120,75 +125,193 @@ class PurePursuitController:
                 else:
                     rospy.logfatal('tf frames of path and odometry are not same: ')
                     sys.exit('tf frames of path and odometry are not same"')
-                    rate.sleep()
+            rate.sleep()
         time.sleep(1)
 
         while not rospy.is_shutdown():
             if self.trajectory_data and self.robot_state and self.gps_robot_state:
-                rospy.loginfo("trajectory_data and robot_state and gps_robot_state are avilable")
+                rospy.loginfo("trajectory_data and robot_state and gps_robot_state are available")
                 break
             else:
-                rospy.loginfo("waiting for trajectory_data or robot_state or gps_robot_state")
+                rospy.logwarn("waiting for trajectory_data or robot_state or gps_robot_state")
                 rate.sleep()
+        # rospy.Timer(rospy.Duration(0.0001), self.main_loop)
+        # rospy.Timer(rospy.Duration(0.1), self.timer)
+        self.main_loop()
+
+    def main_loop(self):
 
         diagnostic_msg = ControllerDiagnose()
         diagnostic_msg.name = "Pure Pursuit Node"
-        rate = rospy.Rate(100)
-        robot_pose = current_robot_pose("map", self.robot_base_frame)
+        rate = rospy.Rate(20)
 
-        close_point_ind, distance = self.find_first_close_point(robot_pose)
-        mission_count = 0
+        prev_steering_angle = 0
+        prev_speed = 0
+        prev_time = time.time()
+
+        target_pose_msg = PoseStamped()
+        target_pose_msg.header.frame_id = "map"
+        close_pose_msg = PoseStamped()
+        close_pose_msg.header.frame_id = "map"
+        # main loop starts
+        # robot_pose = current_robot_pose("map", self.robot_base_frame)
+
         while not rospy.is_shutdown():
-            robot_pose = current_robot_pose("map", self.robot_base_frame)
-            if not robot_pose:
-                rospy.logwarn("No tf between map and %s", self.robot_base_frame)
+            # TODO
+            # remove this current robot pose with odom callback, it increases speeed
+            # robot_pose = current_robot_pose("map", self.robot_base_frame)
+            robot_pose = self.robot_state.pose.pose
+            if time.time() - self.updated_odom_time > 1:
+                rospy.logwarn("Time out from Odometry, no update from last %s seconds",
+                              str(time.time() - self.updated_odom_time))
+                diagnostic_msg = ControllerDiagnose()
                 diagnostic_msg.level = diagnostic_msg.WARN
-                diagnostic_msg.message = 'Time out from tf'
+                diagnostic_msg.message = "Time out from Odometry, no update from last %s seconds" + \
+                                         str(time.time() - self.updated_odom_time)
                 diagnostic_msg.stamp = rospy.Time.now()
-                controller_diagnose_pub.publish(diagnostic_msg)
-                self.send_ack_msg(0, 0, 0)
+                self.controller_diagnose_pub.publish(diagnostic_msg)
                 rate.sleep()
                 continue
+                # return 0
+
+            # if not robot_pose:
+            #     rospy.logwarn("No tf between map and %s", self.robot_base_frame)
+            #     diagnostic_msg = ControllerDiagnose()
+            #     diagnostic_msg.level = diagnostic_msg.WARN
+            #     diagnostic_msg.message = 'Time out from tf'
+            #     diagnostic_msg.stamp = rospy.Time.now()
+            #     self.controller_diagnose_pub.publish(diagnostic_msg)
+            #     # rate.sleep()
+            #     # continue
+            #     return 0
+
+            if self.index_old is None:
+                id_heading_okay, reason, close_idx, cross_track_dis = self.find_first_close_point(robot_pose)
+
+                if id_heading_okay:
+                    diagnostic_msg = ControllerDiagnose()
+                    diagnostic_msg.name = "Pure Pursuit Node"
+                    diagnostic_msg.level = diagnostic_msg.OK
+                    diagnostic_msg.message = reason
+                    self.controller_diagnose_pub.publish(diagnostic_msg)
+                    self.index_old = close_idx
+                    rospy.loginfo(reason)
+                    self.send_ack_msg(0, 0, 0)
+                    rate.sleep()
+                    continue
+                    # return 0
+                else:
+                    diagnostic_msg = ControllerDiagnose()
+                    diagnostic_msg.name = "Pure Pursuit Node"
+                    diagnostic_msg.level = diagnostic_msg.ERROR
+                    diagnostic_msg.message = reason
+                    self.controller_diagnose_pub.publish(diagnostic_msg)
+                    self.index_old = None
+                    rospy.logerr(reason)
+                    self.send_ack_msg(0, 0, 0)
+                    rate.sleep()
+                    continue
+                    # return 0
 
             # close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
-            close_point_ind, close_dis = self.find_close_point(robot_pose, close_point_ind)
-            if close_point_ind >= self.trajectory_len:
-                rospy.logwarn("No tf between map and %s", self.robot_base_frame)
-                diagnostic_msg.level = diagnostic_msg.OK
-                diagnostic_msg.message = 'Mission completed'
-                diagnostic_msg.stamp = rospy.Time.now()
-                controller_diagnose_pub.publish(diagnostic_msg)
+            self.index_old, close_dis = self.find_close_point_by_distance(robot_pose, self.index_old)
+            if close_dis > self.avg_look_ahead:
+                # TODO
+                # Check for cross track error limit
+                diagnostic_msg = ControllerDiagnose()
+                diagnostic_msg.level = diagnostic_msg.WARN
+                diagnostic_msg.message = "Distance to close point is more than " + str(self.avg_look_ahead)
+                rospy.logwarn("Distance to close point is more than " + str(self.avg_look_ahead))
+                self.controller_diagnose_pub.publish(diagnostic_msg)
                 self.send_ack_msg(0, 0, 0)
-                if mission_continue:
-                    rospy.loginfo("Mission completed , count %s", str(mission_count))
-                    rospy.loginfo("Waiting for %s seconds ", str(wait_time_at_ends))
-                    time.sleep(wait_time_at_ends)
-                    close_point_ind = 1
-                else:
-                    rospy.loginfo("Mission completed ")
-                    sys.exit("Mission completed ")
-                rate.sleep()
+                self.index_old = None
                 continue
+                # return 0
 
-            target_point_ind, lhd = self.target_index(robot_pose, close_point_ind)
-            target_pose = PoseStamped()
-            target_pose.header.frame_id = "map"
-            target_pose.pose = self.trajectory_data.points[target_point_ind].pose
-            target_pose_pub.publish(target_pose)
+            lhd = self.compute_lookahead_distance(self.robot_speed)
+            target_point_ind, lhd = self.find_target_index(robot_pose, self.index_old, lhd)
+            close_point_ind = self.index_old
 
-            slope = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
-            alpha = slope - get_yaw(robot_pose.orientation)
+            if target_point_ind >= self.trajectory_len - 1:
+                self.count_mission_repeat += 1
+                diagnostic_msg = ControllerDiagnose()
+                rospy.loginfo(' Mission count %s ', self.count_mission_repeat)
+                self.mission_count_pub.publish(self.count_mission_repeat)
+                diagnostic_msg.level = diagnostic_msg.OK
+                diagnostic_msg.message = 'Mission count  ' + str(self.count_mission_repeat)
+                self.controller_diagnose_pub.publish(diagnostic_msg)
+                if self.mission_continue:
+                    if self.mission_trips == 0:
+                        diagnostic_msg = ControllerDiagnose()
+                        diagnostic_msg.level = diagnostic_msg.WARN
+                        diagnostic_msg.message = 'Mission completed and restarting the plan' + str(
+                            self.count_mission_repeat) + " waiting for : " + str(self.wait_time_at_ends) + " secs"
+                        self.controller_diagnose_pub.publish(diagnostic_msg)
+                        # TODO
+                        # publish this message for the complete duration of wait time
+                        self.send_ack_msg(0, 0, 0)
+                        rospy.logwarn('Mission completed and restarting the plan' + str(
+                            self.count_mission_repeat))
+                        rospy.loginfo("waiting for %s", str(self.wait_time_at_ends))
+                        time.sleep(self.wait_time_at_ends)
+                        self.index_old = 1
+                        rate.sleep()
+                        continue
+                    elif self.count_mission_repeat <= self.mission_trips:
+                        diagnostic_msg = ControllerDiagnose()
+                        diagnostic_msg.level = diagnostic_msg.WARN
+                        diagnostic_msg.message = 'completed mission ' + str(
+                            self.count_mission_repeat) + 'and target is' + str(
+                            self.mission_trips) + " waiting for : " + str(self.wait_time_at_ends) + " secs"
+                        self.controller_diagnose_pub.publish(diagnostic_msg)
+                        self.send_ack_msg(0, 0, 0)
+                        rospy.logwarn('completed mission  %s and target is %s', self.count_mission_repeat,
+                                      self.mission_trips)
+                        rospy.loginfo("waiting for %s", str(self.wait_time_at_ends))
+                        time.sleep(self.wait_time_at_ends)
+                        self.index_old = 1
+                        rate.sleep()
+                        continue
+                    else:
+                        rospy.logwarn("mission repeats of :" + str(self.mission_trips) + " are completed")
+                        diagnostic_msg = ControllerDiagnose()
+                        diagnostic_msg.level = diagnostic_msg.WARN
+                        diagnostic_msg.message = "mission repeats of :" + str(self.mission_trips) + " are completed"
+                        self.controller_diagnose_pub.publish(diagnostic_msg)
+                        self.send_ack_msg(0, 0, 0)
+                        rate.sleep()
+                        break
+                else:
+                    self.send_ack_msg(0, 0, 0)
+                    rospy.logwarn('completed mission')
+                    diagnostic_msg = ControllerDiagnose()
+                    diagnostic_msg.level = diagnostic_msg.WARN
+                    diagnostic_msg.message = "completed mission"
+                    self.controller_diagnose_pub.publish(diagnostic_msg)
+                    break
+
+            # Publishing close and target poses.
+            close_pose_msg.pose = self.trajectory_data.points[close_point_ind].pose
+            self.close_pose_pub.publish(close_pose_msg)
+            target_pose_msg.pose = self.trajectory_data.points[target_point_ind].pose
+            self.target_pose_pub.publish(target_pose_msg)
+
+            target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
+            alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
             delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
-            delta_degrees = -math.degrees(delta)
+            delta_degrees = math.degrees(delta)
             steering_angle = np.clip(delta_degrees, -30, 30)
             speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
+            rospy.loginfo('lhd: %s, alpha: %s , robot_speed: %s ', str(lhd), str(alpha), str(self.robot_speed))
             if speed <= 0:
                 self.send_ack_msg(steering_angle, speed, 1)
             else:
                 self.send_ack_msg(steering_angle, speed, 0)
 
             # fill the control diagnose topic
+            diagnostic_msg = ControllerDiagnose()
+            diagnostic_msg.name = "Pure Pursuit Node"
             diagnostic_msg.level = diagnostic_msg.OK
             diagnostic_msg.message = "Tracking path"
             diagnostic_msg.stamp = rospy.Time.now()
@@ -198,60 +321,89 @@ class PurePursuitController:
             diagnostic_msg.steering_angle = steering_angle
             diagnostic_msg.lateral_velocity_dps = steering_angle - prev_steering_angle / time.time() - prev_time
             diagnostic_msg.acceleration_mps2 = speed - prev_speed / time.time() - prev_time
-            diagnostic_msg.target_pose = target_pose.pose
+            diagnostic_msg.target_pose = target_pose_msg.pose
             diagnostic_msg.target_gps_pose = self.trajectory_data.points[target_point_ind].gps_pose
             diagnostic_msg.vehicle_pose = robot_pose
             diagnostic_msg.vehicle_gps_pose = self.gps_robot_state
-            controller_diagnose_pub.publish(diagnostic_msg)
+            k1 = FloatKeyValue("close_index", close_point_ind)
+            k2 = FloatKeyValue("target_index", target_point_ind)
+            path_percent = (self.trajectory_data.points[close_point_ind].accumulated_distance_m /
+                            self.trajectory_data.points[-1].accumulated_distance_m) * 100
+            k3 = FloatKeyValue("path_completed_percentage", round(path_percent, 3))
+            diagnostic_msg.values.extend([k1, k2, k3])
+            # diagnostic_msg.values["close_index"] = 10
+            self.controller_diagnose_pub.publish(diagnostic_msg)
             prev_steering_angle = steering_angle
             prev_time = time.time()
             prev_speed = speed
+            # removing this sleep increasing the speed
+            diagnostic_msg = None
             rate.sleep()
+            # return 0
 
     def find_first_close_point(self, robot_pose):
         index_list = []
-        for i in range(self.trajectory_len):
-            dis = distance_btw_poses(robot_pose, self.trajectory_data.points[i].pose)
-            if dis < self.avg_look_ahead:
-                heading_ok = heading_check(robot_pose.orientation, self.trajectory_data.points[i].pose.orientation)
-                if heading_ok:
-                    return i, dis
-                else:
-                    index_list.append(i)
-        if len(index_list) > 0:
-            distance_list = [distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose) for ind in
-                             index_list]
-            ind = np.argmin(distance_list)
-            close_index = index_list[ind]
-            dis = distance_list[ind]
-            return close_index, dis
-        else:
-            close_index, dis = self.calc_nearest_ind(robot_pose)
-            return close_index, dis
-
-    def find_close_point(self, robot_pose, old_close_index):
-        close_dis = distance_btw_poses(robot_pose, self.trajectory_data.points[old_close_index].pose)
-        for ind in range(old_close_index + 1, self.trajectory_len):
+        for ind in range(self.trajectory_len):
             dis = distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
-            if close_dis >= dis:
-                close_dis = dis
-            else:
-                return ind - 1, close_dis
-        return self.trajectory_len, 0
+            if dis < self.avg_look_ahead:
+                heading_ok = heading_check(robot_pose.orientation, self.trajectory_data.points[ind].pose.orientation)
+                # print("heading_ok", heading_ok)
+                # exit()
+                if heading_ok:
+                    return heading_ok, "Heading is okay", ind, dis
+                else:
+                    index_list.append(ind)
+        if len(index_list) == 0:
+            return False, "No close point found", 0, 0
+        else:
+            return False, "Found " + str(
+                len(index_list)) + "points are close, But No Heading is not okay for them", 0, 0
 
-    def target_index(self, robot_pose, close_point_ind):
+    # def find_close_point(self, robot_pose, old_close_index):
+    #     close_dis = distance_btw_poses(robot_pose, self.trajectory_data.points[old_close_index].pose)
+    #     for ind in range(old_close_index + 1, self.trajectory_len):
+    #         dis = distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
+    #         if close_dis >= dis:
+    #             close_dis = dis
+    #         else:
+    #             return ind - 1, close_dis
+    #     return self.trajectory_len, 0
+
+    def find_close_point_by_distance(self, robot_pose, old_close_index):
+        distance_list = []
+        acc_dis = 0
+        if old_close_index >= self.trajectory_len - 1:
+            dis = distance_btw_poses(robot_pose, self.trajectory_data.points[self.trajectory_len - 1].pose)
+            return self.trajectory_len - 1, dis
+        for ind in range(old_close_index, self.trajectory_len):
+            acc_dis += distance_btw_poses(self.trajectory_data.points[ind].pose,
+                                          self.trajectory_data.points[ind + 1].pose)
+            if acc_dis < self.search_point_distance:
+                dis = distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
+                distance_list.append(dis)
+            else:
+                break
+        if len(distance_list) > 0:
+            i = np.argmin(distance_list)
+            dis = distance_list[i]
+            return old_close_index + i, dis
+        else:
+            return self.trajectory_len - 1, 0
+
+    def find_target_index(self, robot_pose, close_point_ind, lhd):
         """
         search index of target point in the reference path. The following implementation was inspired from
         http://dyros.snu.ac.kr/wp-content/uploads/2021/02/Ahn2021_Article_AccuratePathTrackingByAdjustin-1.pdf
         Args:
             robot_pose:  pose of robot
             close_point_ind : index of close point to the vehicle
+            lhd : look ahead distance
         Returns:
-            close_index, target_index, lookahead_distance, cross_track_dis,
+            target_index, distance
         """
-        lhd = self.compute_lookahead_distance(abs(self.robot_state.twist.twist.linear.x))
+
         close_dis = self.trajectory_data.points[close_point_ind].accumulated_distance_m
-        for ind in range(close_point_ind, len(self.trajectory_data.points)):
+        for ind in range(close_point_ind, self.trajectory_len):
             path_acc_distance = self.trajectory_data.points[ind].accumulated_distance_m - close_dis
             if path_acc_distance > lhd:
                 return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
@@ -278,6 +430,8 @@ class PurePursuitController:
     def odom_callback(self, data):
         rospy.loginfo_once("Odom data received")
         self.robot_state = data
+        self.robot_speed = math.sqrt(data.twist.twist.linear.x ** 2 + data.twist.twist.linear.y ** 2)
+        self.updated_odom_time = time.time()
 
     def gps_callback(self, data):
         self.gps_robot_state = data

@@ -67,6 +67,8 @@ class PurePursuitController:
         # Publishers
         self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10)
         target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
+        close_pose_pub = rospy.Publisher('/close_pose', PoseStamped, queue_size=2)
+
         controller_diagnose_pub = rospy.Publisher("pure_pursuit_diagnose", ControllerDiagnose, queue_size=2)
 
         # ros subscribers
@@ -162,6 +164,11 @@ class PurePursuitController:
             target_pose.header.frame_id = "map"
             target_pose.pose = self.trajectory_data.points[target_point_ind].pose
             target_pose_pub.publish(target_pose)
+            close_pose = PoseStamped()
+            close_pose.header.frame_id = "map"
+            close_pose.pose = self.trajectory_data.points[close_point_ind].pose
+            close_pose_pub.publish(close_pose)
+
 
             slope = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
             alpha = slope - get_yaw(robot_pose.orientation)
