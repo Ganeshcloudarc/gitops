@@ -215,18 +215,20 @@ class PurePursuitController:
 
             # close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
             self.index_old, close_dis = self.find_close_point_by_distance(robot_pose, self.index_old)
-            if close_dis > self.avg_look_ahead:
-                # TODO
-                # Check for cross track error limit
-                diagnostic_msg = ControllerDiagnose()
-                diagnostic_msg.level = diagnostic_msg.WARN
-                diagnostic_msg.message = "Distance to close point is more than " + str(self.avg_look_ahead)
-                rospy.logwarn("Distance to close point is more than " + str(self.avg_look_ahead))
-                self.controller_diagnose_pub.publish(diagnostic_msg)
-                self.send_ack_msg(0, 0, 0)
-                self.index_old = None
-                continue
-                # return 0
+
+            #  COMMETING FOR DEBUG
+            # if close_dis > self.avg_look_ahead:
+            #     # TODO
+            #     # Check for cross track error limit
+            #     diagnostic_msg = ControllerDiagnose()
+            #     diagnostic_msg.level = diagnostic_msg.WARN
+            #     diagnostic_msg.message = "Distance to close point is more than " + str(self.avg_look_ahead)
+            #     rospy.logwarn("Distance to close point is more than " + str(self.avg_look_ahead))
+            #     self.controller_diagnose_pub.publish(diagnostic_msg)
+            #     self.send_ack_msg(0, 0, 0)
+            #     self.index_old = None
+            #     continue
+            #     # return 0
 
             lhd = self.compute_lookahead_distance(self.robot_speed)
             target_point_ind, lhd = self.find_target_index(robot_pose, self.index_old, lhd)
@@ -244,7 +246,7 @@ class PurePursuitController:
                     if self.mission_trips == 0:
                         diagnostic_msg = ControllerDiagnose()
                         diagnostic_msg.level = diagnostic_msg.WARN
-                        diagnostic_msg.message = 'Mission completed and restarting the plan' + str(
+                        diagnostic_msg.message = 'Mission completed and restarting the plan ' + str(
                             self.count_mission_repeat) + " waiting for : " + str(self.wait_time_at_ends) + " secs"
                         self.controller_diagnose_pub.publish(diagnostic_msg)
                         # TODO
