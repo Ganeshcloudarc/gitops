@@ -1,21 +1,33 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
     <arg name="mission_continue" default="true"/>
-    <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a missiion repeat works, 0-infinity loops "/>
+    <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
     <arg name="record" default="true"/>
     <arg name="failsafe_enable" default="true"/>
-
+    <arg name="obs_stop_planner" default="true"/>
     <arg name="carla" default="false"/>
+    <arg name="sensor_source" default='1' doc="1: Zed camera, 1: Rslidar, 2: carla"/>
+
+
+    <param name = "/carla_sim/activate" value = "$(arg carla)"/>
+    <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
+    <param name="/patrol/mission_continue" value ="$(arg mission_continue)"/>
+    <param name="/patrol/mission_trips" value ="$(arg mission_trips)"/>
+
+    <param name="/patrol/failsafe_enable" value = "$(arg failsafe_enable)"/>
+
     <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
+
 
     <group if="$(eval arg('carla'))">
         <param name='/patrol/gps_topic' value = '/carla/ego_vehicle/gnss'/>
         <param name='/patrol/imu_topic' value = '/carla/ego_vehicle/imu'/>
         <param name='/patrol/odom_topic' value = '/carla/ego_vehicle/odometry'/>
-        <param name="/patrol/base_frame" value ="ego_vehicle"/>
+        <param name="/robot_base_frame" value ="ego_vehicle"/>
+        <param name="robot_base_frame" value ="ego_vehicle"/>
         <param name ='/patrol/max_forward_speed' value="0.3"/>
-        <param name ='/patrol/min_forward_speed' value="0.01"/>
+        <param name ='/patrol/min_forward_speed' value="0.1"/>
         <param name ='/patrol/max_backward_speed' value="0.3"/>
         <param name ='/patrol/min_backward_speed' value="0.01"/>
 
@@ -24,35 +36,43 @@
     <group unless="$(arg carla)">
         <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
         <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
-        <param name='/patrol/odom_topic' value = '/mavros/global_position/local'/>
-
+        <param name='/patrol/odom_topic' value = 'vehicle/odom'/>
+        <param name="/robot_base_frame" value ="base_link"/>
     </group>
     <param name="/patrol/failsafe_enable" value="$(arg failsafe_enable)"/>
 
-    <param name="/patrol/failsafe_enable" value ="$(arg failsafe_enable)"/>
-    <param name = "/carla_sim/activate" value = "$(arg carla)"/>
-    <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
-    <param name="patrol/mission_continue" value ="$(arg mission_continue)"/>
-    <param name="patrol/mission_trips" value ="$(arg mission_trips)"/>
 
-
-
-    
     <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />
-    <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
-
-
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/path.rviz" if = "$(eval arg('rviz'))"/>
-    <node pkg = "autopilot" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
     <node pkg = "autopilot" type = "odom_path_plotter.py" name = "odom_path_plotter_node">
         <param name="max_list_append" value="300" />
     </node>
+    <node pkg = "autopilot" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
+
+    <group if="$(eval arg('obs_stop_planner'))">
+        <include file="$(find autopilot)/launch/patrol_obs_stopper.launch">
+            <arg name="carla"         value="$(arg carla)" />
+            <arg name="rviz"          value="$(arg rviz)"/>
+            <arg name="mission_continue"          value="$(arg mission_continue)"/>
+            <arg name="sensor_source" value ="$(arg sensor_source)"/>
+        </include>
+    </group>
+
+    <group unless="$(eval arg('obs_stop_planner'))">
+
+          <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
+          <group if="$(eval arg('rviz'))">
+                <node name="carla_rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/carla-patrol.rviz" if = "$(eval arg('carla'))"/>
+                <node name="rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol.rviz" unless = "$(eval arg('carla'))"/>
+          </group>
+    </group>
+
     
 
-    <node name="bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*) " if="$(eval record)"/>
+    <node name="patrol_bag_record" pkg="rosbag" type="record"
+        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
     
     <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include>
+
 
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">

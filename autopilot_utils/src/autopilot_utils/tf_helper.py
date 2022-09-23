@@ -5,6 +5,7 @@ import geometry_msgs.msg as gmsg
 import tf2_ros
 import tf2_geometry_msgs
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 
 # Lazy create on use (convert_pose) to avoid errors.
 tfBuffer = None
@@ -71,12 +72,12 @@ def convert_point(point, from_frame, to_frame):
     if tfBuffer is None or listener is None:
         _init_tf()
     try:
-        trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time.now(), rospy.Duration(1.0))
+        trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time.now(), rospy.Duration(2.0))
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
         rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, from_frame))
-        rospy.logerr('REASON IS' % (str(e)))
+        rospy.logerr(str(e))
         return None
-    final_point = gmsg.Point()
+    # final_point = gmsg.Point()
     if type(point) == type(gmsg.Point()):
         p2 = tf2_geometry_msgs.do_transform_point(gmsg.PointStamped(point=point), trans).point
         return p2
@@ -200,6 +201,32 @@ def get_yaw(orientation):
     _, _, yaw = euler_from_quaternion(
         [orientation.x, orientation.y, orientation.z, orientation.w])
     return yaw
+
+
+def transform_cloud(cloud, from_frame, to_frame):
+    """
+    Transforms Point cloud
+    :param cloud: Pointcloud you want to transform
+    :param from_frame: from which frame you want to convert (sensor frame/ base frame )
+    :param to_frame: to which frame you want to convert the point cloud (map frame )
+    :return: transformed point cloud in to_frame
+    """
+    global tfBuffer, listener
+    if tfBuffer is None or listener is None:
+        _init_tf()
+    try:
+        trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time.now(), rospy.Duration(1.0))
+    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+        rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, from_frame))
+        return None
+    cloud_out = do_transform_cloud(cloud, trans)
+    return cloud_out
+
+
+
+
+
+
 # def add_poses(pose1, pose2):
 #
 #     tf =gmsg.TransformStamped()

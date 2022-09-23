@@ -6,6 +6,8 @@ find_package(catkin REQUIRED
     message_generation
     std_msgs
     geometry_msgs
+    geographic_msgs
+    mavros_msgs
     )
 
 ## Generate messages in the 'msg' folder
@@ -21,4 +23,7 @@ add_message_files(
   DEPENDENCIES
   std_msgs
   geometry_msgs
+  geographic_msgs
+  mavros_msgs
+  sensor_msgs
 )

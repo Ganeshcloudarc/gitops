@@ -1,0 +1,23 @@
+<launch>
+<arg name="cloud_in" default="/zed2i/zed_node/point_cloud/cloud_registered"/>
+<arg name="target_frame" default="zed2i_left_camera_frame" />
+<arg name ="laser_out_topic" default="zed2i/laser_scan"/>
+
+
+ <include file="$(find collision_check)/launch/pointcloud_to_laserscan.launch">
+            <arg name="cloud_in"         value="$(arg cloud_in)"/>
+            <arg name="target_frame"     value="$(arg target_frame)" />
+            <arg name="laser_out_topic" value="$(arg laser_out_topic)"/>
+</include>
+
+<node name="laser_obstacle_detect_node" pkg="collision_check" type="laser_obstacle_detect.py" ouput="log">
+    <param name="scan_in" value="$(arg laser_out_topic)"/>
+    <rosparam>
+        min_group_distance : 0.3 # 10 cm
+        distance_proportion :  0.00628
+        min_stop_distance_x : 2.5
+        min_stop_distance_y : 1
+    </rosparam>
+</node>
+
+<launch/>

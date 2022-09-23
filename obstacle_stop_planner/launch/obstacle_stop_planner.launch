@@ -1,0 +1,18 @@
+<launch>
+    
+    <arg name="mission_continue" default="false"/>
+    <arg name="sensor_source" default="0" doc="0: zed_camera, 1: rslidar, 2:carla "/>
+
+    <param name = "/obstacle_stop_planner/mission_continue" value = "$(arg mission_continue)"/>
+    
+
+    <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
+        <arg name="sensor_source"         value="$(arg sensor_source)" />
+    </include>
+
+    <rosparam command="load" file="$(find obstacle_stop_planner)/params/obstacle_stop_planner.yaml"/>
+    <node pkg="obstacle_stop_planner" type="obstacle_stop_planner.py" name="obstacle_stop_planner_node" output="screen" />
+
+</launch>
+
+<!-- if="$(eval arg('arg_name') == 'desired_value')"/> -->
