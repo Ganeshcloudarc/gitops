@@ -16,7 +16,7 @@
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher">
   	<param name="publish_frequency" value="50"/>
   </node>
-
+  
   <node pkg = "vehicle_common" type = "mavros_map_to_base.py" name = "tf_converter" />
-
+  <node pkg = "tf" type = "static_transform_publisher" name = "odom_to_base_tf_node" args= " 0 0 0 0 0 0 1  /map /odom 20" />
 </launch>
