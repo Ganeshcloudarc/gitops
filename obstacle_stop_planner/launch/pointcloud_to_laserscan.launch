@@ -1,30 +1,72 @@
 <launch>
-   <!-- <arg name="cloud_in" default="/zed2i/zed_node/point_cloud/cloud_registered"/> -->
-    <!-- /carla/ego_vehicle/lidar -->
-    <arg name="cloud_in" default="/carla/ego_vehicle/lidar"/>
 
-    <arg name="target_frame" default="ego_vehicle" />
-    <!-- <arg name="target_frame" default="zed2i_base_link" /> -->
-
-    <arg name="laser_out_topic" default="zed/laser_scan"/>
+   <arg name='sensor_source' default="0" doc="0: zed_camera, 1: rslidar, 2:carla "/>
     
-    <node name='pointcloud_to_laserscan_node' pkg='pointcloud_to_laserscan' type='pointcloud_to_laserscan_node'>
-      <remap from="cloud_in" to="$(arg cloud_in)"/>
-      <remap from="scan" to="$(arg laser_out_topic)"/>
-      <param name='target_frame' value="$(arg target_frame)"/>
-      <rosparam>
-         min_height  : 0.1
-         max_height  : 1
-         angle_min   : -1.570
-         angle_max   : 1.5708
-         
-         angle_increment : 0.0087
-         scan_time : 0.3333
-         range_min : 0.45
-         range_max : 50
-         concurrency_level : 1
-         use_inf : false
-      </rosparam>
-    </node>
+   <group if="$(eval arg('sensor_source') == 0)">
+      <include file="$(find zed_wrapper)/launch/zed2i.launch"> </include>
+
+      <node name='zed_pointcloud_to_laserscan_node' pkg='pointcloud_to_laserscan' type='pointcloud_to_laserscan_node'>
+         <remap from="cloud_in" to="/zed2i/zed_node/point_cloud/cloud_registered"/>
+         <remap from="scan" to="laser_scan"/>
+         <param name="target_frame" value="base_link"/>
+         <rosparam>
+            min_height   : 0.1
+            max_height  : 1
+            angle_min   : -1.570
+            angle_max   : 1.5708
+            
+            angle_increment : 0.0087
+            scan_time : 0.3333
+            range_min : 0.2
+            range_max : 50
+            concurrency_level : 1
+            use_inf : false
+         </rosparam>
+      </node>
+    </group>
+
+   <group if="$(eval arg('sensor_source') == 1)">
+      <include file="$(find rslidar_sdk)/launch/start.launch"> </include>
+      <node name='rslidar_pointcloud_to_laserscan_node' pkg='pointcloud_to_laserscan' type='pointcloud_to_laserscan_node'>
+         <remap from="cloud_in" to="/rslidar_points"/>
+         <remap from="scan" to="laser_scan"/>
+         <param name="target_frame" value="rslidar"/>
+         <rosparam>
+            min_height   : -0.1
+            max_height  : 0.3
+            angle_min   : -1.570
+            angle_max   : 1.5708
+            
+            angle_increment : 0.0087
+            scan_time : 0.3333
+            range_min : 0.45
+            range_max : 100
+            concurrency_level : 1
+            use_inf : false
+         </rosparam>
+      </node>
+    </group>
+
+   <group if="$(eval arg('sensor_source') == 2)">
+
+      <node name='carla_pointcloud_to_laserscan_node' pkg='pointcloud_to_laserscan' type='pointcloud_to_laserscan_node'>
+         <remap from="cloud_in" to="/carla/ego_vehicle/lidar"/>
+         <remap from="scan" to="laser_scan"/>
+         <param name="target_frame" value="ego_vehicle"/>
+         <rosparam>
+            min_height   : 0.1
+            max_height  : 1
+            angle_min   : -1.570
+            angle_max   : 1.5708
+            
+            angle_increment : 0.0087
+            scan_time : 0.3333
+            range_min : 0.45
+            range_max : 70
+            concurrency_level : 1
+            use_inf : false
+         </rosparam>
+      </node>
+    </group>
 
 </launch>

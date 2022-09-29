@@ -105,8 +105,11 @@ class ObstacleStopPlanner:
                 rate.sleep()
         count = 0
         rate = rospy.Rate(20)
+        robot_pose = current_robot_pose("map", self.robot_base_frame)
+
         while not rospy.is_shutdown():
             robot_pose = current_robot_pose("map", self.robot_base_frame)
+
             if not robot_pose:
                 rospy.logwarn("No TF between %s and %s", "map", self.robot_base_frame)
                 rate.sleep()
@@ -201,13 +204,13 @@ class ObstacleStopPlanner:
                 self.publish_velocity_marker(trajectory_msg)
             self.local_traj_publisher.publish(trajectory_msg)
 
-            rate.sleep()
+            # rate.sleep()
 
     def scan_callback(self, data):
         pass
         self.laser_data_in_time = time.time()
         points = self.laser_geo_obj.projectLaser(data)
-        tf_points = transform_cloud(points, self.robot_base_frame, "map")
+        tf_points = transform_cloud(points, data.header.frame_id, "map")
         self.pc_np = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=True)
         self.scan_data_received = True
         # self.publish_points(self.pc_np)

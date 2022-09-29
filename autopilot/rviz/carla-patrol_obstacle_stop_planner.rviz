@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /MarkerArray2/Namespaces1
+        - /LaserScan1
       Splitter Ratio: 0.8294117450714111
     Tree Height: 259
   - Class: rviz/Selection
@@ -209,7 +210,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.10000000149011612
       Style: Flat Squares
-      Topic: /zed/laser_scan
+      Topic: /laser_scan
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -259,8 +260,6 @@ Visualization Manager:
           Value: true
         ego_vehicle/imu:
           Value: true
-        ego_vehicle/lane_invasion:
-          Value: true
         ego_vehicle/lidar:
           Value: true
         ego_vehicle/radar_front:
@@ -297,8 +296,6 @@ Visualization Manager:
             ego_vehicle/gnss:
               {}
             ego_vehicle/imu:
-              {}
-            ego_vehicle/lane_invasion:
               {}
             ego_vehicle/lidar:
               {}
@@ -354,7 +351,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 71.37733459472656
+      Distance: 39.452606201171875
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -370,9 +367,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5597963333129883
+      Pitch: 1.5697963237762451
       Target Frame: ego_vehicle
-      Yaw: 3.115398645401001
+      Yaw: 3.1053998470306396
     Saved: ~
 Window Geometry:
   Displays:
