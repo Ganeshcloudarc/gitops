@@ -40,7 +40,7 @@
 
   <!-- <node name="map2odom" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 1 /slamware_map /odom 100"/>
   <node name="base2laser" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 1 /base_link /laser 100"/> -->
-<node name="rp_lidar" pkg="rviz" type="rviz" args="-d $(find slamware_ros_sdk)/rviz/laser_bringup.rviz" if = "$(eval arg('rviz'))"/>
+<node name="rp_lidar_rviz" pkg="rviz" type="rviz" args="-d $(find slamware_ros_sdk)/rviz/laser_bringup.rviz" if = "$(eval arg('rviz'))"/>
 
 
 </launch>
