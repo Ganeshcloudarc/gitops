@@ -377,7 +377,7 @@ class PurePursuitController:
         if old_close_index >= self.trajectory_len - 1:
             dis = distance_btw_poses(robot_pose, self.trajectory_data.points[self.trajectory_len - 1].pose)
             return self.trajectory_len - 1, dis
-        for ind in range(old_close_index, self.trajectory_len):
+        for ind in range(old_close_index, self.trajectory_len-1):
             acc_dis += distance_btw_poses(self.trajectory_data.points[ind].pose,
                                           self.trajectory_data.points[ind + 1].pose)
             if acc_dis < self.search_point_distance:
