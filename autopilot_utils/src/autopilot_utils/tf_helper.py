@@ -47,6 +47,9 @@ def convert_pose(pose, from_frame, to_frame):
 
     try:
         trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time.now(), rospy.Duration(1.0))
+        # trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time(0))
+
+
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
         rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, from_frame))
         return None
@@ -215,10 +218,15 @@ def transform_cloud(cloud, from_frame, to_frame):
     if tfBuffer is None or listener is None:
         _init_tf()
     try:
-        trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time.now(), rospy.Duration(1.0))
+        # trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time.now(), rospy.Duration(1.0))
+        
+        trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time(0))
+
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
         rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, from_frame))
         return None
+
+    print("trans_tf_utils", trans)
     cloud_out = do_transform_cloud(cloud, trans)
     return cloud_out
 
