@@ -96,7 +96,7 @@ Visualization Manager:
       Buffer Length: 1
       Class: rviz/Path
       Color: 0; 255; 0
-      Enabled: true
+      Enabled: false
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
@@ -115,7 +115,7 @@ Visualization Manager:
       Shaft Length: 0.10000000149011612
       Topic: /vehicle_travelled_path
       Unreliable: false
-      Value: true
+      Value: false
     - Class: rviz/Marker
       Enabled: true
       Marker Topic: /target_pose_marker
@@ -252,6 +252,8 @@ Visualization Manager:
           Value: true
         ego_vehicle:
           Value: true
+        ego_vehicle/collision:
+          Value: true
         ego_vehicle/depth_front:
           Value: true
         ego_vehicle/dvs_front:
@@ -259,6 +261,8 @@ Visualization Manager:
         ego_vehicle/gnss:
           Value: true
         ego_vehicle/imu:
+          Value: true
+        ego_vehicle/lane_invasion:
           Value: true
         ego_vehicle/lidar:
           Value: true
@@ -276,6 +280,10 @@ Visualization Manager:
           Value: true
         map:
           Value: true
+        odom:
+          Value: true
+        rplidar:
+          Value: true
         rslidar:
           Value: true
         zed_camera:
@@ -289,6 +297,8 @@ Visualization Manager:
       Tree:
         map:
           ego_vehicle:
+            ego_vehicle/collision:
+              {}
             ego_vehicle/depth_front:
               {}
             ego_vehicle/dvs_front:
@@ -296,6 +306,8 @@ Visualization Manager:
             ego_vehicle/gnss:
               {}
             ego_vehicle/imu:
+              {}
+            ego_vehicle/lane_invasion:
               {}
             ego_vehicle/lidar:
               {}
@@ -309,6 +321,8 @@ Visualization Manager:
               {}
             ego_vehicle/semantic_segmentation_front:
               {}
+          odom:
+            {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -351,7 +365,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 39.452606201171875
+      Distance: 11.940720558166504
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -359,8 +373,8 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0
-        Y: 0
+        X: 1.1939146518707275
+        Y: 2.363295793533325
         Z: 0
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
@@ -369,7 +383,7 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5697963237762451
       Target Frame: ego_vehicle
-      Yaw: 3.1053998470306396
+      Yaw: 1.9703978300094604
     Saved: ~
 Window Geometry:
   Displays:

@@ -3,7 +3,7 @@
     <arg name="rviz" default="true"/>
     <arg name="mission_continue" default="true"/>
     <arg name="sensor_source" default="0" doc="0: Zed camera, 1: Rslidar, 2: carla"/>
-    <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
+<!--    <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />-->
 
     <group if="$(eval arg('rviz'))">
         <node name="carla_rviz_obstacle_stop_planner" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/carla-patrol_obstacle_stop_planner.rviz" if = "$(eval arg('carla'))"/>

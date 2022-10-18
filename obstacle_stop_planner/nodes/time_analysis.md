@@ -157,15 +157,15 @@ time taken for a loop is: 0.4753849506378174 , count :698
 
 ---------
 
-    time taken for a loop is: 2.832885980606079 , count :5504
+time taken for a loop is: 2.832885980606079 , count :5504
 
 
-    time taken for laser scan conversion is tf: 0.10142731666564941 
-    time taken for laser scan conversion is no tf: 0.002649545669555664
+time taken for laser scan conversion is tf: 0.10142731666564941 
+time taken for laser scan conversion is no tf: 0.002649545669555664
 
 
 
 
-    time taken for laser scan conversion is tf: latest, 0.053977251052856445 
+time taken for laser scan conversion is tf: latest, 0.053977251052856445 
 
-    wait tf  0.10399723052978516
+wait tf  0.10399723052978516

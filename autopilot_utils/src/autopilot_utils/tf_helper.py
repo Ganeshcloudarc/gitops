@@ -226,7 +226,7 @@ def transform_cloud(cloud, from_frame, to_frame):
         rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, from_frame))
         return None
 
-    print("trans_tf_utils", trans)
+    # print("trans_tf_utils", trans)
     cloud_out = do_transform_cloud(cloud, trans)
     return cloud_out
 
