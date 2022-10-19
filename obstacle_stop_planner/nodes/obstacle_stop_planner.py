@@ -21,7 +21,7 @@ try:
     from nav_msgs.msg import Path, Odometry
     from jsk_recognition_msgs.msg import BoundingBoxArray
     from zed_interfaces.msg import ObjectsStamped, Object
-    from geometry_msgs.msg import Point, PoseArray, Pose, TransformStamped
+    from geometry_msgs.msg import Point, PoseArray, Pose, TransformStamped, PoseStamped
     from visualization_msgs.msg import Marker, MarkerArray
     from std_msgs.msg import Float32MultiArray, Header
     from sensor_msgs.msg import PointCloud2, LaserScan
@@ -36,8 +36,10 @@ try:
     # autopilot related imports
     from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud
     from autopilot_utils.pose_helper import distance_btw_poses, get_yaw
+    from autopilot_utils.trajectory_smoother import TrajectorySmoother
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
+
     from velocity_planner import VelocityPlanner
 
 except Exception as e:
@@ -106,9 +108,7 @@ class ObstacleStopPlanner:
         self.laser_geo_obj = LaserProjection()
         self._a_max, self._slow_speed, self._stop_line_buffer = 1, 0.5, 3.5
 
-        # self._velocity_planner = \
-        #     VelocityPlanner(a_max, slow_speed,
-        #                     stop_line_buffer)
+        self._smoother = TrajectorySmoother(sigma=1, kernal_size=11)
 
         # ros parameters for Obstacle stop planner
         # TODO accept form patrol application if available else take from patrol params.
@@ -146,6 +146,9 @@ class ObstacleStopPlanner:
         self.local_traj_publisher = rospy.Publisher('local_gps_trajectory', Trajectory, queue_size=10)
         self.collision_points_publisher = rospy.Publisher('collision_points', PointCloud2, queue_size=10)
         self.velocity_marker_publisher = rospy.Publisher('collision_velocity_marker', MarkerArray, queue_size=10)
+        self.close_pose_pub = rospy.Publisher("close_point", PoseStamped, queue_size=1)
+        self.front_pose_pub = rospy.Publisher("front_point", PoseStamped, queue_size=1)
+
         # TODO: publish stop, slow_down margin's circle
 
         rate = rospy.Rate(1)
@@ -159,7 +162,7 @@ class ObstacleStopPlanner:
                 rospy.logwarn("waiting for scan data or global path or robot_pose ")
                 rate.sleep()
 
-        rate = rospy.Rate(1)
+        rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             print("---------------------------------------------")
             loop_start_time = time.time()
@@ -191,23 +194,25 @@ class ObstacleStopPlanner:
                 rospy.logwarn("Close point heading and vehicle are not on same side")
                 rate.sleep()
                 continue
+            print("index_old", self.index_old)
+            self.close_pose_pub.publish(PoseStamped(header=Header(frame_id="map"), pose=self.traj_in.points[self.index_old].pose))
             close_dis = self.traj_in.points[self.index_old].accumulated_distance_m
             # Finding car front tip index
             if abs(self.traj_in.points[self.index_old].accumulated_distance_m - \
                     self.traj_in.points[-1].accumulated_distance_m) <= self.base_to_front:
                 self.front_tip_index = self.traj_end_index - 1
-                print("a")
             else:
-                print("b")
                 for ind in range(self.index_old, self.traj_end_index):
                     path_acc_distance = abs(self.traj_in.points[ind].accumulated_distance_m - close_dis)
-                    print("path_acc_distance", path_acc_distance)
-                    print("self.base_to_fron", self.base_to_front)
+                    # print("path_acc_distance", path_acc_distance)
+                    # print("self.base_to_fron", self.base_to_front)
                     if path_acc_distance > self.base_to_front:
                         self.front_tip_index = ind
                         break
 
             print("front_tip_index", self.front_tip_index)
+            self.front_pose_pub.publish(
+                PoseStamped(header=Header(frame_id="map"), pose=self.traj_in.points[self.front_tip_index].pose))
 
             if self.traj_in.points[-1].accumulated_distance_m - \
                     self.traj_in.points[self.index_old].accumulated_distance_m < self.min_look_ahead_dis:
@@ -226,7 +231,9 @@ class ObstacleStopPlanner:
             trajectory_msg = Trajectory()
             trajectory_msg.header.frame_id = "map"
             trajectory_msg.home_position = self.traj_in.home_position
-
+            trajectory_msg.points.append(TrajectoryPoint(pose=self.traj_in.points[self.index_old].pose,
+                                                         longitudinal_velocity_mps=self.robot_speed))
+            # trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
             prev_processed_ind = self.index_old
 
             for ind in range(self.index_old, self.traj_end_index):
@@ -251,7 +258,7 @@ class ObstacleStopPlanner:
                         obstacle_found = True
                         break
             collision_index = ind
-
+            print("self.index_old after loop", self.index_old)
             if obstacle_found:
                 collision_points = list(collision_points[0])
 
@@ -263,201 +270,27 @@ class ObstacleStopPlanner:
                     temp_dist = self.traj_in.points[collision_index].accumulated_distance_m - \
                                 self.traj_in.points[stop_index].accumulated_distance_m
                     stop_index -= 1
+                # Our trajectory starts from close_index to stop index
+                for i in range(self.index_old, stop_index+1):
+                    trajectory_msg.points.append(self.traj_in.points[i])
+                trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
+                traj_out = self._smoother.filter(trajectory_msg)
+                self.publish_points(collision_points)
 
-                decel_distance = calc_distance(self.robot_speed, 0, -self.max_accel)
-                decel_distance =2
-                print("collision index", collision_index)
-                print("stop_index", stop_index)
-                print("decel_distanbce", decel_distance)
-
-                # check for stop margin  from car front.
-                print("distance between front tip to obstace", abs(self.traj_in.points[collision_index].accumulated_distance_m - \
-                        self.traj_in.points[self.front_tip_index].accumulated_distance_m))
-                print("front tip index", self.front_tip_index)
-                if decel_distance + self.stop_line_buffer > \
-                        abs(self.traj_in.points[collision_index].accumulated_distance_m - \
-                        self.traj_in.points[self.front_tip_index].accumulated_distance_m):
-                    # strong acceleration
-                    print("string acceleration")
-                    speeds = []
-                    vf = 0.0
-                    for _ in reversed(range(stop_index, collision_index)):
-                        speeds.insert(0, 0.0)
-                    for i in reversed(range(self.index_old, stop_index)):
-                        dist = abs(self.traj_in.points[i + 1].accumulated_distance_m - self.traj_in.points[
-                            i].accumulated_distance_m)
-                        vi = calc_final_speed(vf, -self.max_accel, dist)
-                        # We don't want to have points above the starting speed
-                        # along our profile, so clamp to start_speed.
-                        if vi > self.max_forward_speed:
-                            vi = self.max_forward_speed
-
-                        speeds.insert(0, vi)
-                        vf = vi
-
-                    # Generate the profile, given the computed speeds.
-                    print("len of speed", len(speeds))
-                    print("len from index", collision_index- self.index_old  )
-                    for i in range(len(speeds)):
-                        trajectory_point_msg = TrajectoryPoint()
-                        trajectory_point_msg.pose = self.traj_in.points[self.index_old + i].pose
-                        trajectory_point_msg.longitudinal_velocity_mps = min(speeds[i], self.traj_in.points[
-                            self.index_old + i].longitudinal_velocity_mps)
-                        trajectory_msg.points.append(trajectory_point_msg)
-
-                # if we have enough space for smooth de-acceleration
-                else:
-                    print("smooth de-acceleration")
-                    decel_distance = calc_distance(self.max_forward_speed, 0, -self.max_accel)
-                    brake_index = stop_index
-                    temp_dist = 0.0
-                    # Compute the index at which to start braking down to zero.
-                    while temp_dist < decel_distance:
-                        temp_dist = self.traj_in.points[stop_index].accumulated_distance_m - \
-                                    self.traj_in.points[brake_index].accumulated_distance_m
-                        brake_index -= 1
-
-                    if self.max_forward_speed < self.robot_speed:
-                        accel_distance = calc_distance(self.robot_speed, self.max_forward_speed, -self.max_accel)
-                    else:
-                        accel_distance = calc_distance(self.robot_speed, self.max_forward_speed, self.max_accel)
-
-                        # Here we will compute the end of the ramp for our velocity profile.
-                        # At the end of the ramp, we will maintain our final speed.
-                    ramp_end_index = self.index_old
-                    distance = 0
-                    while distance < accel_distance:
-                        distance = self.traj_in.points[ramp_end_index].accumulated_distance_m - \
-                                   self.traj_in.points[self.index_old].accumulated_distance_m
-                        ramp_end_index += 1
-                    print("brake_index", brake_index)
-                    print("accel_distance", accel_distance)
-                    print("ramp_end_index", ramp_end_index)
-                    print("old_index", self.index_old)
-
-                    # Here we will actually compute the velocities along the ramp.
-                    vi = self.robot_speed
-                    for i in range(self.index_old, ramp_end_index):
-                        dist = abs(self.traj_in.points[i + 1].accumulated_distance_m - self.traj_in.points[
-                            i].accumulated_distance_m)
-                        if self.max_forward_speed < self.robot_speed:
-                            vf = calc_final_speed(vi, -self.max_accel, dist)
-                            # clamp speed to desired speed
-                            if vf < self.max_forward_speed:
-                                vf = self.max_forward_speed
-                        else:
-                            vf = calc_final_speed(vi, self.max_accel, dist)
-                            # clamp speed to desired speed
-                            if vf > self.max_forward_speed:
-                                vf = self.max_forward_speed
-
-                        trajectory_point_msg = TrajectoryPoint()
-                        trajectory_point_msg.pose = self.traj_in.points[i].pose
-                        trajectory_point_msg.longitudinal_velocity_mps = min(vi, self.traj_in.points[
-                            i].longitudinal_velocity_mps)
-                        trajectory_msg.points.append(trajectory_point_msg)
-                        vi = vf
-                    for i in range(ramp_end_index, brake_index):
-                        trajectory_point_msg = TrajectoryPoint()
-                        trajectory_point_msg.pose = self.traj_in.points[i].pose
-                        trajectory_point_msg.longitudinal_velocity_mps = min(self.max_forward_speed,
-                                                                             self.traj_in.points[
-                                                                                 i].longitudinal_velocity_mps)
-                        trajectory_msg.points.append(trajectory_point_msg)
-                    vf = self.max_forward_speed
-                    for i in range(brake_index, stop_index):
-                        dist = abs(self.traj_in.points[i + 1].accumulated_distance_m - self.traj_in.points[
-                            i].accumulated_distance_m)
-                        vi = calc_final_speed(vf, -self.max_accel, dist)
-
-
-                        # We don't want to have points above the starting speed
-                        # along our profile, so clamp to start_speed.
-                        if vi > self.max_forward_speed:
-                            vi = self.max_forward_speed
-
-                        trajectory_point_msg = TrajectoryPoint()
-                        trajectory_point_msg.pose = self.traj_in.points[i].pose
-                        trajectory_point_msg.longitudinal_velocity_mps = min(vi, self.traj_in.points[
-                            i].longitudinal_velocity_mps)
-                        trajectory_msg.points.append(trajectory_point_msg)
-                        vf = vi
-                    for i in range(stop_index, collision_index):
-                        trajectory_point_msg = TrajectoryPoint()
-                        trajectory_point_msg.pose = self.traj_in.points[i].pose
-                        trajectory_point_msg.longitudinal_velocity_mps = min(0.0, self.traj_in.points[
-                            i].longitudinal_velocity_mps)
-                        trajectory_msg.points.append(trajectory_point_msg)
-                print("collision_points", collision_points)
-                if self.vis_collision_points:
-                    self.publish_points(collision_points)
-                if self.vis_trajectory_rviz:
-                    self.publish_velocity_marker(trajectory_msg)
-                self.local_traj_publisher.publish(trajectory_msg)
-                print(f"time taken for a loop is: {time.time() - loop_start_time} , count :{count}")
-                print("len of local traj", len(trajectory_msg.points))
-                print("index dis", collision_index - self.index_old)
-                rate.sleep()
             else:
                 rospy.loginfo("No obstacle found")
+                for i in range(self.index_old, collision_index):
+                    print()
+                    trajectory_msg.points.append(self.traj_in.points[i])
+                traj_out = self._smoother.filter(trajectory_msg)
 
-                if self.max_forward_speed < self.robot_speed:
-                    accel_distance = calc_distance(self.robot_speed, self.max_forward_speed, -self.max_accel)
-                else:
-                    accel_distance = calc_distance(self.robot_speed, self.max_forward_speed, self.max_accel)
+            self.local_traj_publisher.publish(traj_out)
+            print(f"time taken for a loop is: {time.time() - loop_start_time} , count :{count}")
+            print("len of local traj", len(traj_out.points))
+            print("collision_index", collision_index)
 
-                    # Here we will compute the end of the ramp for our velocity profile.
-                    # At the end of the ramp, we will maintain our final speed.
-                ramp_end_index = self.index_old
-                print("accel_distance", accel_distance)
-                distance = 0
-                while (ramp_end_index < self.traj_end_index - 1) and (distance < accel_distance):
-                    distance = self.traj_in.points[ramp_end_index].accumulated_distance_m - \
-                               self.traj_in.points[self.index_old].accumulated_distance_m
-                    print(distance)
-                    ramp_end_index += 1
-
-                # Here we will actually compute the velocities along the ramp.
-                vi = self.robot_speed
-                print("close ind", self.index_old)
-                print("ramp_end_index", ramp_end_index)
-                print("collision_index", collision_index)
-
-                for i in range(self.index_old, ramp_end_index):
-                    dist = abs(self.traj_in.points[i + 1].accumulated_distance_m - self.traj_in.points[
-                        i].accumulated_distance_m)
-                    if self.max_forward_speed < self.robot_speed:
-                        vf = calc_final_speed(vi, -self.max_accel, dist)
-                        # clamp speed to desired speed
-                        if vf < self.max_forward_speed:
-                            vf = self.max_forward_speed
-                    else:
-                        vf = calc_final_speed(vi, self.max_accel, dist)
-                        # clamp speed to desired speed
-                        if vf > self.max_forward_speed:
-                            vf = self.max_forward_speed
-
-                    trajectory_point_msg = TrajectoryPoint()
-                    trajectory_point_msg.pose = self.traj_in.points[i].pose
-                    trajectory_point_msg.longitudinal_velocity_mps = min(vi, self.traj_in.points[
-                        i].longitudinal_velocity_mps)
-                    trajectory_msg.points.append(trajectory_point_msg)
-                    vi = vf
-                for i in range(ramp_end_index, collision_index):
-                    trajectory_point_msg = TrajectoryPoint()
-                    trajectory_point_msg.pose = self.traj_in.points[i].pose
-                    trajectory_point_msg.longitudinal_velocity_mps = min(self.max_forward_speed, self.traj_in.points[
-                        i].longitudinal_velocity_mps)
-                    trajectory_msg.points.append(trajectory_point_msg)
-                if self.vis_trajectory_rviz:
-                    self.publish_velocity_marker(trajectory_msg)
-
-                print("len of traj", len())
-                self.local_traj_publisher.publish(trajectory_msg)
-                print(f"time taken for a loop is: {time.time() - loop_start_time} , count :{count}")
-                print("len of local traj", len(trajectory_msg.points))
-                print("collision_index", collision_index)
-                rate.sleep()
+            self.publish_velocity_marker(traj_out)
+            rate.sleep()
 
     def compute_velocity_profile(self, traj, ego_state):
         pass
@@ -550,16 +383,15 @@ class ObstacleStopPlanner:
         marker_arr_msg = MarkerArray()
         i = 0
         for traj_point in trajectory.points:
-
             marker = Marker()
             marker.header.frame_id = trajectory.header.frame_id
             marker.type = marker.TEXT_VIEW_FACING
             marker.text = str(round(traj_point.longitudinal_velocity_mps, 2))
+            # marker.text = str(i-1)
             marker.id = i
             i += 1
             marker.action = marker.ADD
             if traj_point.longitudinal_velocity_mps == 0:
-
                 marker.scale.x = 0.4
                 marker.scale.y = 0.4
                 marker.scale.z = 0.4
@@ -568,17 +400,20 @@ class ObstacleStopPlanner:
                 marker.color.g = 0.0
                 marker.color.b = 0.0
             else:
-                marker.scale.x = 0.1
-                marker.scale.y = 0.1
-                marker.scale.z = 0.1
+                marker.scale.x = 0.2
+                marker.scale.y = 0.2
+                marker.scale.z = 0.2
                 marker.color.a = 1.0
                 marker.color.r = 0.0
                 marker.color.g = 1.0
                 marker.color.b = 0.0
-
+            # marker.lifetime = rospy.Duration.from_sec(1)
             marker.pose = traj_point.pose
             marker_arr_msg.markers.append(marker)
+        # print(marker_arr_msg)
+
         self.velocity_marker_publisher.publish(marker_arr_msg)
+        print("marker published")
 
 
 if __name__ == "__main__":
