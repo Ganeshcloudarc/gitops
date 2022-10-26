@@ -1,6 +1,6 @@
 from autopilot_msgs.msg import Trajectory, TrajectoryPoint
 from astropy.convolution import Gaussian1DKernel, convolve
-
+import copy
 
 class TrajectorySmoother:
     """
@@ -30,29 +30,32 @@ class TrajectorySmoother:
         # avoid changing the start and end point of trajectory
         # use same padding for points beyond either end of the trajectory
         vel_list = []
-        for i in range(0, len(traj_in.points) - 1):
-            vel_list.append(traj_in.points[i].longitudinal_velocity_mps)
+        traj_out = copy.deepcopy(traj_in)
+        # traj_out = traj_in
+        for _ in range(0, len(traj_out.points) - 1):
+            vel_list.append(traj_out.points[i].longitudinal_velocity_mps)
         # Convolve data
-        filtered_list = convolve(vel_list, self._gaussian_kernal)
-        for i in range(0, len(traj_in.points) - 1):
-            traj_in.points[i].longitudinal_velocity_mps = filtered_list[i]
-        return traj_in
+        vel_list = convolve(vel_list, self._gaussian_kernal)
+        for _ in range(0, len(traj_out.points) - 1):
+            traj_out.points[i].longitudinal_velocity_mps = vel_list[i]
+        return traj_out
 
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     ts = TrajectorySmoother(2, 11)
-    raw = [2.5] * 20
-    raw[1] = 0
+    raw = [2.5] * 100
+    raw[0] = 1
     raw[-1] = 0
     traj_in = Trajectory()
     for i in range(len(raw)):
         traj_in.points.append(TrajectoryPoint(longitudinal_velocity_mps=raw[i]))
-
-    filtered = ts.filter(traj_in)
+    for _ in range(1000):
+        print(traj_in.points[50].longitudinal_velocity_mps)
+        filtered = ts.filter(traj_in)
     filtered_list = []
     for i in range(len(filtered.points)):
-        filtered_list.append(traj_in.points[i].longitudinal_velocity_mps)
+        filtered_list.append(filtered.points[i].longitudinal_velocity_mps)
 
     plt.plot(raw[1:])
     plt.plot(filtered_list[1:])

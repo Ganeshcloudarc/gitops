@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /MarkerArray2/Namespaces1
         - /LaserScan1
+        - /Target_pose2
       Splitter Ratio: 0.8294117450714111
     Tree Height: 259
   - Class: rviz/Selection
@@ -65,7 +66,7 @@ Visualization Manager:
       Shaft Length: 0.5
       Shaft Radius: 0.05000000074505806
       Shape: Arrow
-      Topic: /target_pose
+      Topic: /obstacle_stop_planner/close_point
       Unreliable: false
       Value: true
     - Alpha: 1
@@ -121,7 +122,7 @@ Visualization Manager:
       Marker Topic: /target_pose_marker
       Name: Target_pose_marker
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -134,7 +135,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/MarkerArray
       Enabled: true
-      Marker Topic: /collision_velocity_marker
+      Marker Topic: /obstacle_stop_planner/collision_velocity_marker
       Name: MarkerArray
       Namespaces:
         "": true
@@ -238,7 +239,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 1
       Style: Flat Squares
-      Topic: /collision_points
+      Topic: /obstacle_stop_planner/collision_points
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -252,8 +253,6 @@ Visualization Manager:
           Value: true
         ego_vehicle:
           Value: true
-        ego_vehicle/collision:
-          Value: true
         ego_vehicle/depth_front:
           Value: true
         ego_vehicle/dvs_front:
@@ -261,8 +260,6 @@ Visualization Manager:
         ego_vehicle/gnss:
           Value: true
         ego_vehicle/imu:
-          Value: true
-        ego_vehicle/lane_invasion:
           Value: true
         ego_vehicle/lidar:
           Value: true
@@ -297,8 +294,6 @@ Visualization Manager:
       Tree:
         map:
           ego_vehicle:
-            ego_vehicle/collision:
-              {}
             ego_vehicle/depth_front:
               {}
             ego_vehicle/dvs_front:
@@ -306,8 +301,6 @@ Visualization Manager:
             ego_vehicle/gnss:
               {}
             ego_vehicle/imu:
-              {}
-            ego_vehicle/lane_invasion:
               {}
             ego_vehicle/lidar:
               {}
@@ -335,6 +328,22 @@ Visualization Manager:
       Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Target_pose
+      Queue Size: 10
+      Shaft Length: 0.5
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic: /obstacle_stop_planner/front_point
       Unreliable: false
       Value: true
   Enabled: true
@@ -365,7 +374,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 11.940720558166504
+      Distance: 7.882784366607666
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -373,8 +382,8 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 1.1939146518707275
-        Y: 2.363295793533325
+        X: 14.150885581970215
+        Y: 3.8589441776275635
         Z: 0
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
@@ -383,7 +392,7 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5697963237762451
       Target Frame: ego_vehicle
-      Yaw: 1.9703978300094604
+      Yaw: 2.1753928661346436
     Saved: ~
 Window Geometry:
   Displays:

@@ -1,9 +1,6 @@
 obstacle_stop_planner:
   stop_line_buffer : 3 # distance to be maintained from obstacle from front tip of vehicle (m).
-  stop_margin : 7 # meters
-  slow_down_margin : 10 # meters
-
-  radial_off_set_to_vehicle_width : 1 # offset search radius to add vehicle width.
+  radial_off_set_to_vehicle_width : 0.3 # offset search radius to add vehicle width.
   trajectory_resolution : 0.5 # the minimum distance between the points in trajectory
 
   lookup_collision_distance : 20 # the distance to look for obstacle from vehicle location on the path.
@@ -11,11 +8,10 @@ obstacle_stop_planner:
   traj_in  : "global_gps_trajectory"
   scan_in  : "laser_scan"
   traj_out : "local_gps_trajectory"
-
-  max_forward_speed: 2.5
-  min_forward_speed: 1.0
-  max_acceleration : 0.8 # m/s^2
-
+  speed_min_threshold : 0.5 # speed less than this would not move vehicle.
   vis_collision_points : true
   vis_trajectory_rviz  : true
-  
+
+gaussian_velocity_filter:
+  sigma : 3
+  kernal_size : 11 # should be odd number
