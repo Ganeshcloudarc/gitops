@@ -239,25 +239,27 @@ class ObstacleStopPlanner:
                     for i in range(self._close_idx, stop_index + 1):
                         trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
                     trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
-                    if self.robot_speed < self.robot_min_speed_th:
-                        trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
-                    else:
-                        trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+                    # if self.robot_speed < self.robot_min_speed_th:
+                    #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+                    # else:
+                    #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+
                     traj_out = self._smoother.filter(trajectory_msg)
                     for i in range(stop_index, collision_index):
                         traj_point = self._traj_in.points[i]
                         traj_point.longitudinal_velocity_mps = 0.0
                         traj_out.points.append(traj_point)
 
+
             else:
                 rospy.loginfo("No obstacle found")
                 for i in range(self._close_idx, collision_index):
                     trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
                 trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
-                if self.robot_speed < self.robot_min_speed_th:
-                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
-                else:
-                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+                # if self.robot_speed < self.robot_min_speed_th:
+                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+                # else:
+                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
 
                 traj_out = self._smoother.filter(trajectory_msg)
 
