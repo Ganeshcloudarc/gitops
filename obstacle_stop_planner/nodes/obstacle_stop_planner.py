@@ -94,6 +94,7 @@ class ObstacleStopPlanner:
         self._mission_repeat = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
         self._time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
         self._max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
+        self.robot_min_speed_th = 0.5
         self._TIME_OUT_FROM_LASER = 2  # in secs
         self._TIME_OUT_FROM_ODOM = 2
         # TODO consider vehicle diagonal to check for collision detection radius
@@ -250,7 +251,12 @@ class ObstacleStopPlanner:
                 for i in range(self._close_idx, collision_index):
                     trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
                 trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
-                trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+                if self.robot_speed > self.robot_min_speed_th:
+
+                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+                else:
+                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+
                 traj_out = self._smoother.filter(trajectory_msg)
 
             self.local_traj_publisher.publish(traj_out)
