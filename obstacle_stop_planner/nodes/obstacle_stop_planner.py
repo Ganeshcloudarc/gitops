@@ -251,16 +251,16 @@ class ObstacleStopPlanner:
                 for i in range(self._close_idx, collision_index):
                     trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
                 trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
-                if self.robot_speed > self.robot_min_speed_th:
-
-                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
-                else:
+                if self.robot_speed < self.robot_min_speed_th:
                     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+                else:
+                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
 
                 traj_out = self._smoother.filter(trajectory_msg)
 
             self.local_traj_publisher.publish(traj_out)
             self.publish_points(collision_points)
+            rospy.loginfo("robot_speed", self.robot_speed )
             print(f"time taken for a loop is: {time.time() - loop_start_time} ")
             # print("len of local traj", len(traj_out.points))
             print("collision_index", collision_index)
