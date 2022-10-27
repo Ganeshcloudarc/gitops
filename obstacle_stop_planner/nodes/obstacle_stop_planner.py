@@ -260,7 +260,7 @@ class ObstacleStopPlanner:
 
             self.local_traj_publisher.publish(traj_out)
             self.publish_points(collision_points)
-            rospy.loginfo("robot_speed", self.robot_speed )
+            print("robot_speed", self.robot_speed)
             print(f"time taken for a loop is: {time.time() - loop_start_time} ")
             # print("len of local traj", len(traj_out.points))
             print("collision_index", collision_index)
