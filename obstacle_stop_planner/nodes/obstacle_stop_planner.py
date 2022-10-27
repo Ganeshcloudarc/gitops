@@ -249,8 +249,7 @@ class ObstacleStopPlanner:
                         traj_point = self._traj_in.points[i]
                         traj_point.longitudinal_velocity_mps = 0.0
                         traj_out.points.append(traj_point)
-
-
+                        trajectory_msg.points.append(traj_point)
             else:
                 rospy.loginfo("No obstacle found")
                 for i in range(self._close_idx, collision_index):
@@ -263,14 +262,14 @@ class ObstacleStopPlanner:
 
                 traj_out = self._smoother.filter(trajectory_msg)
 
-            self.local_traj_publisher.publish(traj_out)
+            self.local_traj_publisher.publish(traj_point)
             self.publish_points(collision_points)
             print("robot_speed", self.robot_speed)
             print(f"time taken for a loop is: {time.time() - loop_start_time} ")
             # print("len of local traj", len(traj_out.points))
             print("collision_index", collision_index)
 
-            self.publish_velocity_marker(traj_out)
+            self.publish_velocity_marker(traj_point)
             rate.sleep()
 
     def odom_callback(self, data):
