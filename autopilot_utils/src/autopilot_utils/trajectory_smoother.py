@@ -32,11 +32,11 @@ class TrajectorySmoother:
         vel_list = []
         traj_out = copy.deepcopy(traj_in)
         # traj_out = traj_in
-        for _ in range(0, len(traj_out.points) - 1):
+        for i in range(0, len(traj_out.points) - 1):
             vel_list.append(traj_out.points[i].longitudinal_velocity_mps)
         # Convolve data
         vel_list = convolve(vel_list, self._gaussian_kernal)
-        for _ in range(0, len(traj_out.points) - 1):
+        for i in range(0, len(traj_out.points) - 1):
             traj_out.points[i].longitudinal_velocity_mps = vel_list[i]
         return traj_out
 
