@@ -262,14 +262,14 @@ class ObstacleStopPlanner:
 
                 traj_out = self._smoother.filter(trajectory_msg)
 
-            self.local_traj_publisher.publish(traj_point)
+            self.local_traj_publisher.publish(trajectory_msg)
             self.publish_points(collision_points)
             print("robot_speed", self.robot_speed)
             print(f"time taken for a loop is: {time.time() - loop_start_time} ")
             # print("len of local traj", len(traj_out.points))
             print("collision_index", collision_index)
 
-            self.publish_velocity_marker(traj_point)
+            self.publish_velocity_marker(trajectory_msg)
             rate.sleep()
 
     def odom_callback(self, data):
