@@ -89,7 +89,7 @@ class TrajectoryManager:
                 continue
             yaw_diff = normalize_angle(curr_yaw - get_yaw(traj_point.pose.orientation))
             # print(yaw_diff)
-            if abs(yaw_diff) > angle_thr:
+            if abs(math.degrees(yaw_diff)) > angle_thr:
                 continue
             if dis < dist_min:
                 dist_min = dis
