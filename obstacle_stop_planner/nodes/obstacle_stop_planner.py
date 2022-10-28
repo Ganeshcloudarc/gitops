@@ -79,7 +79,8 @@ class ObstacleStopPlanner:
         # self._a_max, self._slow_speed, self._stop_line_buffer = 1, 0.5, 3.5
         sigma = rospy.get_param("gaussian_velocity_filter/sigma", 1)
         kernal_size = rospy.get_param("gaussian_velocity_filter/kernal_size", 11)
-        self._smoother = TrajectorySmoother(sigma, kernal_size)
+        self.robot_min_speed_th = rospy.get_param("obstacle_stop_planner/robot_min_speed_th", 0.8)
+        self._smoother = TrajectorySmoother(sigma, kernal_size,self.robot_min_speed_th)
         self._traj_manager = TrajectoryManager()
         self._stop_line_buffer = rospy.get_param("obstacle_stop_planner/stop_line_buffer", 3.0)
 
@@ -94,7 +95,7 @@ class ObstacleStopPlanner:
         self._mission_repeat = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
         self._time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
         self._max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
-        self.robot_min_speed_th = 0.5
+
         self._TIME_OUT_FROM_LASER = 2  # in secs
         self._TIME_OUT_FROM_ODOM = 2
         # TODO consider vehicle diagonal to check for collision detection radius
@@ -255,21 +256,20 @@ class ObstacleStopPlanner:
                 for i in range(self._close_idx, collision_index):
                     trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
                 trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
-                # if self.robot_speed < self.robot_min_speed_th:
-                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
-                # else:
-                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
-
+                if self.robot_speed < self.robot_min_speed_th:
+                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+                else:
+                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
                 traj_out = self._smoother.filter(trajectory_msg)
 
-            self.local_traj_publisher.publish(trajectory_msg)
+            self.local_traj_publisher.publish(traj_out)
             self.publish_points(collision_points)
             print("robot_speed", self.robot_speed)
             print(f"time taken for a loop is: {time.time() - loop_start_time} ")
             # print("len of local traj", len(traj_out.points))
             print("collision_index", collision_index)
 
-            self.publish_velocity_marker(trajectory_msg)
+            self.publish_velocity_marker(traj_out)
             rate.sleep()
 
     def odom_callback(self, data):

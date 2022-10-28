@@ -4,6 +4,7 @@ obstacle_stop_planner:
   trajectory_resolution : 0.5 # the minimum distance between the points in trajectory
 
   lookup_collision_distance : 20 # the distance to look for obstacle from vehicle location on the path.
+  robot_min_speed_th : 0.8
 
   traj_in  : "global_gps_trajectory"
   scan_in  : "laser_scan"

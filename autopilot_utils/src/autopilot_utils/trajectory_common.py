@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+import math
+
 from autopilot_msgs.msg import Trajectory, TrajectoryPoint
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Pose, PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped, Point
 from nav_msgs.msg import Path
 from autopilot_utils.pose_helper import *
 import sys
@@ -24,8 +26,8 @@ class TrajectoryManager:
                   traj(autopilot_msgs/Trajectory)
                """
         if traj:
-            self._traj_len = traj
-            self._traj_in = len(self._traj_in)
+            self._traj_in = traj
+            self._traj_len = len(self._traj_in.points)
         else:
             self._traj_len = -1
             self._traj_in = None
@@ -139,7 +141,7 @@ class TrajectoryManager:
             path_msg.poses.append(pose_stamped)
         return path_msg
 
-    def to_marker(self, trajectory_msg):
+    def to_marker(self):
         """
         Returns marker(MarkerArray) of trajectory_points and  velocities.
 
@@ -149,7 +151,7 @@ class TrajectoryManager:
         for i in range(self._traj_len):
             traj_point = self._traj_in.points[i]
             marker = Marker()
-            marker.header.frame_id = trajectory_msg.header.frame_id
+            marker.header.frame_id = self._traj_len.header.frame_id
             marker.type = marker.TEXT_VIEW_FACING
             marker.text = str(round(traj_point.longitudinal_velocity_mps, 2))
             marker.id = i
@@ -166,11 +168,54 @@ class TrajectoryManager:
             marker_arr_msg.markers.append(marker)
         return marker_arr_msg
 
+    def to_line(self, width):
+        marker = Marker()
+        marker.header.frame_id = self._traj_in.header.frame_id
+        marker.type = marker.LINE_STRIP
+        # marker.text = str(round(traj_point.longitudinal_velocity_mps, 2))
+        marker.id = 1
+        marker.action = marker.ADD
+        marker.scale.x = width
+        marker.color.a = 1.0
+        marker.color.r = 0.0
+        marker.color.g = 1.0
+        marker.color.b = 0.0
+
+        # marker_arr_msg.header.frame_id = self._traj_in.header.frame_id
+        for i in range(self._traj_len):
+            pt = Point()
+            pt.x = self._traj_in.points[i].pose.position.x
+            pt.y = self._traj_in.points[i].pose.position.y
+            pt.z = self._traj_in.points[i].pose.position.z
+            marker.points.append(pt)
+        return marker
+
+
 
 if __name__ == "__main__":
     print("library for trajectory")
-    tm = TrajectoryManager()
-    print(tm.get_len())
+    rospy.init_node("test_trajectory_common")
+    traj_pub = rospy.Publisher("/test_vis_mark", Marker, queue_size=1, latch=True)
+    raw = [2.5] * 100
+    raw[0] = 1
+    raw[-1] = 0
+    traj_in = Trajectory()
+    traj_in.header.frame_id = "map"
+    f = 0
+    for i in range(len(raw)):
+        tp = TrajectoryPoint()
+        tp.pose.position.x = 1000* math.sin(i * math.pi)
+        tp.pose.orientation.w = 1
+        tp.longitudinal_velocity_mps = raw[i]
+        traj_in.points.append(tp)
+    print(traj_in.points[50])
+    tm = TrajectoryManager(traj_in)
+    #
+    print(tm.to_line(0.5))
+    traj_pub.publish(tm.to_line(0.5))
+    rospy.loginfo("line published")
+    rospy.spin()
+
 
 
 

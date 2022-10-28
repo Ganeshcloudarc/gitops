@@ -122,7 +122,7 @@ Visualization Manager:
       Marker Topic: /target_pose_marker
       Name: Target_pose_marker
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -374,7 +374,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 7.882784366607666
+      Distance: 20.66746711730957
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -382,17 +382,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 14.150885581970215
-        Y: 3.8589441776275635
+        X: -3.7563371658325195
+        Y: -2.030479907989502
         Z: 0
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5697963237762451
+      Pitch: 1.459796667098999
       Target Frame: ego_vehicle
-      Yaw: 2.1753928661346436
+      Yaw: 4.730402946472168
     Saved: ~
 Window Geometry:
   Displays:
