@@ -362,12 +362,15 @@ class ObstacleStopPlanner:
     def publish_velocity_marker(self, trajectory):
         marker_arr_msg = MarkerArray()
         i = 0
+        marker = Marker()
+        marker.header.frame_id = trajectory.header.frame_id
+        marker.action = marker.DELETEALL
+        marker_arr_msg.markers.append(marker)
         for traj_point in trajectory.points:
             marker = Marker()
             marker.header.frame_id = trajectory.header.frame_id
             marker.type = marker.TEXT_VIEW_FACING
             # marker.type = marker.LINE_STRIP
-
             marker.text = str(round(traj_point.longitudinal_velocity_mps, 2))
             # marker.text = str(i-1)
             marker.id = i
