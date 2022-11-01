@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+import random
 
 from autopilot_msgs.msg import Trajectory, TrajectoryPoint
 import rospy
@@ -169,6 +170,7 @@ class TrajectoryManager:
         return marker_arr_msg
 
     def to_line(self, width):
+        marker_arr = MarkerArray()
         marker = Marker()
         marker.header.frame_id = self._traj_in.header.frame_id
         marker.type = marker.LINE_STRIP
@@ -182,21 +184,44 @@ class TrajectoryManager:
         marker.color.b = 0.0
 
         # marker_arr_msg.header.frame_id = self._traj_in.header.frame_id
-        for i in range(self._traj_len):
+        for i in range(self._traj_len-10):
             pt = Point()
             pt.x = self._traj_in.points[i].pose.position.x
             pt.y = self._traj_in.points[i].pose.position.y
             pt.z = self._traj_in.points[i].pose.position.z
             marker.points.append(pt)
-        return marker
+        marker_arr.markers.append(marker)
+        marker = Marker()
+        marker.header.frame_id = self._traj_in.header.frame_id
+        marker.type = marker.LINE_STRIP
+        # marker.text = str(round(traj_point.longitudinal_velocity_mps, 2))
+        marker.id = 2
+        marker.action = marker.ADD
+        marker.scale.x = width
+        marker.color.a = 1.0
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+
+        # marker_arr_msg.header.frame_id = self._traj_in.header.frame_id
+        for i in range(self._traj_len - 10, self._traj_len ):
+            pt = Point()
+            pt.x = self._traj_in.points[i].pose.position.x
+            pt.y = self._traj_in.points[i].pose.position.y
+            pt.z = self._traj_in.points[i].pose.position.z
+            marker.points.append(pt)
+        marker_arr.markers.append(marker)
+
+
+        return marker_arr
 
 
 
 if __name__ == "__main__":
     print("library for trajectory")
     rospy.init_node("test_trajectory_common")
-    traj_pub = rospy.Publisher("/test_vis_mark", Marker, queue_size=1, latch=True)
-    raw = [2.5] * 100
+    traj_pub = rospy.Publisher("/test_vis_mark", MarkerArray, queue_size=1, latch=True)
+    raw = [2.5] * 20
     raw[0] = 1
     raw[-1] = 0
     traj_in = Trajectory()
@@ -204,11 +229,12 @@ if __name__ == "__main__":
     f = 0
     for i in range(len(raw)):
         tp = TrajectoryPoint()
-        tp.pose.position.x = 1000* math.sin(i * math.pi)
+        tp.pose.position.x = i
+        tp.pose.position.y = i
         tp.pose.orientation.w = 1
         tp.longitudinal_velocity_mps = raw[i]
         traj_in.points.append(tp)
-    print(traj_in.points[50])
+    # print(traj_in.points[50])
     tm = TrajectoryManager(traj_in)
     #
     print(tm.to_line(0.5))
