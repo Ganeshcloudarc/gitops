@@ -1,5 +1,5 @@
 obstacle_stop_planner:
-  stop_line_buffer : 3 # distance to be maintained from obstacle from front tip of vehicle (m).
+  stop_line_buffer : 5 # distance to be maintained from obstacle from front tip of vehicle (m).
   radial_off_set_to_vehicle_width : 0.3 # offset search radius to add vehicle width.
   trajectory_resolution : 0.5 # the minimum distance between the points in trajectory
 

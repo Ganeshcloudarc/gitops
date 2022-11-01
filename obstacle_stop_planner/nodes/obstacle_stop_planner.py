@@ -80,7 +80,7 @@ class ObstacleStopPlanner:
         sigma = rospy.get_param("gaussian_velocity_filter/sigma", 1)
         kernal_size = rospy.get_param("gaussian_velocity_filter/kernal_size", 11)
         self.robot_min_speed_th = rospy.get_param("obstacle_stop_planner/robot_min_speed_th", 0.8)
-        self._smoother = TrajectorySmoother(sigma, kernal_size,self.robot_min_speed_th)
+        self._smoother = TrajectorySmoother(sigma, kernal_size, self.robot_min_speed_th)
         self._traj_manager = TrajectoryManager()
         self._stop_line_buffer = rospy.get_param("obstacle_stop_planner/stop_line_buffer", 3.0)
 
@@ -216,60 +216,62 @@ class ObstacleStopPlanner:
                 dis_to_obstacle = abs(self._traj_in.points[collision_index].accumulated_distance_m -
                                       self._traj_in.points[self._close_idx].accumulated_distance_m)
                 dis_from_front_to_obs = abs(self._traj_in.points[collision_index].accumulated_distance_m -
-                                      self._traj_in.points[front_tip_idx].accumulated_distance_m)
+                                            self._traj_in.points[front_tip_idx].accumulated_distance_m)
                 rospy.logwarn(f"obstacle found at {dis_to_obstacle} meters ")
                 # if obstacle distance is less than _stop_line_buffer -> hard stop
                 if dis_to_obstacle < self._stop_line_buffer + self._base_to_front:
+
+                    # TODO apply break directly to pilot
                     rospy.logwarn("obstacle is very close, applying hard breaking")
-                    for i in range(self._close_idx, collision_index +1):
+                    for i in range(self._close_idx, collision_index + 1):
                         traj_point = copy.deepcopy(self._traj_in.points[i])
                         traj_point.longitudinal_velocity_mps = 0.0
                         trajectory_msg.points.append(traj_point)
-                    traj_out = trajectory_msg
+                    # traj_out = trajectory_msg
                 else:
                     rospy.loginfo("obstacle dis is more than the stop_distance")
                     # find the stop index
                     stop_index = collision_index
                     temp_dist = 0.0
                     # Compute the index at which we should stop.
-                    while temp_dist < self._stop_line_buffer and stop_index > self._close_idx :
+                    while temp_dist < self._stop_line_buffer and stop_index > self._close_idx:
                         temp_dist = abs(self._traj_in.points[collision_index].accumulated_distance_m -
                                         self._traj_in.points[stop_index].accumulated_distance_m)
                         stop_index -= 1
                     # Our trajectory starts from close_index to stop index
                     for i in range(self._close_idx, stop_index + 1):
                         trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
-                    trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
-                    # if self.robot_speed < self.robot_min_speed_th:
-                    #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
-                    # else:
-                    #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
-
-                    traj_out = self._smoother.filter(trajectory_msg)
+                    # trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
+                    # # if self.robot_speed < self.robot_min_speed_th:
+                    # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+                    # # else:
+                    # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+                    # #
+                    # # traj_out = self._smoother.filter(trajectory_msg)
                     for i in range(stop_index, collision_index):
-                        traj_point = self._traj_in.points[i]
+                        traj_point = copy.deepcopy(self._traj_in.points[i])
                         traj_point.longitudinal_velocity_mps = 0.0
-                        traj_out.points.append(traj_point)
+                        # traj_out.points.append(traj_point)
                         trajectory_msg.points.append(traj_point)
             else:
                 rospy.loginfo("No obstacle found")
                 for i in range(self._close_idx, collision_index):
                     trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
                 trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
-                if self.robot_speed < self.robot_min_speed_th:
-                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
-                else:
-                    trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
-                traj_out = self._smoother.filter(trajectory_msg)
+                # if self.robot_speed < self.robot_min_speed_th:
+                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+                # else:
+                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+                # traj_out = self._smoother.filter(trajectory_msg)
 
-            self.local_traj_publisher.publish(traj_out)
+            self.local_traj_publisher.publish(trajectory_msg)
             self.publish_points(collision_points)
             print("robot_speed", self.robot_speed)
             print(f"time taken for a loop is: {time.time() - loop_start_time} ")
             # print("len of local traj", len(traj_out.points))
             print("collision_index", collision_index)
 
-            self.publish_velocity_marker(traj_out)
+            self.publish_velocity_marker(trajectory_msg)
             rate.sleep()
 
     def odom_callback(self, data):
