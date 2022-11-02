@@ -1,12 +1,15 @@
 # Helper Functions for interfacing with TF2
 # Stolen from the ACRV 2017 Amazon Robotics Challenge
+import math
+
 import rospy
 import geometry_msgs.msg as gmsg
 import tf2_ros
 import tf2_geometry_msgs
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
-
+import numpy as np
+from autopilot_utils.pose_helper import yaw_to_quaternion
 # Lazy create on use (convert_pose) to avoid errors.
 tfBuffer = None
 listener = None
@@ -219,7 +222,7 @@ def transform_cloud(cloud, from_frame, to_frame):
         _init_tf()
     try:
         # trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time.now(), rospy.Duration(1.0))
-        
+
         trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time(0))
 
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
@@ -231,8 +234,104 @@ def transform_cloud(cloud, from_frame, to_frame):
     return cloud_out
 
 
+def convert_point_by_transform(point, trans):
+    if isinstance(point, gmsg.Point):
+        p2 = tf2_geometry_msgs.do_transform_point(gmsg.PointStamped(point=point), trans).point
+        return p2
+    elif isinstance(point, list) or isinstance(point, tuple) and len(point) == 3:
+        point = gmsg.Point(point[0], point[1], point[2])
+        p2 = tf2_geometry_msgs.do_transform_point(gmsg.PointStamped(point=point), trans).point
+        return p2.x, p2.y, p2.z
 
 
+def convert_pose_by_transform(pose, trans):
+    p2 = tf2_geometry_msgs.do_transform_pose(gmsg.PoseStamped(pose=pose), trans)
+    return p2
+
+
+def transform_zed_objects(object_data, to_frame):
+    """
+    Transforms zed objects data to target frame.
+    :param object_data: (zed_interfaces/ObjectsStamped) object data you want to transform
+    :param to_frame: frame to transform
+    :return transformed_object_data (zed_interfaces/ObjectsStamped)
+    """
+    if object_data.header.frame_id == to_frame:
+        return object_data
+    global tfBuffer, listener
+    if tfBuffer is None or listener is None:
+        _init_tf()
+    try:
+        trans = tfBuffer.lookup_transform(to_frame, object_data.header.frame_id, rospy.Time(0))
+    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+        rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, object_data.header.frame_id))
+        return None
+    for i in range(len(object_data.objects)):
+        object_data.objects[i].position = convert_point_by_transform(object_data.objects[i].position, trans)
+        for j in range(len(object_data.objects[i].bounding_box_3d.corners)):
+            object_data.objects[i].bounding_box_3d.corners[j].kp = \
+                convert_point_by_transform(object_data.objects[i].bounding_box_3d.corners[j].kp, trans)
+
+    object_data.header.frame_id = to_frame
+    object_data.header.stamp = rospy.Time.now()
+    return object_data
+
+
+def transform_lidar_objects(bbox_arr_data, to_frame):
+    """
+        Transforms jsk_recognition_msgs/BoundingBoxArray objects data to target frame
+        :param bbox_arr_data: (jsk_recognition_msgs/BoundingBoxArray) object data you want to transform
+        :param to_frame: frame to transform
+        :return
+         - transformed_object_data (jsk_recognition_msgs/BoundingBoxArray) in target frame.
+         - corners_list (list of geometry_msgs/Point).
+    """
+    if bbox_arr_data.header.frame_id == to_frame:
+        return bbox_arr_data
+    global tfBuffer, listener
+    if tfBuffer is None or listener is None:
+        _init_tf()
+    try:
+        trans = tfBuffer.lookup_transform(to_frame, bbox_arr_data.header.frame_id, rospy.Time(0))
+    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+        rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, bbox_arr_data.header.frame_id))
+        return None, None
+    for i in range(len(bbox_arr_data.boxes)):
+        bbox_arr_data.boxes[i].pose = \
+            tf2_geometry_msgs.do_transform_pose(gmsg.PoseStamped(pose=bbox_arr_data.boxes[i].pose), trans)
+        bbox_arr_data.boxes[i].header.frame_id = to_frame
+    bbox_arr_data.header.frame_id = to_frame
+    bbox_arr_data.header.stamp = rospy.Time.now()
+    return bbox_arr_data
+
+
+def bbox_to_corners(bbox):
+    """
+        Transforms jsk_recognition_msgs/BoundingBoxArray objects data to target frame
+        :param bbox: (jsk_recognition_msgs/BoundingBox)
+        :return numpy arr of four coordinates
+    """
+    trans_list = [
+        [-1, -1],
+        [-1, 1],
+        [1, 1],
+        [1, -1]
+    ]
+    corners_list = []
+    yaw = get_yaw(bbox.pose.orientation)
+    c, s = np.cos(yaw), np.sin(yaw)
+    R = np.array(((c, -s), (s, c)))
+    for x_, y_ in trans_list:
+        # print(x_)
+        pt = gmsg.Point()
+        pt.x = bbox.pose.position.x + x_ * bbox.dimensions[0]
+        pt.y = bbox.pose.position.y + y_ * bbox.dimensions[1]
+        # print("x", pt.x)
+        # print("x", type(pt.y))
+        print(np.array([pt.x, pt.y]))
+        result = np.dot(R, np.array([pt.x, pt.y]))
+        corners_list.append(result)
+    return corners_list
 
 
 # def add_poses(pose1, pose2):
@@ -242,13 +341,28 @@ def transform_cloud(cloud, from_frame, to_frame):
 #     tf.transform.rotation = gmsg.Quaternion(pose1.orinetati.x, pose1.position.y, pose1.position.z)
 
 
-# if __name__ == "__main__":
-#     # initialize ros node
-#     rospy.init_node('tf2_ros_example', anonymous=True)
-#
-#     # define source and target frame
-#     source_frame = 'base_link'
-#     target_frame = 'map'
-#
-#     point_wrt_source = gmsg.Point(34, 2, 3)
-#     p = [34, 2, 3]
+if __name__ == "__main__":
+    from jsk_recognition_msgs.msg import BoundingBoxArray, BoundingBox
+    # initialize ros node
+    # rospy.init_node('tf2_ros_example', anonymous=True)
+
+    # define source and target frame
+    source_frame = 'base_link'
+    target_frame = 'map'
+
+    # point_wrt_source = gmsg.Point(34, 2, 3)
+    b = BoundingBox()
+    b.dimensions = (1, 6, 1)
+    b.pose.position.x = 10
+
+    b.pose.orientation = yaw_to_quaternion(math.radians(0))
+
+    # print(b)
+    print(bbox_to_corners(b))
+    b.pose.orientation = yaw_to_quaternion(math.radians(9))
+    print(bbox_to_corners(b))
+
+
+
+
+

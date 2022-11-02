@@ -149,6 +149,10 @@ class TrajectoryManager:
         """
         marker_arr_msg = MarkerArray()
         marker_arr_msg.header.frame_id = self._traj_in.header.frame_id
+        marker = Marker()
+        marker.header.frame_id = self._traj_in.header.frame_id
+        marker.action = marker.DELETEALL
+        marker_arr_msg.markers.append(marker)
         for i in range(self._traj_len):
             traj_point = self._traj_in.points[i]
             marker = Marker()
@@ -212,9 +216,7 @@ class TrajectoryManager:
             marker.points.append(pt)
         marker_arr.markers.append(marker)
 
-
         return marker_arr
-
 
 
 if __name__ == "__main__":
