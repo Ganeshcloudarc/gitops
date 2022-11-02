@@ -1,0 +1,15 @@
+<launch>
+
+    <arg name="can_channel" default="can0"/>
+    <arg name="fcu_url" default="/dev/ttyACM0:115200" />
+
+    <include file="$(find pilot)/launch/all_pilot.launch"/>
+    <include file="$(find mavros)/launch/px4.launch">
+        <arg name="fcu_url"         value="$(arg fcu_url)" />
+    </include>
+    <include file="$(find vehicle_common)/launch/vehicle_description.launch" />
+    <include file="$(find zed_wrapper)/launch/zed2i.launch" />
+    <include file="$(find rslidar_sdk)/launch/start.launch"/>
+    <include file="$(find slamware_ros_sdk)/launch/scan_pub_no_tf.launch"/>
+
+</launch>

@@ -10,6 +10,7 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 import numpy as np
 from autopilot_utils.pose_helper import yaw_to_quaternion
+
 # Lazy create on use (convert_pose) to avoid errors.
 tfBuffer = None
 listener = None
@@ -307,7 +308,7 @@ def transform_lidar_objects(bbox_arr_data, to_frame):
 
 def bbox_to_corners(bbox):
     """
-        Transforms jsk_recognition_msgs/BoundingBoxArray objects data to target frame
+        finds the corner points from jsk_recognition_msgs/BoundingBox
         :param bbox: (jsk_recognition_msgs/BoundingBox)
         :return numpy arr of four coordinates
     """
@@ -343,6 +344,7 @@ def bbox_to_corners(bbox):
 
 if __name__ == "__main__":
     from jsk_recognition_msgs.msg import BoundingBoxArray, BoundingBox
+
     # initialize ros node
     # rospy.init_node('tf2_ros_example', anonymous=True)
 
@@ -361,8 +363,3 @@ if __name__ == "__main__":
     print(bbox_to_corners(b))
     b.pose.orientation = yaw_to_quaternion(math.radians(9))
     print(bbox_to_corners(b))
-
-
-
-
-
