@@ -2,14 +2,18 @@
 
     <arg name="can_channel" default="can0"/>
     <arg name="fcu_url" default="/dev/ttyACM0:115200" />
+    <arg name="zed_camera" default="true"/>
+    <arg name="2d_lidar" default="true"/>
+    <arg name="3d_lidar" default="true"/>
+
 
     <include file="$(find pilot)/launch/all_pilot.launch"/>
     <include file="$(find mavros)/launch/px4.launch">
         <arg name="fcu_url"         value="$(arg fcu_url)" />
     </include>
     <include file="$(find vehicle_common)/launch/vehicle_description.launch" />
-    <include file="$(find zed_wrapper)/launch/zed2i.launch" />
-    <include file="$(find rslidar_sdk)/launch/start.launch"/>
-    <include file="$(find slamware_ros_sdk)/launch/scan_pub_no_tf.launch"/>
+    <include file="$(find zed_wrapper)/launch/zed2i.launch" if = "$(eval arg('zed_camera'))"/>
+    <include file="$(find slamware_ros_sdk)/launch/scan_pub_no_tf.launch" if = "$(eval arg('2d_lidar'))" />
+    <include file="$(find rslidar_sdk)/launch/start.launch" if = "$(eval arg('3d_lidar'))"/>
 
 </launch>
