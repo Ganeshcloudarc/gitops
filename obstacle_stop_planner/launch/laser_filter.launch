@@ -2,6 +2,7 @@
   <node pkg="laser_filters" type="scan_to_scan_filter_chain"
       name="laser_filter">
     <rosparam command="load" file="$(find obstacle_stop_planner)/params/laser_filter_params.yaml"/>
-    <remap from="scan" to="laser_scan" />
+    <remap from="scan" to="slamware_ros_sdk_server_node/scan" />
+    <remap from="/scan_filtered" to="laser_scan" />
   </node>
 </launch>

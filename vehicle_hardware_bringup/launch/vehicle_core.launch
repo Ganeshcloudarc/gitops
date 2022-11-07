@@ -1,19 +1,27 @@
 <launch>
-
+    <arg name="vehicle_type" default="porter"/>
+    <arg name="vcu_up" default="true"/>
     <arg name="can_channel" default="can0"/>
+    <arg name="gps_up" default="true"/>
     <arg name="fcu_url" default="/dev/ttyACM0:115200" />
     <arg name="zed_camera" default="true"/>
     <arg name="2d_lidar" default="true"/>
+    <arg name="2d_lidar_ip" default="192.168.6.66"/>
     <arg name="3d_lidar" default="true"/>
+    <arg name="3d_lidar_ip" default="true" doc="todo"/>
 
 
-    <include file="$(find pilot)/launch/all_pilot.launch"/>
-    <include file="$(find mavros)/launch/px4.launch">
+    <include file="$(find pilot)/launch/all_pilot.launch" if ="$(eval arg('vcu_up'))"/>
+    <include file="$(find mavros)/launch/px4.launch" if = "$(eval arg('gps_up'))">
         <arg name="fcu_url"         value="$(arg fcu_url)" />
     </include>
-    <include file="$(find vehicle_common)/launch/vehicle_description.launch" />
+    <include file="$(find vehicle_common)/launch/vehicle_description.launch">
+        <arg name="vehicle_type" value="$arg vehicle_type"/>
+    </include>
     <include file="$(find zed_wrapper)/launch/zed2i.launch" if = "$(eval arg('zed_camera'))"/>
-    <include file="$(find slamware_ros_sdk)/launch/scan_pub_no_tf.launch" if = "$(eval arg('2d_lidar'))" />
+    <include file="$(find slamware_ros_sdk)/launch/scan_pub_no_tf.launch" if = "$(eval arg('2d_lidar'))" >
+           <arg name="ip_address" value="$arg  2d_lidar_ip)"/>
+    </include>
     <include file="$(find rslidar_sdk)/launch/start.launch" if = "$(eval arg('3d_lidar'))"/>
 
 </launch>

@@ -1,13 +1,13 @@
 <launch>
-    <arg name="mission_file" default="default.json"/>
+    <arg name="mission_file" default="carla2.json"/>
     <arg name="mission_continue" default="true"/>
     <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
-    <arg name="record" default="true"/>
-    <arg name="failsafe_enable" default="true"/>
+    <arg name="record" default="false"/>
+    <arg name="failsafe_enable" default="false"/>
     <arg name="obs_stop_planner" default="true"/>
-    <arg name="carla" default="false"/>
-    <arg name="sensor_source" default='1' doc="0: Zed camera, 1: Rslidar, 2: carla"/>
+    <arg name="carla" default="true"/>
+    <arg name="sensor_source" default='2' doc="0: Zed camera, 1: Rslidar, 2: carla"/>
 
 
     <param name = "/carla_sim/activate" value = "$(arg carla)"/>

@@ -1,0 +1,44 @@
+<launch>
+    <!--    Here we will have concept -->
+    <arg name="hardware_in_loop" default="true" doc="false to software in loop"/>
+    <arg name="vehicle_type" default="porter" doc="It can be either half_cabin or porter"/>
+    <arg name="mission_file" default="default.json"/>
+    <arg name='min_dis' default='0.1'/>
+    <arg name="failsafe_enable" default="true"/>
+    <arg name="record" default="true"/>
+
+
+    <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
+    <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
+    <param name='/patrol/odom_topic' value = '/vehicle/odom'/>
+
+    <group if="$(eval arg('hardware_in_loop'))">
+       <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
+           <arg name="vehicle_type" value="$(arg vehicle_type)"/>
+            <arg name="vcu_up" default="false"/>
+            <arg name="gps_up" default="true"/>
+            <arg name="zed_camera" value="false"/>
+            <arg name="2d_lidar" value="false"/>
+            <arg name="3d_lidar" value="false"/>
+       </include>
+    </group>
+
+     <group unless="$(eval arg('hardware_in_loop'))">
+       <include file="$(find vehicle_description)/launch/boson_sim.launch">
+            <arg name="vehicle_type" value="$(arg vehicle_type)"/>
+       </include>
+    </group>
+
+    <param name="/save_path/mission_file" value="$(arg mission_file)"/>
+    <param name="/save_path/min_dis_between_waypoints" value="$(arg min_dis)"/>
+    <param name="/save_path/failsafe_enable" value="$(arg failsafe_enable)"/>
+    <node pkg="autopilot" type="record_waypoints_json.py" name="waypoints_recorder_node" output='screen' />
+
+    <group if="$(eval arg('failsafe_enable'))">
+        <include file="$(find vehicle_safety)/launch/vehicle_safety.launch"> </include>
+    </group>
+
+    <node name="save_path_bag_record" pkg="rosbag" type="record"
+        args="record -o $(env HOME)/.bags/boson_save_path -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
+
+</launch>

@@ -1,7 +1,7 @@
 <launch>
     
     <arg name="mission_continue" default="false"/>
-    <arg name="sensor_source" default="0" doc="0: zed_camera, 1: rslidar, 2:carla "/>
+    <arg name="sensor_source" default="2" doc="0: zed_camera, 1: rslidar, 2: rplidar "/>
 
     <param name = "/obstacle_stop_planner/mission_continue" value = "$(arg mission_continue)"/>
     

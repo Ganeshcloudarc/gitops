@@ -53,14 +53,14 @@ class PurePursuitController:
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
         self.time_out_from_input_trajectory = rospy.get_param("/pure_pursuit/time_out", 3)
         trajectory_in_topic = rospy.get_param("/trajectory_in", "/local_gps_trajectory")
-        odom_topic = rospy.get_param("/patrol/odom_topic", "/mavros/global_position/local")
-        gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/local")
+        odom_topic = rospy.get_param("/patrol/odom_topic", "/vehicle/odom")
+        gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/global")
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
 
         failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
 
         if failsafe_enable:
-            cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
+            cmd_topic = rospy.get_param("patrol/cmd_topic", "/vehicle/cmd_drive_safe")
         else:
             cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
 
@@ -233,12 +233,16 @@ class PurePursuitController:
             close_index , distance
         """
         distance_list = [distance_btw_poses(robot_pose, point.pose) for point in self.trajectory_data.points]
-        ind = np.argmin(distance_list)
-        dis = distance_list[ind]
-        if ind == len(self.trajectory_data.points)-1:
-            return -1, -1
+        if len(distance_list) > 0:
+            ind = np.argmin(distance_list)
+            dis = distance_list[ind]
+            if ind == len(self.trajectory_data.points)-1:
+                return -1, -1
+            else:
+                return ind, dis
         else:
-            return ind, dis
+            return 0, 0
+
 
     def trajectory_callback(self, data):
         self.trajectory_data = data
