@@ -1,7 +1,7 @@
 <launch>
   <rosparam file="$(find vehicle_safety)/params/vehicle_safety_params.yaml" command="load"/>
-  <node name="vehicle_safety_diagnostics" pkg="vehicle_safety" type="vehicle_safety" output="screen">
+  <node name="vehicle_safety_diagnostics" pkg="vehicle_safety" type="vehicle_safety" respawn="true"> <!--added respawn so even if this node kills it can restart-->
   <remap from="diagnostics" to="/vehicle_safety_diagnostics"/>
   </node>
-  <node name="vehicle_safety_analyzer" pkg="vehicle_safety" type="vehicle_safety_analyzer.py" output="screen"/>
+  <node name="vehicle_safety_analyzer" pkg="vehicle_safety" type="vehicle_safety_analyzer.py" respawn="true"/>
 </launch>

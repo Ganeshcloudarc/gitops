@@ -39,7 +39,7 @@ class FailSafeAutoPilot:
             else:
                 # print("Black list",field.name,field.level)
                 pass
-        print(self.status.values())
+        # print(self.status.values())
         if any(self.status.values()):
             self.fail_status = True
         else:
