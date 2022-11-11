@@ -37,6 +37,8 @@ float GROUND_THRESH;
 float CLUSTER_THRESH;
 int CLUSTER_MAX_SIZE, CLUSTER_MIN_SIZE;
 float DISPLACEMENT_THRESH, IOU_THRESH;
+int NEIGHOBORS;
+float STANDARD_DEVIATION;
 
 class ObstacleDetectorNode
 {
@@ -53,8 +55,7 @@ class ObstacleDetectorNode
   ros::NodeHandle nh;
   tf2_ros::Buffer tf2_buffer;
   tf2_ros::TransformListener tf2_listener;
-  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
-  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config>::CallbackType f;
+  
 
   ros::Subscriber sub_lidar_points;
   ros::Publisher pub_cloud_ground;
@@ -73,6 +74,7 @@ class ObstacleDetectorNode
 void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& config, uint32_t level)
 {
   // Pointcloud Filtering Parameters
+  ROS_INFO("dynamicParamCallback");
   USE_PCA_BOX = config.use_pca_box;
   USE_TRACKING = config.use_tracking;
   VOXEL_GRID_SIZE = config.voxel_grid_size;
@@ -109,10 +111,51 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
   pub_jsk_bboxes = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>(jsk_bboxes_topic, 1);
   pub_autoware_objects = nh.advertise<autoware_msgs::DetectedObjectArray>(autoware_objects_topic, 1);
 
-  // Dynamic Parameter Server & Function
-  f = boost::bind(&dynamicParamCallback, _1, _2);
-  server.setCallback(f);
+  // bool use_recon;
+  // private_nh.getParam("rqt_reconfigure", use_recon);
+  // if (use_recon)
+  // {
+  //   ROS_INFO("rqt is true");
+  //   dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
+  //   dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config>::CallbackType f;
 
+  //   // // Dynamic Parameter Server & Function
+  //   f = boost::bind(&dynamicParamCallback, _1, _2);
+  //   server.setCallback(f);
+  // }
+  // else
+  // {
+    ROS_INFO("rqt is False");
+    private_nh.getParam("use_pca_box", USE_PCA_BOX);
+    private_nh.getParam("use_tracking", USE_TRACKING);
+    private_nh.getParam("voxel_grid_size", VOXEL_GRID_SIZE);
+    float roi_max_x, roi_max_y, roi_max_z;
+    float roi_min_x, roi_min_y, roi_min_z;
+
+    private_nh.getParam("roi_max_x", roi_max_x);
+    private_nh.getParam("roi_max_y", roi_max_y);
+    private_nh.getParam("roi_max_z", roi_max_z);
+
+    private_nh.getParam("roi_min_x", roi_min_x);
+    private_nh.getParam("roi_min_y", roi_min_y);
+    private_nh.getParam("roi_min_z", roi_min_z);
+
+    ROI_MAX_POINT = Eigen::Vector4f(roi_max_x, roi_max_y, roi_max_z, 1);
+    ROI_MIN_POINT = Eigen::Vector4f(roi_min_x, roi_min_y, roi_min_z, 1);
+
+
+    private_nh.getParam("ground_threshold", GROUND_THRESH);
+    private_nh.getParam("cluster_threshold", CLUSTER_THRESH);
+    private_nh.getParam("cluster_max_size", CLUSTER_MAX_SIZE);
+    private_nh.getParam("cluster_min_size", CLUSTER_MIN_SIZE);
+    private_nh.getParam("displacement_threshold", DISPLACEMENT_THRESH);
+
+    private_nh.getParam("iou_threshold", IOU_THRESH);
+    private_nh.getParam("neighbors", NEIGHOBORS);
+    private_nh.getParam("standard_deviation", STANDARD_DEVIATION);
+
+  // }
+  
   // Create point processor
   obstacle_detector = std::make_shared<ObstacleDetector<pcl::PointXYZ>>();
   obstacle_id_ = 0;
@@ -130,7 +173,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   pcl::fromROSMsg(*lidar_points, *raw_cloud);
 
   // Downsampleing, ROI, and removing the car roof
-  auto filtered_cloud = obstacle_detector->filterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT);
+  auto filtered_cloud = obstacle_detector->filterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT, NEIGHOBORS, STANDARD_DEVIATION);
 
   // Segment the groud plane and obstacles
   auto segmented_clouds = obstacle_detector->segmentPlane(filtered_cloud, 30, GROUND_THRESH);
@@ -271,7 +314,7 @@ void ObstacleDetectorNode::publishDetectedObjects(std::vector<pcl::PointCloud<pc
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "obstacle_detector_node");
+  ros::init(argc, argv, "obstacle_detector_node", ros::init_options::AnonymousName);
   lidar_obstacle_detector::ObstacleDetectorNode obstacle_detector_node;
   ros::spin();
   return 0;

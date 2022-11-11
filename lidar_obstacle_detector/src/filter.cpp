@@ -49,7 +49,7 @@ void chatterCallback(const jsk_recognition_msgs::BoundingBoxArray& msg)
 
 int main(int argc, char **argv)
 {
-  init(argc, argv, "filter");
+  init(argc, argv, "filter", ros::init_options::AnonymousName);
   NodeHandle n;
   pub = n.advertise<jsk_recognition_msgs::BoundingBoxArray>("/filtered_detector/jsk_bboxes", 10);
   Subscriber sub = n.subscribe("/obstacle_detector/jsk_bboxes", 10, chatterCallback); 

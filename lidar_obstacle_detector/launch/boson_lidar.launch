@@ -1,16 +1,17 @@
 <?xml version="1.0"?>
 <launch>
 
-  <node name="obstacle_detector_node" pkg="lidar_obstacle_detector" type="obstacle_detector_node">
+  <node name="obstacle_detector_node" pkg="lidar_obstacle_detector" type="obstacle_detector_node" output="screen">
     <!-- Input Topic Names -->
     <param name="lidar_points_topic"                  value="/rslidar_points"/>
-    <!-- <param name="lidar_points_topic"                  value="/carla/ego_vehicle/lidar"/> -->
+<!--     <param name="lidar_points_topic"                  value="/zed2i/zed_node/point_cloud/cloud_registered"/>-->
 
     <!-- Output Topic Names -->
     <param name="cloud_ground_topic"                  value="obstacle_detector/cloud_ground"/>
     <param name="cloud_clusters_topic"                value="obstacle_detector/cloud_clusters"/>
     <param name="jsk_bboxes_topic"                    value="obstacle_detector/jsk_bboxes"/>
     <param name="autoware_objects_topic"              value="obstacle_detector/objects"/>
+    
     <!-- Parameters -->
     <param name="bbox_target_frame"                   value="rslidar"/>
   </node>

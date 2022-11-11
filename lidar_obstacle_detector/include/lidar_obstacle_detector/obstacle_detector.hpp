@@ -20,6 +20,7 @@
 #include <pcl/common/transforms.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/filters/crop_box.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/segmentation/sac_segmentation.h>
@@ -38,7 +39,7 @@ class ObstacleDetector
 
   // ****************** Detection ***********************
 
-  typename pcl::PointCloud<PointT>::Ptr filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt);
+  typename pcl::PointCloud<PointT>::Ptr filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt,  int NEIGHOBORS, float STANDARD_DEVIATION);
   
   std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> segmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int max_iterations, const float distance_thresh);
 
@@ -83,7 +84,7 @@ template <typename PointT>
 ObstacleDetector<PointT>::~ObstacleDetector() {}
 
 template <typename PointT>
-typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt)
+typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt,  int neighbors, float standard_deviation)
 {
   // Time segmentation process
   // const auto start_time = std::chrono::steady_clock::now();
@@ -120,6 +121,16 @@ typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(cons
   extract.setIndices(inliers);
   extract.setNegative(true);
   extract.filter(*cloud_roi);
+
+
+
+
+  // statistical radial removal
+   pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+  sor.setInputCloud (cloud_roi);
+  sor.setMeanK (neighbors);
+  sor.setStddevMulThresh (standard_deviation);
+  sor.filter (*cloud_roi);
 
   // const auto end_time = std::chrono::steady_clock::now();
   // const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
