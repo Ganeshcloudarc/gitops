@@ -1,16 +1,20 @@
 <launch>
     
     <arg name="mission_continue" default="false"/>
-    <arg name="sensor_source" default="2" doc="0: zed_camera, 1: rslidar, 2: rplidar "/>
+    <arg name="sensor_source" default="1" doc="0: zed_camera, 1: rslidar, 2: rplidar "/>
 
     <param name = "/obstacle_stop_planner/mission_continue" value = "$(arg mission_continue)"/>
     
+    <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+        <arg name="rviz" value="false"/>
+    </include>
 
     <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
-        <arg name="sensor_source"         value="$(arg sensor_source)" />
+        <arg name="cloud_in" value="/obstacle_detector/cloud_clusters"/>
     </include>
 
     <rosparam command="load" file="$(find obstacle_stop_planner)/params/obstacle_stop_planner.yaml"/>
+    <param name="obstacle_stop_planner/scan_in" value="laser_scan"/>
     <node pkg="obstacle_stop_planner" type="obstacle_stop_planner.py" name="obstacle_stop_planner_node" output="screen" />
 
 </launch>
