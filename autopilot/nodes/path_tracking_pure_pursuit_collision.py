@@ -233,12 +233,16 @@ class PurePursuitController:
             close_index , distance
         """
         distance_list = [distance_btw_poses(robot_pose, point.pose) for point in self.trajectory_data.points]
-        ind = np.argmin(distance_list)
-        dis = distance_list[ind]
-        if ind == len(self.trajectory_data.points)-1:
-            return -1, -1
+        if len(distance_list)>0:
+            ind = np.argmin(distance_list)
+            dis = distance_list[ind]
+            if ind == len(self.trajectory_data.points)-1:
+                return -1, -1
+            else:
+                return ind, dis
         else:
-            return ind, dis
+            return -1, -1
+
 
     def trajectory_callback(self, data):
         self.trajectory_data = data
