@@ -183,24 +183,27 @@ class PurePursuitController:
                 self.send_ack_msg(steering_angle, speed, 0)
 
             # fill the control diagnose topic
-            diagnostic_msg.level = diagnostic_msg.OK
-            diagnostic_msg.message = "Tracking path"
-            diagnostic_msg.stamp = rospy.Time.now()
-            diagnostic_msg.look_ahead = lhd
-            diagnostic_msg.cte = close_dis
-            diagnostic_msg.longitudinal_velocity_mps = speed
-            diagnostic_msg.steering_angle = steering_angle
-            diagnostic_msg.lateral_velocity_dps = steering_angle - prev_steering_angle / time.time() - prev_time
-            diagnostic_msg.acceleration_mps2 = speed - prev_speed / time.time() - prev_time
-            diagnostic_msg.target_pose = target_pose.pose
-            diagnostic_msg.target_gps_pose = self.trajectory_data.points[target_point_ind].gps_pose
-            diagnostic_msg.vehicle_pose = robot_pose
-            diagnostic_msg.vehicle_gps_pose = self.gps_robot_state
-            controller_diagnose_pub.publish(diagnostic_msg)
-            prev_steering_angle = steering_angle
-            prev_time = time.time()
-            prev_speed = speed
-            rate.sleep()
+            try:
+                diagnostic_msg.level = diagnostic_msg.OK
+                diagnostic_msg.message = "Tracking path"
+                diagnostic_msg.stamp = rospy.Time.now()
+                diagnostic_msg.look_ahead = lhd
+                diagnostic_msg.cte = close_dis
+                diagnostic_msg.longitudinal_velocity_mps = speed
+                diagnostic_msg.steering_angle = steering_angle
+                diagnostic_msg.lateral_velocity_dps = steering_angle - prev_steering_angle / time.time() - prev_time
+                diagnostic_msg.acceleration_mps2 = speed - prev_speed / time.time() - prev_time
+                diagnostic_msg.target_pose = target_pose.pose
+                diagnostic_msg.target_gps_pose = self.trajectory_data.points[target_point_ind].gps_pose
+                diagnostic_msg.vehicle_pose = robot_pose
+                diagnostic_msg.vehicle_gps_pose = self.gps_robot_state
+                controller_diagnose_pub.publish(diagnostic_msg)
+                prev_steering_angle = steering_angle
+                prev_time = time.time()
+                prev_speed = speed
+                rate.sleep()
+            except Exception as e:
+                rospy.logerr("%s",str(e))
 
     def target_index(self, robot_pose, close_point_ind):
         """
