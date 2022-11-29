@@ -139,7 +139,7 @@ class ObstacleStopPlanner:
                     f"waiting for data  scan :{self.scan_data_received}, global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
                 rate.sleep()
 
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(100)
         while not rospy.is_shutdown():
             loop_start_time = time.time()
             # checks whether data from sensors are updated.

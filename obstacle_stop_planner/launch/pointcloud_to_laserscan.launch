@@ -11,8 +11,8 @@
       <param name="target_frame" value="$(arg target_frame)"/>
       <!-- <param value="min_height" value="$(arg min_height)"/> -->
       <rosparam>
-         min_height  : -0.1
-         max_height  : 0.3
+         min_height  : -0.2
+         max_height  : 0.5
          angle_min   : -1.570
          angle_max   : 1.5708
          

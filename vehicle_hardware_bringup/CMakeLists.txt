@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   zed_wrapper
-  pilot
+  #  pilot
 )
 
 ## System dependencies are found with CMake's conventions

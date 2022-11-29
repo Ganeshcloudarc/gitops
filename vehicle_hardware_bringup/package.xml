@@ -52,15 +52,15 @@
   <build_depend>roscpp</build_depend>
   <build_depend>rospy</build_depend>
   <build_depend>zed_wrapper</build_depend>
-  <build_depend>pilot</build_depend>
+ 
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
   <build_export_depend>zed_wrapper</build_export_depend>
-  <build_export_depend>pilot</build_export_depend>
+ 
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>zed_wrapper</exec_depend>
-  <exec_depend>pilot</exec_depend>
+ 
 
 
 

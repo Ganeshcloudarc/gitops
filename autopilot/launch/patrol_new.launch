@@ -1,12 +1,12 @@
 <launch>
     <arg name="hardware_in_loop" default="true" doc="false to software in loop"/>
-    <arg name="vehicle_type" default="porter" doc="It can be either half_cabin or porter"/>
+    <arg name="vehicle_type" default="half_cabin" doc="It can be either half_cabin or porter"/>
 
     <arg name="mission_file" default="default.json"/>
     <arg name="mission_continue" default="true"/>
     <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
-    <arg name="record" default="false"/>
+    <arg name="record" default="true"/>
     <arg name="failsafe_enable" default="false"/>
     <arg name="obs_stop_planner" default="false"/>
 
@@ -56,7 +56,7 @@
     </group>
 
     <node name="patrol_bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
+        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*) " if="$(eval record)"/>
 
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">

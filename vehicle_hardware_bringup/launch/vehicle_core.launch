@@ -16,7 +16,7 @@
         <arg name="fcu_url"         value="$(arg fcu_url)" />
     </include>
     <include file="$(find vehicle_common)/launch/vehicle_description.launch">
-        <arg name="vehicle_type" value="$arg vehicle_type"/>
+        <arg name="vehicle_type" value="$(arg vehicle_type)"/>
     </include>
     <include file="$(find zed_wrapper)/launch/zed2i.launch" if = "$(eval arg('zed_camera'))"/>
     <include file="$(find slamware_ros_sdk)/launch/scan_pub_no_tf.launch" if = "$(eval arg('2d_lidar'))" >
