@@ -1,78 +1,75 @@
 <launch>
-    <arg name="mission_file" default="carla2.json"/>
+    <arg name="hardware_in_loop" default="true" doc="false to software in loop"/>
+    <arg name="vehicle_type" default="half_cabin" doc="It can be either half_cabin or porter"/>
+
+    <arg name="mission_file" default="default.json"/>
     <arg name="mission_continue" default="true"/>
     <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
-    <arg name="record" default="false"/>
-    <arg name="failsafe_enable" default="false"/>
+    <arg name="record" default="true"/>
+    <arg name="failsafe_enable" default="true"/>
     <arg name="obs_stop_planner" default="true"/>
-    <arg name="carla" default="true"/>
-    <arg name="sensor_source" default='2' doc="0: Zed camera, 1: Rslidar, 2: carla"/>
 
-
-    <param name = "/carla_sim/activate" value = "$(arg carla)"/>
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
     <param name="/patrol/mission_continue" value ="$(arg mission_continue)"/>
     <param name="/patrol/mission_trips" value ="$(arg mission_trips)"/>
-
     <param name="/patrol/failsafe_enable" value = "$(arg failsafe_enable)"/>
-
     <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
+    <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
+    <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
+    <param name='/patrol/odom_topic' value = 'vehicle/odom'/>
+    <param name="/robot_base_frame" value ="base_link"/>
 
-
-    <group if="$(eval arg('carla'))">
-        <param name='/patrol/gps_topic' value = '/carla/ego_vehicle/gnss'/>
-        <param name='/patrol/imu_topic' value = '/carla/ego_vehicle/imu'/>
-        <param name='/patrol/odom_topic' value = '/carla/ego_vehicle/odometry'/>
-        <param name="/robot_base_frame" value ="ego_vehicle"/>
-        <param name="robot_base_frame" value ="ego_vehicle"/>
-        <param name ='/patrol/max_forward_speed' value="2.5"/>
-        <param name ='/patrol/min_forward_speed' value="0.8"/>
-        <param name ='/patrol/max_backward_speed' value="0.3"/>
-        <param name ='/patrol/min_backward_speed' value="0.01"/>
-
-        <node name="carla_control_converter_node" pkg="autopilot" type="carla_control_converter.py" />
+ 
+    <group if="$(eval arg('hardware_in_loop'))">
+       <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
+           <arg name="vehicle_type" value="$(arg vehicle_type)"/>
+            <arg name="vcu_up" default="true"/>
+            <arg name="gps_up" default="true"/>
+            <arg name="zed_camera" value="false"/>
+            <arg name="2d_lidar" value="false"/>
+            <arg name="3d_lidar" value="true"/>
+       </include>
     </group>
-    <group unless="$(arg carla)">
-        <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
-        <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
-        <param name='/patrol/odom_topic' value = 'vehicle/odom'/>
-        <param name="/robot_base_frame" value ="base_link"/>
+
+     <group unless="$(eval arg('hardware_in_loop'))">
+       <include file="$(find vehicle_description)/launch/boson_sim.launch">
+            <arg name="vehicle_type" value="$(arg vehicle_type)"/>
+       </include>
     </group>
-    <param name="/patrol/failsafe_enable" value="$(arg failsafe_enable)"/>
 
 
-    <node pkg = "autopilot" type = "path_publisher.py" name = "gps_path_pub_node" />
+    <!-- path publisher -->
+    <include file="$(find autopilot)launch/path_publisher.launch">
+        <arg name="mission_file" value="$(arg mission_file)"/>
+        <arg name="mission_continue" value="$(arg mission_continue)"/>
+    </include>
+
+    <!-- utils-->
     <node pkg = "autopilot" type = "odom_path_plotter.py" name = "odom_path_plotter_node">
         <param name="max_list_append" value="300" />
     </node>
     <node pkg = "autopilot" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
 
+    <!-- obstacle stop planner -->
     <group if="$(eval arg('obs_stop_planner'))">
-        <include file="$(find autopilot)/launch/patrol_obs_stopper.launch">
-            <arg name="carla"         value="$(arg carla)" />
-            <arg name="rviz"          value="$(arg rviz)"/>
-            <arg name="mission_continue"          value="$(arg mission_continue)"/>
-            <arg name="sensor_source" value ="$(arg sensor_source)"/>
+        <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
+        <include file="$(find obstacle_stop_planner)/launch/obstacle_stop_planner.launch">
+            <arg name="mission_continue" value="$(arg mission_continue)"/>
+<!--            <arg name="sensor_source" value="$(arg sensor_source)"/>-->
         </include>
+        <node name="rviz_obstacle_stop_planner" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol_obstacle_stop_planner.rviz" if = "$(eval arg('rviz'))"/>
     </group>
 
     <group unless="$(eval arg('obs_stop_planner'))">
-
           <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
           <group if="$(eval arg('rviz'))">
-                <node name="carla_rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/carla-patrol.rviz" if = "$(eval arg('carla'))"/>
-                <node name="rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol.rviz" unless = "$(eval arg('carla'))"/>
+                <node name="rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol.rviz" if = "$(eval arg('rviz'))"/>
           </group>
     </group>
 
-    
-
     <node name="patrol_bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
-    
-    <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include>
-
+        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*) " if="$(eval record)"/>
 
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">
