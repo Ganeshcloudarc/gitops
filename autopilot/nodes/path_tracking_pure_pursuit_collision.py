@@ -185,8 +185,8 @@ class PurePursuitController:
                 else:
                     self.send_ack_msg(steering_angle, speed, 0)
 
-            # fill the control diagnose topic
-            try:
+                # fill the control diagnose topic
+            
                 diagnostic_msg.level = diagnostic_msg.OK
                 diagnostic_msg.message = "Tracking path"
                 diagnostic_msg.stamp = rospy.Time.now()
@@ -205,8 +205,14 @@ class PurePursuitController:
                 prev_time = time.time()
                 prev_speed = speed
                 rate.sleep()
-            except Exception as e:
-                rospy.logerr("%s",str(e))
+            except IndexError:
+                rospy.logerr("index error occured")
+                rate.sleep()
+                continue
+            except Exception as err:
+                rospy.logerr(f"Error occured :{err}")
+                rate.sleep()
+                continue
 
     def target_index(self, robot_pose, close_point_ind):
         """
