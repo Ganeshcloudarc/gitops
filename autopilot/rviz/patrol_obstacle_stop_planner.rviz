@@ -4,6 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /LocalVel1
         - /MarkerArray1/Namespaces1
       Splitter Ratio: 0.4761904776096344
     Tree Height: 725
@@ -25,7 +26,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: LaserScan
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -72,7 +73,7 @@ Visualization Manager:
       Marker Topic: /target_pose_marker
       Name: TargetPoseMarker
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Alpha: 10
@@ -128,15 +129,15 @@ Visualization Manager:
       Marker Topic: /target_pose_marker
       Name: Target_pose_marker
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
       Enabled: true
-      Marker Topic: obstacle_stop_planner/collision_velocity_marke
+      Marker Topic: /obstacle_stop_planner/collision_velocity_marker
       Name: LocalVel
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -144,7 +145,7 @@ Visualization Manager:
       Marker Topic: /global_gps_trajectory_velocity_marker
       Name: MarkerArray
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Align Bottom: false
@@ -246,6 +247,40 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
+        base_link:
+          Value: true
+        chassis:
+          Value: true
+        fl_axle:
+          Value: true
+        fr_axle:
+          Value: true
+        front_left_wheel:
+          Value: true
+        front_right_wheel:
+          Value: true
+        map:
+          Value: true
+        odom:
+          Value: true
+        rear_left_wheel:
+          Value: true
+        rear_right_wheel:
+          Value: true
+        rplidar:
+          Value: true
+        rslidar:
+          Value: true
+        steering_wheel:
+          Value: true
+        velodyne:
+          Value: true
+        velodyne_base_link:
+          Value: true
+        zed2i_base_link:
+          Value: true
+        zed2i_base_link_optical:
+          Value: true
       Marker Alpha: 1
       Marker Scale: 1
       Name: TF
@@ -253,7 +288,31 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        map:
+          odom:
+            base_link:
+              chassis:
+                fl_axle:
+                  front_left_wheel:
+                    {}
+                fr_axle:
+                  front_right_wheel:
+                    {}
+                rear_left_wheel:
+                  {}
+                rear_right_wheel:
+                  {}
+                steering_wheel:
+                  {}
+              rplidar:
+                {}
+              rslidar:
+                velodyne_base_link:
+                  velodyne:
+                    {}
+              zed2i_base_link:
+                zed2i_base_link_optical:
+                  {}
       Update Interval: 0
       Value: true
     - Class: jsk_rviz_plugin/Diagnostics

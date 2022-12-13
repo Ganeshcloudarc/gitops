@@ -139,7 +139,7 @@ class ObstacleStopPlanner:
                     f"waiting for data  scan :{self.scan_data_received}, global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
                 rate.sleep()
 
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(100)
         while not rospy.is_shutdown():
             loop_start_time = time.time()
             # checks whether data from sensors are updated.
@@ -174,13 +174,16 @@ class ObstacleStopPlanner:
             front_tip_idx = self._traj_manager.next_point_within_dist(self._close_idx, self._base_to_front)
             self.front_pose_pub.publish(
                 PoseStamped(header=Header(frame_id="map"), pose=self._traj_manager.get_traj_point(front_tip_idx).pose))
+
             # filling Kd true
+
             try:
                 kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
             except:
                 rospy.logerr("Could not fill KDtree")
-                rate.sleep()
-                continue
+                pass
+                # rate.sleep()
+                # continue
             prev_processed_ind = self._close_idx
             obstacle_found = False
             trajectory_msg = Trajectory()
@@ -257,7 +260,7 @@ class ObstacleStopPlanner:
                 rospy.loginfo("No obstacle found")
                 for i in range(self._close_idx, collision_index):
                     trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
-                trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
+                # trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
                 # if self.robot_speed < self.robot_min_speed_th:
                 #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
                 # else:
@@ -291,11 +294,14 @@ class ObstacleStopPlanner:
         points = self.laser_geo_obj.projectLaser(data)
         tf_points = transform_cloud(points, data.header.frame_id, "map")
         if tf_points:
-            self.laser_np_3d = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=True)
+            self.laser_np_3d = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=False)
             self.laser_np_2d = np.delete(self.laser_np_3d, -1, axis=1)
+            if len(self.laser_np_2d.tolist()) == 0:
+                self.laser_np_2d = np.array([100, 100])
             self.scan_data_received = True
         else:
             self.scan_data_received = False
+
         rospy.logdebug(f"time taken for laser scan callback: {time.time() - start} ")
 
         # self.publish_points(self.pc_np)

@@ -53,14 +53,14 @@ class PurePursuitController:
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
         self.time_out_from_input_trajectory = rospy.get_param("/pure_pursuit/time_out", 3)
         trajectory_in_topic = rospy.get_param("/trajectory_in", "/local_gps_trajectory")
-        odom_topic = rospy.get_param("/patrol/odom_topic", "/mavros/global_position/local")
-        gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/local")
+        odom_topic = rospy.get_param("/patrol/odom_topic", "/vehicle/odom")
+        gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/global")
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
 
         failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
 
         if failsafe_enable:
-            cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
+            cmd_topic = rospy.get_param("patrol/cmd_topic", "/vehicle/cmd_drive_safe")
         else:
             cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
 
@@ -121,66 +121,69 @@ class PurePursuitController:
         diagnostic_msg.name = "Pure Pursuit Node"
         rate = rospy.Rate(100)
         while not rospy.is_shutdown():
-            robot_pose = current_robot_pose("map", self.robot_base_frame)
-            if not robot_pose:
-                rospy.logwarn("No tf between map and %s", self.robot_base_frame)
-                diagnostic_msg.level = diagnostic_msg.WARN
-                diagnostic_msg.message = 'Time out from tf'
-                diagnostic_msg.stamp = rospy.Time.now()
-                controller_diagnose_pub.publish(diagnostic_msg)
-                rate.sleep()
-                continue
-            if time.time() - self.updated_traj_time > self.time_out_from_input_trajectory:
-                rospy.logwarn("timeout from input trajectory by %s", str(time.time() - self.updated_traj_time))
-                diagnostic_msg.level = diagnostic_msg.WARN
-                diagnostic_msg.message = "Timeout from input trajectory by " + str(time.time() - self.updated_traj_time)
-                diagnostic_msg.stamp = rospy.Time.now()
-                controller_diagnose_pub.publish(diagnostic_msg)
-                rate.sleep()
-                continue
+            try:
 
-            close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
-            if close_point_ind == -1:
-                self.send_ack_msg(0, 0, 0)
-                rospy.loginfo("Reached end of local trajectory")
-                diagnostic_msg.level = diagnostic_msg.WARN
-                diagnostic_msg.message = "Reached end of local trajectory"
-                diagnostic_msg.stamp = rospy.Time.now()
-                controller_diagnose_pub.publish(diagnostic_msg)
-                rate.sleep()
-                continue
-            else:
-                target_point_ind, lhd = self.target_index(robot_pose, close_point_ind)
-            if target_point_ind == -1:
-                self.send_ack_msg(0, 0, 0)
-                rospy.loginfo("Lhd is less than min_look_ahead distance, reached end of local_traj")
-                diagnostic_msg.level = diagnostic_msg.WARN
-                diagnostic_msg.message = "Lhd is less than min_look_ahead distance, reached end of local_traj"
-                diagnostic_msg.stamp = rospy.Time.now()
-                controller_diagnose_pub.publish(diagnostic_msg)
-                rate.sleep()
-                continue
-            target_pose = PoseStamped()
-            target_pose.header.frame_id = "map"
-            target_pose.pose = self.trajectory_data.points[target_point_ind].pose
-            target_pose_pub.publish(target_pose)
-            close_pose = PoseStamped()
-            close_pose.header.frame_id = "map"
-            close_pose.pose = self.trajectory_data.points[close_point_ind].pose
-            close_pose_pub.publish(close_pose)
+                # robot_pose = current_robot_pose("map", self.robot_base_frame)
+                robot_pose = self.robot_state.pose.pose
+                if not robot_pose:
+                    rospy.logwarn("No tf between map and %s", self.robot_base_frame)
+                    diagnostic_msg.level = diagnostic_msg.WARN
+                    diagnostic_msg.message = 'Time out from tf'
+                    diagnostic_msg.stamp = rospy.Time.now()
+                    controller_diagnose_pub.publish(diagnostic_msg)
+                    rate.sleep()
+                    continue
+                if time.time() - self.updated_traj_time > self.time_out_from_input_trajectory:
+                    rospy.logwarn("timeout from input trajectory by %s", str(time.time() - self.updated_traj_time))
+                    diagnostic_msg.level = diagnostic_msg.WARN
+                    diagnostic_msg.message = "Timeout from input trajectory by " + str(time.time() - self.updated_traj_time)
+                    diagnostic_msg.stamp = rospy.Time.now()
+                    controller_diagnose_pub.publish(diagnostic_msg)
+                    rate.sleep()
+                    continue
+
+                close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
+                if close_point_ind == -1:
+                    self.send_ack_msg(0, 0, 0)
+                    rospy.loginfo("Reached end of local trajectory")
+                    diagnostic_msg.level = diagnostic_msg.WARN
+                    diagnostic_msg.message = "Reached end of local trajectory"
+                    diagnostic_msg.stamp = rospy.Time.now()
+                    controller_diagnose_pub.publish(diagnostic_msg)
+                    rate.sleep()
+                    continue
+                else:
+                    target_point_ind, lhd = self.target_index(robot_pose, close_point_ind)
+                if target_point_ind == -1:
+                    self.send_ack_msg(0, 0, 0)
+                    rospy.loginfo("Lhd is less than min_look_ahead distance, reached end of local_traj")
+                    diagnostic_msg.level = diagnostic_msg.WARN
+                    diagnostic_msg.message = "Lhd is less than min_look_ahead distance, reached end of local_traj"
+                    diagnostic_msg.stamp = rospy.Time.now()
+                    controller_diagnose_pub.publish(diagnostic_msg)
+                    rate.sleep()
+                    continue
+                target_pose = PoseStamped()
+                target_pose.header.frame_id = "map"
+                target_pose.pose = self.trajectory_data.points[target_point_ind].pose
+                target_pose_pub.publish(target_pose)
+                close_pose = PoseStamped()
+                close_pose.header.frame_id = "map"
+                close_pose.pose = self.trajectory_data.points[close_point_ind].pose
+                close_pose_pub.publish(close_pose)
 
 
-            slope = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
-            alpha = slope - get_yaw(robot_pose.orientation)
-            delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
-            delta_degrees = -math.degrees(delta)
-            steering_angle = np.clip(delta_degrees, -30, 30)
-            speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
-            rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
-            if speed <= 0 :
-                self.send_ack_msg(steering_angle, speed, 1)
-            else:
-                self.send_ack_msg(steering_angle, speed, 0)
+                slope = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
+                alpha = slope - get_yaw(robot_pose.orientation)
+                delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
+                delta_degrees = -math.degrees(delta)
+                steering_angle = np.clip(delta_degrees, -30, 30)
+                speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
+                rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
+                if speed <= 0 :
+                    self.send_ack_msg(steering_angle, speed, 1)
+                else:
+                    self.send_ack_msg(steering_angle, speed, 0)
 
             # fill the control diagnose topic
             try:
@@ -236,7 +239,7 @@ class PurePursuitController:
             close_index , distance
         """
         distance_list = [distance_btw_poses(robot_pose, point.pose) for point in self.trajectory_data.points]
-        if len(distance_list)>0:
+        if len(distance_list) > 0:
             ind = np.argmin(distance_list)
             dis = distance_list[ind]
             if ind == len(self.trajectory_data.points)-1:
@@ -244,7 +247,7 @@ class PurePursuitController:
             else:
                 return ind, dis
         else:
-            return -1, -1
+            return 0, 0
 
 
     def trajectory_callback(self, data):
