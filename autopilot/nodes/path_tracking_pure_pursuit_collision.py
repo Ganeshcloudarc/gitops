@@ -173,17 +173,30 @@ class PurePursuitController:
                 close_pose_pub.publish(close_pose)
 
 
-                slope = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
-                alpha = slope - get_yaw(robot_pose.orientation)
+                # slope = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
+                # alpha = slope - get_yaw(robot_pose.orientation)
+                # delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
+                # delta_degrees = -math.degrees(delta)
+                # steering_angle = np.clip(delta_degrees, -30, 30)
+                # speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
+                # rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
+                # if speed <= 0 :
+                #     self.send_ack_msg(steering_angle, speed, 1)
+                # else:
+                #     self.send_ack_msg(steering_angle, speed, 0)
+                target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
+                alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
                 delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
-                delta_degrees = -math.degrees(delta)
+                delta_degrees = math.degrees(delta)
                 steering_angle = np.clip(delta_degrees, -30, 30)
                 speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
                 rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
-                if speed <= 0 :
+                rospy.loginfo('lhd: %s, alpha: %s , robot_speed: %s ', str(lhd), str(alpha), str(self.robot_speed))
+                if speed <= 0:
                     self.send_ack_msg(steering_angle, speed, 1)
                 else:
                     self.send_ack_msg(steering_angle, speed, 0)
+
 
                 # fill the control diagnose topic
             
@@ -224,7 +237,7 @@ class PurePursuitController:
         Returns:
             close_index, target_index, lookahead_distance, cross_track_dis,
         """
-        lhd = self.compute_lookahead_distance(abs(self.robot_state.twist.twist.linear.x))
+        lhd = self.compute_lookahead_distance(self.robot_speed)
         close_dis = self.trajectory_data.points[close_point_ind].accumulated_distance_m
         for ind in range(close_point_ind, len(self.trajectory_data.points)):
             path_acc_distance = self.trajectory_data.points[ind].accumulated_distance_m - close_dis
@@ -263,6 +276,8 @@ class PurePursuitController:
     def odom_callback(self, data):
         rospy.loginfo_once("Odom data received")
         self.robot_state = data
+        self.robot_speed = math.sqrt(data.twist.twist.linear.x ** 2 + data.twist.twist.linear.y ** 2)
+
 
     def gps_callback(self, data):
         self.gps_robot_state = data
