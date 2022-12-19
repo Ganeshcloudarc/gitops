@@ -68,8 +68,10 @@
           </group>
     </group>
 
+    <!-- <node name="patrol_bag_record" pkg="rosbag" type="record"
+        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*) " if="$(eval record)"/> -->
     <node name="patrol_bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*) " if="$(eval record)"/>
+        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
 
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">
