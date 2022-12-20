@@ -24,6 +24,7 @@ try:
     from visualization_msgs.msg import Marker, MarkerArray
     from std_msgs.msg import Float32MultiArray, Header
     from sensor_msgs.msg import PointCloud2, LaserScan
+    from std_msgs.msg import Float32
 
     # utils
     from laser_geometry import LaserProjection
@@ -92,9 +93,11 @@ class ObstacleStopPlanner:
         self._vis_collision_points = rospy.get_param("/obstacle_stop_planner/vis_collision_points", True)
         self._vis_trajectory_rviz = rospy.get_param("/obstacle_stop_planner/vis_trajectory_rviz", True)
         self._robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
-        self._mission_repeat = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
+        self.mission_continue = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
         self._time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
+        self._min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self._max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
+
 
         self._TIME_OUT_FROM_LASER = 2  # in secs
         self._TIME_OUT_FROM_ODOM = 2
@@ -121,6 +124,8 @@ class ObstacleStopPlanner:
                                                          queue_size=10)
         self.close_pose_pub = rospy.Publisher("obstacle_stop_planner/close_point", PoseStamped, queue_size=1)
         self.front_pose_pub = rospy.Publisher("obstacle_stop_planner/front_point", PoseStamped, queue_size=1)
+        self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2, latch=True)
+        self.count_mission_repeat = 0
 
         self.main_loop()
 
@@ -177,6 +182,22 @@ class ObstacleStopPlanner:
 
             # filling Kd true
 
+                 # check for mission complete
+            path_percent = (self._traj_in.points[self._close_idx].accumulated_distance_m /
+                            self._traj_in.points[-1].accumulated_distance_m) * 100
+
+            if path_percent > 95.0 and distance_btw_poses(self.robot_pose, self._traj_in.points[-1].pose) <= self._min_look_ahead_dis:
+                self.count_mission_repeat += 1
+                rospy.loginfo(' Mission count %s ', self.count_mission_repeat)
+                self.mission_count_pub.publish(self.count_mission_repeat)
+                if self.mission_continue: 
+                    self._close_idx = 1
+                    rate.sleep()
+                    continue
+                else:
+                    # self.send_ack_msg(0, 0, 0)
+                    rate.sleep()
+                    break
             try:
                 kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
             except:
