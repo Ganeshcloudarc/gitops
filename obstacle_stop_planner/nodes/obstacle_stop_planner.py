@@ -192,11 +192,13 @@ class ObstacleStopPlanner:
                 self.mission_count_pub.publish(self.count_mission_repeat)
                 if self.mission_continue: 
                     self._close_idx = 1
+                    time.sleep(self._time_to_wait_at_ends)
                     rate.sleep()
                     continue
                 else:
                     # self.send_ack_msg(0, 0, 0)
                     rate.sleep()
+
                     break
             try:
                 kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
