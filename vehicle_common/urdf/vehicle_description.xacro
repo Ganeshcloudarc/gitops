@@ -28,10 +28,17 @@
   </joint>
 
   <link name="rslidar"/>
-  <joint name="lidar_link" type="fixed">
+  <joint name="3d_lidar_link" type="fixed">
     <origin xyz="2.8 0 0.2" rpy="0 0 0" />
     <parent link="base_link" />
     <child link="rslidar" />
+  </joint>
+
+  <link name="rplidar"/>
+  <joint name="2d_lidar_link" type="fixed">
+    <origin xyz="2.8 0 0.1" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="rplidar" />
   </joint>
 
 </robot>

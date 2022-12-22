@@ -32,6 +32,7 @@ class PathPubGps:
         self.max_dis_btw_points = rospy.get_param("path_publisher/max_dis_btw_points", 0.5)
         self.path_resolution = rospy.get_param("path_publisher/path_resolution", 0.1)
         self.steering_limits_to_slow_down = rospy.get_param("path_publisher/steering_limits_to_slow_down", 10)
+        self.speed_reduce_factor = rospy.get_param("path_publisher/speed_reduce_factor", 0.7)
         self.min_look_ahead = rospy.get_param("pure_pursuit/min_look_ahead_dis", 3)
         self.max_look_ahead = rospy.get_param("pure_pursuit/max_look_ahead_dis", 6)
         self.avg_lhd = (self.min_look_ahead + self.max_look_ahead) / 2
@@ -176,11 +177,16 @@ class PathPubGps:
             if abs(delta_degrees) <= self.steering_limits_to_slow_down:
                 trajectory_msg.points[i].longitudinal_velocity_mps = self.max_forward_speed
             else:
-                trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(abs(delta_degrees),
+                trajectory_msg.points[i].longitudinal_velocity_mps = max(self.speed_reduce_factor * np.interp(abs(delta_degrees),
                                                                                [self.steering_limits_to_slow_down,
                                                                                 vehicle_data.speed.max_steering_angle],
                                                                                [self.max_forward_speed,
-                                                                                self.min_forward_speed])
+                                                                                self.min_forward_speed]), self.min_forward_speed)
+                # trajectory_msg.points[i].longitudinal_velocity_mps =  np.interp(abs(delta_degrees),
+                #                                                     [self.steering_limits_to_slow_down,
+                #                                                     vehicle_data.speed.max_steering_angle],
+                #                                                     [self.max_forward_speed,
+                #                                                     self.min_forward_speed])
 
         marker_arr = trajectory_to_marker(trajectory_msg, self.max_forward_speed)
         trajectory_velocity_marker_pub.publish(marker_arr)

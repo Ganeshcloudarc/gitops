@@ -28,7 +28,7 @@ rear_overhang = rospy.get_param("/vehicle/dimensions/rear_overhang", 0.7)
 rear_axle_center_height_from_ground = rospy.get_param("/vehicle/dimensions/tyre_radius", 0.3)
 
 vehicle_frame = rospy.get_param("/base_frame", "base_link")
-odom_in_topic = rospy.get_param("/odometry_in", '/mavros/local_position/odom')
+odom_in_topic = rospy.get_param("/odometry_in", '/mavros/global_position/local')
 send_odom = rospy.get_param("/send_odom", True)  # send odom from base link
 send_foot_print = rospy.get_param("/send_footprint", True)
 send_odom_topic_name = rospy.get_param("/odometry_out", "/vehicle/odom")
@@ -56,7 +56,7 @@ def odom_callback(data):
     y_pos = data.pose.pose.position.y - fcu_offset_vehicle * math.sin(yaw)  # transom sensor location to rear axle in y
 
     tf_msg.header.stamp = rospy.Time.now()
-    tf_msg.header.frame_id = data.header.frame_id
+    tf_msg.header.frame_id = 'odom'                            #data.header.frame_id
     tf_msg.child_frame_id = vehicle_frame
     tf_msg.transform.translation.x = x_pos
     tf_msg.transform.translation.y = y_pos

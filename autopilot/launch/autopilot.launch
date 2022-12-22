@@ -1,0 +1,25 @@
+<launch>
+<!--    Here we will have concept -->
+    <arg name="hardware_in_loop" default="true" doc="false to software in loop"/>
+    <arg name="vehicle_type" default="porter" doc="It can be either half_cabin or porter"/>
+
+    <group if="$(eval arg('hardware_in_loop'))">
+       <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
+           <arg name="vehicle_type" value="$(arg vehicle_type)"/>
+            <arg name="can_channel" value="can0"/>
+            <arg name="fcu_url" value="/dev/ttyACM0:115200" />
+            <arg name="zed_camera" value="true"/>
+            <arg name="2d_lidar" value="true"/>
+            <arg name="2d_lidar_ip" value="192.168.6.66"/>
+            <arg name="3d_lidar" value="true"/>
+            <arg name="3d_lidar_ip" value="true" doc="todo"/>
+       </include>
+    </group>
+
+    <group unless="$(eval arg('hardware_in_loop'))">
+       <include file="$(find vehicle_description)/launch/boson_sim.launch">
+            <arg name="vehicle_type" value="$(arg vehicle_type)"/>
+       </include>
+    </group>
+
+</launch>

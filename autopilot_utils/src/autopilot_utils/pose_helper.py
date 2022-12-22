@@ -2,6 +2,7 @@ from geometry_msgs.msg import Point, PoseArray, Pose, Quaternion
 import math
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
+
 def pol2cart(rho, phi):
     """
     Converts a Polar coordinate point to Cartesian coordinate point.

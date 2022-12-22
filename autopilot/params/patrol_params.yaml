@@ -3,6 +3,8 @@ path_publisher:
   distance_to_slowdown_on_ends : 3
   path_resolution : 0.1 # 10 cms
   steering_limits_to_slow_down : 10 # if steering angle is more than this value, its associated speed reduces.
+  speed_reduce_factor : 0.8 # by this factor speed will decrease after steering_limits_to_slow_down
+
 
 patrol:
   path_topic           : "odom_path"
@@ -10,8 +12,8 @@ patrol:
   pilot_cmd_in         : "/vehicle/cmd_drive_safe"
   wait_time_on_mission_complete  : 2  # secs
   google_map_center_always : true
-  max_forward_speed : 2.5
-  min_forward_speed : 1.5
+  max_forward_speed : 1.0
+  min_forward_speed : 0.8
   max_backward_speed : -1.2
   min_backward_speed : -0.3
 

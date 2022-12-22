@@ -1,5 +1,6 @@
 <launch>
-
+    <arg name="vehicle_type" default="porter"/>
+<!--    to do add different desciption file-->
     <arg name="footprint_pub" default="true"/>
     <arg name="odom_pub" default="true"/>
 
@@ -9,14 +10,17 @@
     <param name="/send_footprint" value="$(arg footprint_pub)" />
     <param name="/odometry_out" value="/vehicle/odom" />
     <param name="/foorprint_out" value="/vehicle/foot_print" />
-  
-   <rosparam command="load" file="$(find vehicle_common)/params/vehicle_config.yaml" ns="vehicle"/>
+    <param name="vehicle_type" value="$(arg vehicle_type)"/>
+<!--<group if="$(eval team == 'Red')">-->
+    <rosparam command="load" file="$(find vehicle_common)/params/half_cabin_config.yaml" ns="vehicle" if = "$(eval vehicle_type == 'half_cabin')"/>
+    <rosparam command="load" file="$(find vehicle_common)/params/porter_config.yaml" ns="vehicle" if = "$(eval vehicle_type == 'porter')"/>
 
+<!-- TODO keep the boson sim urdf file here, so that we will have the same desciption file-->
   <param name="robot_description" command="$(find xacro)/xacro '$(find vehicle_common)/urdf/vehicle_description.xacro' "/>
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher">
   	<param name="publish_frequency" value="50"/>
   </node>
-
+  
   <node pkg = "vehicle_common" type = "mavros_map_to_base.py" name = "tf_converter" />
-
+  <node pkg = "tf" type = "static_transform_publisher" name = "odom_to_base_tf_node" args= " 0 0 0 0 0 0 1  /map /odom 20" />
 </launch>

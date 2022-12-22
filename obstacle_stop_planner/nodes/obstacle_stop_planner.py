@@ -8,34 +8,39 @@ try:
     # python3 general packages
     import math
     import numpy as np
-    from numpy import argmin, zeros
     from sklearn.neighbors import KDTree
     import copy
     import ros_numpy
     import rospy
     import tf2_ros
     import time
+    import sys
 
     # ros messages
     from nav_msgs.msg import Path, Odometry
     from jsk_recognition_msgs.msg import BoundingBoxArray
     from zed_interfaces.msg import ObjectsStamped, Object
-    from geometry_msgs.msg import Point, PoseArray, Pose
+    from geometry_msgs.msg import Point, PoseArray, Pose, TransformStamped, PoseStamped
     from visualization_msgs.msg import Marker, MarkerArray
     from std_msgs.msg import Float32MultiArray, Header
     from sensor_msgs.msg import PointCloud2, LaserScan
+    from std_msgs.msg import Float32
 
     # utils
     from laser_geometry import LaserProjection
     import tf2_geometry_msgs
     import sensor_msgs.point_cloud2 as pcd2
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
+    from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 
     # autopilot related imports
     from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud
     from autopilot_utils.pose_helper import distance_btw_poses, get_yaw
+    from autopilot_utils.trajectory_smoother import TrajectorySmoother
     from vehicle_common.vehicle_config import vehicle_data
+    from autopilot_utils.trajectory_common import TrajectoryManager
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
+    from velocity_planner import VelocityPlanner
 
 except Exception as e:
     import rospy
@@ -54,179 +59,289 @@ def min_distance_to_object(pose, corners):
 
 class ObstacleStopPlanner:
     def __init__(self):
-        self.path_end_index = None
-        self.index_old = None
-        self.traj_in = None
+        self._close_idx = None
+        self._traj_in = None
+        self._traj_end_index = None
+
+        self.laser_np_3d = None
+        self.robot_speed = None
+        self.laser_np_2d = None
+        self.traj_end_index = None
+        # self.index_old = None
+
         self.laser_data_in_time = None
         self.scan_data_received = None
         self.pc_np = None
         self.tree = None
+        self.robot_pose = None
+        self.robot_head_pose = Pose()
+        self.odom_data_in_time = None
         self.laser_geo_obj = LaserProjection()
+        # self._a_max, self._slow_speed, self._stop_line_buffer = 1, 0.5, 3.5
+        sigma = rospy.get_param("gaussian_velocity_filter/sigma", 1)
+        kernal_size = rospy.get_param("gaussian_velocity_filter/kernal_size", 11)
+        self.robot_min_speed_th = rospy.get_param("obstacle_stop_planner/robot_min_speed_th", 0.8)
+        self._smoother = TrajectorySmoother(sigma, kernal_size, self.robot_min_speed_th)
+        self._traj_manager = TrajectoryManager()
+        self._stop_line_buffer = rospy.get_param("obstacle_stop_planner/stop_line_buffer", 3.0)
 
         # ros parameters for Obstacle stop planner
-        self.max_slow_down_velocity = rospy.get_param('obstacle_stop_planner/max_slow_down_velocity', 1.5)
-        self.min_slow_down_velocity = rospy.get_param('obstacle_stop_planner/min_slow_down_velocity', 0.8)
-        self.stop_margin = rospy.get_param('obstacle_stop_planner/stop_margin', 3)
-        self.slow_down_margin = rospy.get_param("obstacle_stop_planner/slow_down_margin", 5)
-        self.radial_off_set_to_vehicle_width = rospy.get_param("obstacle_stop_planner/radial_off_set_to_vehicle_width",
-                                                               0.5)
-        self.trajectory_resolution = rospy.get_param("obstacle_stop_planner/trajectory_resolution", 0.5)
-        self.lookup_collision_distance = rospy.get_param("obstacle_stop_planner/lookup_collision_distance", 10)
-        self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
-        self.mission_repeat = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
-        self.vis_collision_points = rospy.get_param("/obstacle_stop_planner/vis_collision_points", True)
-        self.vis_trajectory_rviz = rospy.get_param("/obstacle_stop_planner/vis_trajectory_rviz", True)
-        time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
-        self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
-        time_out_from_laser = 2  # in secs
-        radius_to_search = vehicle_data.dimensions.overall_width / 2 + self.radial_off_set_to_vehicle_width
+        # TODO accept form patrol application if available else take from patrol params.
+        radial_off_set_to_vehicle_width = rospy.get_param("obstacle_stop_planner/radial_off_set_to_vehicle_width", 0.5)
+        self._trajectory_resolution = rospy.get_param("obstacle_stop_planner/trajectory_resolution", 0.5)
+        self._lookup_collision_distance = rospy.get_param("obstacle_stop_planner/lookup_collision_distance", 20)
+        self._vis_collision_points = rospy.get_param("/obstacle_stop_planner/vis_collision_points", True)
+        self._vis_trajectory_rviz = rospy.get_param("/obstacle_stop_planner/vis_trajectory_rviz", True)
+        self._robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
+        self.mission_continue = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
+        self._time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
+        self._min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
+        self._max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
+
+
+        self._TIME_OUT_FROM_LASER = 2  # in secs
+        self._TIME_OUT_FROM_ODOM = 2
+        # TODO consider vehicle diagonal to check for collision detection radius
+        # distance within below value to laser point would make collision.
+        self._radius_to_search = vehicle_data.dimensions.overall_width / 2 + radial_off_set_to_vehicle_width
+
+        self._base_to_front = vehicle_data.dimensions.wheel_base + vehicle_data.dimensions.front_overhang
 
         # ros subscribers
         global_traj_topic = rospy.get_param("obstacle_stop_planner/traj_in", "global_gps_trajectory")
-        scan_topic = rospy.get_param("obstacle_stop_planner/scan_in", "zed/laser_scan")
+        scan_topic = rospy.get_param("obstacle_stop_planner/scan_in", "laser_scan")
+        odom_topic = rospy.get_param("patrol/odom_topic", "vehicle/odom", )
         rospy.Subscriber(global_traj_topic, Trajectory, self.global_traj_callback)
         rospy.Subscriber(scan_topic, LaserScan, self.scan_callback, queue_size=1)
+        rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
 
         # ros publishers
         local_traj_in_topic = rospy.get_param("obstacle_stop_planner/traj_out", "local_gps_trajectory")
-        self.local_traj_publisher = rospy.Publisher('local_gps_trajectory', Trajectory, queue_size=10)
-        self.collision_points_publisher = rospy.Publisher('collision_points', PointCloud2, queue_size=10)
-        self.velocity_marker_publisher = rospy.Publisher('collision_velocity_marker', MarkerArray, queue_size=10)
+        self.local_traj_publisher = rospy.Publisher(local_traj_in_topic, Trajectory, queue_size=10)
+        self.collision_points_publisher = rospy.Publisher('obstacle_stop_planner/collision_points', PointCloud2,
+                                                          queue_size=10)
+        self.velocity_marker_publisher = rospy.Publisher('obstacle_stop_planner/collision_velocity_marker', MarkerArray,
+                                                         queue_size=10)
+        self.close_pose_pub = rospy.Publisher("obstacle_stop_planner/close_point", PoseStamped, queue_size=1)
+        self.front_pose_pub = rospy.Publisher("obstacle_stop_planner/front_point", PoseStamped, queue_size=1)
+        self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2, latch=True)
+        self.count_mission_repeat = 0
+
+        self.main_loop()
+
+    def main_loop(self):
         # TODO: publish stop, slow_down margin's circle
 
         rate = rospy.Rate(1)
         while not rospy.is_shutdown():
-            robot_pose = current_robot_pose("map", self.robot_base_frame)
-            if self.scan_data_received and self.traj_in and robot_pose:
+            # robot_pose = current_robot_pose("map", self.robot_base_frame)
+
+            if self.scan_data_received and self._traj_manager.get_len() > 0 and self.robot_pose:
                 rospy.loginfo("scan data, global path and robot_pose  are received")
                 break
             else:
-                rospy.logwarn("waiting for scan data or global path or robot_pose ")
+                rospy.logwarn(
+                    f"waiting for data  scan :{self.scan_data_received}, global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
                 rate.sleep()
-        count = 0
-        rate = rospy.Rate(20)
-        robot_pose = current_robot_pose("map", self.robot_base_frame)
 
+        rate = rospy.Rate(100)
         while not rospy.is_shutdown():
-            robot_pose = current_robot_pose("map", self.robot_base_frame)
+            loop_start_time = time.time()
+            # checks whether data from sensors are updated.
+            if loop_start_time - self.odom_data_in_time > self._TIME_OUT_FROM_ODOM:
+                rospy.logwarn("No update on odom (robot position)")
+                rate.sleep()
+                continue
+            if loop_start_time - self.laser_data_in_time > self._TIME_OUT_FROM_LASER:
+                rospy.logwarn(f"No update on laser data from last {loop_start_time - self.laser_data_in_time}")
+                rate.sleep()
+                continue
 
-            if not robot_pose:
-                rospy.logwarn("No TF between %s and %s", "map", self.robot_base_frame)
-                rate.sleep()
-                continue
-            if time.time() - self.laser_data_in_time > time_out_from_laser:
-                rospy.logwarn("No update on laser data from last %s", str(time.time() - self.laser_data_in_time))
-                rate.sleep()
-                continue
-            if self.index_old is None:
-                self.index_old, dis, heading_ok = self.calc_nearest_ind(robot_pose)
-            else:
-                self.index_old, dis, heading_ok = self.find_close_point(robot_pose, self.index_old)
-            if not heading_ok:
-                rospy.logwarn("Close point heading and vehicle are not on same side")
-                rate.sleep()
-                continue
-            if self.traj_in.points[-1].accumulated_distance_m - \
-                    self.traj_in.points[self.index_old].accumulated_distance_m < self.min_look_ahead_dis:
-                if self.mission_repeat:
-                    rospy.logwarn("mission count %s", str(count))
-                    count = count + 1
-                    rospy.logwarn("waiting for %s seconds", str(time_to_wait_at_ends))
-                    time.sleep(time_to_wait_at_ends)
-                    self.index_old = 1
+            # check for the close index on the trajectory
+            if self._close_idx is None:
+                angle_th = 90
+                found, index = self._traj_manager.find_closest_idx_with_dist_ang_thr(self.robot_pose,
+                                                                                     self._max_look_ahead_dis, angle_th)
+                if found:
+                    self._close_idx = index
+                else:
+                    rospy.logwarn(f"No close point found dist_thr: {self._max_look_ahead_dis}, angle_thr: {angle_th}")
+                    rate.sleep()
                     continue
-                else:
-                    rospy.logwarn("mission completed")
-                    sys.exit("mission completed")
-
-            collision_points_list = []
-            trajectory_msg = Trajectory()
-            trajectory_msg.header.frame_id = "map"
-            trajectory_msg.home_position = self.traj_in.home_position
-            close_dis = self.traj_in.points[self.index_old].accumulated_distance_m
-            prev_processed_ind = self.index_old
-            for ind in range(self.index_old, self.path_end_index):
-                path_acc_distance = self.traj_in.points[ind].accumulated_distance_m - close_dis
-                # print(path_acc_distance)
-                if path_acc_distance > self.lookup_collision_distance:
-                    break
-
-                collision_points = [np.array([])]
-                if self.traj_in.points[ind].accumulated_distance_m - \
-                        self.traj_in.points[prev_processed_ind].accumulated_distance_m > radius_to_search / 2:
-                    # print("distance added:", self.traj_in.points[ind].accumulated_distance_m -
-                    #       self.traj_in.points[prev_processed_ind].accumulated_distance_m)
-                    path_pose = self.traj_in.points[ind].pose
-                    pose_xyz = np.array([[path_pose.position.x, path_pose.position.y, path_pose.position.z]])
-                    try:
-                        collision_points = self.tree.query_radius(pose_xyz, r=radius_to_search)
-                        prev_processed_ind = ind
-                    except Exception as error:
-                        rospy.logwarn("could not query KD tree", str(error))
-
-                collision_points_list.extend(list(collision_points[0]))
-                trajectory_point_msg = TrajectoryPoint()
-                # print(len(list(collision_points[0])))
-
-                if len(list(collision_points[0])) > 0:
-                    # print("path_acc_distance: ",path_acc_distance)
-                    # print("stop_margin",self.stop_margin )
-                    if self.stop_margin > path_acc_distance:
-                        # return 0
-                        rospy.logwarn("collision detected in stop margin")
-                        trajectory_point_msg = copy.deepcopy(self.traj_in.points[ind])
-                        trajectory_point_msg.longitudinal_velocity_mps = 0
-                        trajectory_msg.points.append(trajectory_point_msg)
-
-                        # for i in range(ind, self.index_old-ind, -1):
-                        for k in range(len(trajectory_msg.points) - 1, -1, -1):
-                            trajectory_msg.points[k].longitudinal_velocity_mps = 0
-                    elif self.stop_margin < path_acc_distance < self.slow_down_margin:
-                        # TODO: look for slow down margin and how to control velocity
-                        # reverse the traj till the end of slow down margin
-
-                        dis_diff = abs(self.slow_down_margin - self.stop_margin)
-                        vel_diff = abs(self.max_slow_down_velocity - self.max_slow_down_velocity)
-                        pass
-
-                        # for k in range(len(trajectory_msg.points) - 1, 0, -1):
-                        #     trajectory_msg.points[k].longitudinal_velocity_mps = 0
-                    else:
-                        pass
-                else:
-                    # print(self.traj_in.points[ind].longitudinal_velocity_mps)
-                    trajectory_point_msg = copy.deepcopy(self.traj_in.points[ind])
-
-                trajectory_msg.points.append(trajectory_point_msg)
-            if self.vis_collision_points:
-                self.publish_points(collision_points_list)
-            if self.vis_trajectory_rviz:
-                self.publish_velocity_marker(trajectory_msg)
-            self.local_traj_publisher.publish(trajectory_msg)
-
+            else:
+                self._close_idx = self._traj_manager.find_close_pose_after_index(self.robot_pose, self._close_idx, 10)
+            # print(self._traj_manager.get_traj_point(self._close_idx))
+            self.close_pose_pub.publish(
+                PoseStamped(header=Header(frame_id="map"),
+                            pose=self._traj_manager.get_traj_point(self._close_idx).pose))
             # rate.sleep()
 
+            front_tip_idx = self._traj_manager.next_point_within_dist(self._close_idx, self._base_to_front)
+            self.front_pose_pub.publish(
+                PoseStamped(header=Header(frame_id="map"), pose=self._traj_manager.get_traj_point(front_tip_idx).pose))
+
+            # filling Kd true
+
+                 # check for mission complete
+            path_percent = (self._traj_in.points[self._close_idx].accumulated_distance_m /
+                            self._traj_in.points[-1].accumulated_distance_m) * 100
+
+            if path_percent > 95.0 and distance_btw_poses(self.robot_pose, self._traj_in.points[-1].pose) <= self._min_look_ahead_dis:
+                self.count_mission_repeat += 1
+                rospy.loginfo(' Mission count %s ', self.count_mission_repeat)
+                self.mission_count_pub.publish(self.count_mission_repeat)
+                if self.mission_continue: 
+                    self._close_idx = 1
+                    time.sleep(self._time_to_wait_at_ends)
+                    rate.sleep()
+                    continue
+                else:
+                    # self.send_ack_msg(0, 0, 0)
+                    rate.sleep()
+
+                    break
+            try:
+                kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
+            except:
+                rospy.logerr("Could not fill KDtree")
+                pass
+                # rate.sleep()
+                # continue
+            prev_processed_ind = self._close_idx
+            obstacle_found = False
+            trajectory_msg = Trajectory()
+            trajectory_msg.header.frame_id = "map"
+            trajectory_msg.home_position = self._traj_in.home_position
+
+            for ind in range(self._close_idx, self._traj_end_index):
+                path_acc_distance = self._traj_in.points[ind].accumulated_distance_m - \
+                                    self._traj_in.points[self._close_idx].accumulated_distance_m
+
+                if path_acc_distance > self._lookup_collision_distance:
+                    break
+                # TODO check for zed object detections (obstacle_found -> True and break)
+                # TODO check for lidar object detections (obstacle_found -> True and break)
+                collision_points = [np.array([])]
+                if self._traj_in.points[ind].accumulated_distance_m - \
+                        self._traj_in.points[prev_processed_ind].accumulated_distance_m > self._radius_to_search / 2:
+
+                    path_pose = self._traj_in.points[ind].pose
+                    pose_xy = np.array([[path_pose.position.x, path_pose.position.y]])  # , path_pose.position.z]])
+                    try:
+                        collision_points = kd_tree.query_radius(pose_xy, r=self._radius_to_search)
+                        prev_processed_ind = ind
+                    except Exception as error:
+                        rospy.logwarn(f"could not query KD tree,{error}")
+                    if len(list(collision_points[0])) > 0:
+                        obstacle_found = True
+                        break
+            collision_index = ind
+            collision_points = list(collision_points[0])
+            print("self.index_old after loop", self._close_idx)
+            if obstacle_found:
+                dis_to_obstacle = abs(self._traj_in.points[collision_index].accumulated_distance_m -
+                                      self._traj_in.points[self._close_idx].accumulated_distance_m)
+                dis_from_front_to_obs = abs(self._traj_in.points[collision_index].accumulated_distance_m -
+                                            self._traj_in.points[front_tip_idx].accumulated_distance_m)
+                rospy.logwarn(f"obstacle found at {dis_to_obstacle} meters ")
+                # if obstacle distance is less than _stop_line_buffer -> hard stop
+                if dis_to_obstacle < self._stop_line_buffer + self._base_to_front:
+
+                    # TODO apply break directly to pilot
+                    rospy.logwarn("obstacle is very close, applying hard breaking")
+                    for i in range(self._close_idx, collision_index + 1):
+                        traj_point = copy.deepcopy(self._traj_in.points[i])
+                        traj_point.longitudinal_velocity_mps = 0.0
+                        trajectory_msg.points.append(traj_point)
+                    # traj_out = trajectory_msg
+                else:
+                    rospy.loginfo("obstacle dis is more than the stop_distance")
+                    # find the stop index
+                    stop_index = collision_index
+                    temp_dist = 0.0
+                    # Compute the index at which we should stop.
+                    while temp_dist < self._stop_line_buffer and stop_index > self._close_idx:
+                        temp_dist = abs(self._traj_in.points[collision_index].accumulated_distance_m -
+                                        self._traj_in.points[stop_index].accumulated_distance_m)
+                        stop_index -= 1
+                    # Our trajectory starts from close_index to stop index
+                    for i in range(self._close_idx, stop_index + 1):
+                        trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
+                    # trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
+                    # # if self.robot_speed < self.robot_min_speed_th:
+                    # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+                    # # else:
+                    # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+                    # #
+                    # # traj_out = self._smoother.filter(trajectory_msg)
+                    for i in range(stop_index, collision_index):
+                        traj_point = copy.deepcopy(self._traj_in.points[i])
+                        traj_point.longitudinal_velocity_mps = 0.0
+                        # traj_out.points.append(traj_point)
+                        trajectory_msg.points.append(traj_point)
+            else:
+                rospy.loginfo("No obstacle found")
+                for i in range(self._close_idx, collision_index):
+                    trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
+                # trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
+                # if self.robot_speed < self.robot_min_speed_th:
+                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+                # else:
+                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+                # traj_out = self._smoother.filter(trajectory_msg)
+
+            self.local_traj_publisher.publish(trajectory_msg)
+            self.publish_points(collision_points)
+            print("robot_speed", self.robot_speed)
+            print(f"time taken for a loop is: {time.time() - loop_start_time} ")
+            # print("len of local traj", len(traj_out.points))
+            print("collision_index", collision_index)
+
+            self.publish_velocity_marker(trajectory_msg)
+            rate.sleep()
+
+    def odom_callback(self, data):
+        self.robot_pose = data.pose.pose
+        self.robot_speed = math.hypot(data.twist.twist.linear.x ** 2, data.twist.twist.linear.y ** 2)
+        # print("self.robot_speed", self.robot_speed)
+        self.odom_data_in_time = time.time()
+        pose_heading = get_yaw(data.pose.pose.orientation)
+        self.robot_head_pose.position.x = data.pose.pose.position.x + self._base_to_front * np.cos(pose_heading)
+        self.robot_head_pose.position.y = data.pose.pose.position.y + self._base_to_front * np.sin(pose_heading)
+        self.robot_head_pose.position.z = data.pose.pose.position.z
+        self.robot_head_pose.orientation = data.pose.pose.orientation
+
     def scan_callback(self, data):
-        pass
+        start = time.time()
         self.laser_data_in_time = time.time()
         points = self.laser_geo_obj.projectLaser(data)
         tf_points = transform_cloud(points, data.header.frame_id, "map")
-        self.pc_np = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=True)
-        self.scan_data_received = True
+        if tf_points:
+            self.laser_np_3d = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=False)
+            self.laser_np_2d = np.delete(self.laser_np_3d, -1, axis=1)
+            if len(self.laser_np_2d.tolist()) == 0:
+                self.laser_np_2d = np.array([100, 100])
+            self.scan_data_received = True
+        else:
+            self.scan_data_received = False
+
+        rospy.logdebug(f"time taken for laser scan callback: {time.time() - start} ")
+
         # self.publish_points(self.pc_np)
         # self.collision_points_publisher.publish(tf_points)
-        try:
-            self.tree = KDTree(self.pc_np, leaf_size=2)
-        except:
-            rospy.logwarn("Could not fill KDtree")
+        # try:
+        #     self.tree = KDTree(self.pc_np, leaf_size=2)
+        # except:
+        #     rospy.logwarn("Could not fill KDtree")
 
     def global_traj_callback(self, data):
-        self.traj_in = data
-        self.path_end_index = len(data.points)
+        self._traj_in = data
+        self._traj_manager.update(data)
+        self._traj_end_index = self._traj_manager.get_len()
 
     def find_close_point(self, robot_pose, old_close_index):
         close_dis = distance_btw_poses(robot_pose, self.traj_in.points[old_close_index].pose)
-        for ind in range(old_close_index + 1, self.path_end_index):
+        for ind in range(old_close_index + 1, self.traj_end_index):
             dis = distance_btw_poses(robot_pose, self.traj_in.points[ind].pose)
             if close_dis >= dis:
                 close_dis = dis
@@ -243,7 +358,7 @@ class ObstacleStopPlanner:
                 else:
                     heading_ok = True
                 return ind - 1, close_dis, heading_ok
-        return self.path_end_index, 0, True
+        return self.traj_end_index, 0, True
 
     def calc_nearest_ind(self, robot_pose):
 
@@ -262,30 +377,35 @@ class ObstacleStopPlanner:
 
     def publish_points(self, collision_points_index):
         try:
-            a = np.take(self.pc_np, list(collision_points_index), 0)
+            obstacle_points = np.take(self.laser_np_3d, collision_points_index, 0)
             header = Header()
             header.stamp = rospy.Time.now()
             header.frame_id = "map"
-            scaled_polygon_pcl = pcd2.create_cloud_xyz32(header, a)
+            scaled_polygon_pcl = pcd2.create_cloud_xyz32(header, obstacle_points)
             rospy.logdebug("happily publishing sample pointcloud.. !")
             self.collision_points_publisher.publish(scaled_polygon_pcl)
+
         except Exception as error:
             rospy.logwarn("not able publish collision points %s", str(error))
 
     def publish_velocity_marker(self, trajectory):
         marker_arr_msg = MarkerArray()
         i = 0
+        marker = Marker()
+        marker.header.frame_id = trajectory.header.frame_id
+        marker.action = marker.DELETEALL
+        marker_arr_msg.markers.append(marker)
         for traj_point in trajectory.points:
-
             marker = Marker()
             marker.header.frame_id = trajectory.header.frame_id
             marker.type = marker.TEXT_VIEW_FACING
+            # marker.type = marker.LINE_STRIP
             marker.text = str(round(traj_point.longitudinal_velocity_mps, 2))
+            # marker.text = str(i-1)
             marker.id = i
             i += 1
             marker.action = marker.ADD
             if traj_point.longitudinal_velocity_mps == 0:
-
                 marker.scale.x = 0.4
                 marker.scale.y = 0.4
                 marker.scale.z = 0.4
@@ -294,17 +414,20 @@ class ObstacleStopPlanner:
                 marker.color.g = 0.0
                 marker.color.b = 0.0
             else:
-                marker.scale.x = 0.1
-                marker.scale.y = 0.1
-                marker.scale.z = 0.1
+                marker.scale.x = 0.2
+                marker.scale.y = 0.2
+                marker.scale.z = 0.2
                 marker.color.a = 1.0
                 marker.color.r = 0.0
                 marker.color.g = 1.0
                 marker.color.b = 0.0
-
+            # marker.lifetime = rospy.Duration.from_sec(1)
             marker.pose = traj_point.pose
             marker_arr_msg.markers.append(marker)
+        # print(marker_arr_msg)
+
         self.velocity_marker_publisher.publish(marker_arr_msg)
+        print("marker published")
 
 
 if __name__ == "__main__":
