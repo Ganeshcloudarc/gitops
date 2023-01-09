@@ -1,7 +1,10 @@
 <launch>
   <rosparam file="$(find vehicle_safety)/params/vehicle_safety_params.yaml" command="load"/>
   <node name="vehicle_safety_diagnostics" pkg="vehicle_safety" type="vehicle_safety" respawn="true"> <!--added respawn so even if this node kills it can restart-->
+  <param name="diagnostic_period" value="0.1"/> <!-- 10 Hz = 0.1; 100 Hz = 0.01-->
   <remap from="diagnostics" to="/vehicle_safety_diagnostics"/>
   </node>
   <node name="vehicle_safety_analyzer" pkg="vehicle_safety" type="vehicle_safety_analyzer.py" respawn="true"/>
+  <node name="curve_detector" pkg="vehicle_safety" type="curve_detector.py"/>
+  <node name="vsCanParser" pkg="vehicle_safety" type="vs_can_parser.py"/>
 </launch>

@@ -12,9 +12,11 @@
 -  [x] emergency stop
 -  [x] Geofence
 -  [x] heading failsafe
+-  [x] Add battery status check before starting patrol. if batt < 40, don't start vehicle
+-  [x] Dynamic CTE based on turnings or straight line.
+-  [x] Detect steering stuck and stop the vehicle - 3
 -  [ ] Sevcon errors fail safe.
 -  [ ] Launch patrol always
--  [ ] Add battery status check before starting patrol. if batt < 40, don't start vehicle
 -  [ ] object detection
 -  [ ] Keep Alive to BCU
 -  [ ] sensor update and fault monitoring
