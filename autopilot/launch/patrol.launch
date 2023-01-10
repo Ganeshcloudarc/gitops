@@ -9,6 +9,14 @@
     <arg name="record" default="true"/>
     <arg name="failsafe_enable" default="true"/>
     <arg name="obs_stop_planner" default="true"/>
+    <arg name="pp_with_pid" default="true"/>
+   
+    <arg name="sensor_source" default='1' doc="1: Zed camera, 1: Rslidar, 2: carla"/>
+    <arg name="kp" default="0.12" doc="kp:0.03,ki:0.02 for us vehicle and kp:0.12 ,ki:0.1 for india vehicles"/>
+    <arg name="ki" default="0.1" doc="Donnot give value more than 0.13 for both ki and kp"/>
+
+    <param name="kp_pid" value="$(arg kp)"/>
+    <param name="ki_pid" value="$(arg ki)"/>
 
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
     <param name="/patrol/mission_continue" value ="$(arg mission_continue)"/>
@@ -56,22 +64,38 @@
         <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
         <include file="$(find obstacle_stop_planner)/launch/obstacle_stop_planner.launch">
             <arg name="mission_continue" value="$(arg mission_continue)"/>
-<!--            <arg name="sensor_source" value="$(arg sensor_source)"/>-->
+           <arg name="sensor_source" value="$(arg sensor_source)"/>
         </include>
         <node name="rviz_obstacle_stop_planner" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol_obstacle_stop_planner.rviz" if = "$(eval arg('rviz'))"/>
     </group>
 
     <group unless="$(eval arg('obs_stop_planner'))">
+        <!-- <group if="$(eval arg('pp_with_pid'))"> -->
           <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
           <group if="$(eval arg('rviz'))">
                 <node name="rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol.rviz" if = "$(eval arg('rviz'))"/>
           </group>
     </group>
 
-    <!-- <node name="patrol_bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*) " if="$(eval record)"/> -->
-    <node name="patrol_bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
+        <!-- <group unless="$(eval arg('pp_with_pid'))">
+          <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
+          <group if="$(eval arg('rviz'))">
+                <node name="rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol.rviz" if = "$(eval arg('rviz'))"/>
+          </group>
+          </group>
+    </group> -->
+
+    <group if="$(eval arg('pp_with_pid'))">
+        <node name="patrol_bag_record" pkg="rosbag" type="record"
+            args="record -o $(env HOME)/.bags/boson_pid_kp_$(arg kp)_ki_$(arg ki) -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/> 
+    </group>
+
+    <group unless="$(eval arg('pp_with_pid'))">
+        <node name="patrol_bag_record" pkg="rosbag" type="record"
+            args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
+    </group>
+    
+    <!-- <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include> -->
 
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">
