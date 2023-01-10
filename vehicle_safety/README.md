@@ -15,6 +15,8 @@
 -  [x] Add battery status check before starting patrol. if batt < 40, don't start vehicle
 -  [x] Dynamic CTE based on turnings or straight line.
 -  [x] Detect steering stuck and stop the vehicle - 3
+-  [ ] Add over current check in VS
+-  [ ] Give Info when obs is there and vehicle stopped.
 -  [ ] Sevcon errors fail safe.
 -  [ ] Launch patrol always
 -  [ ] object detection
