@@ -10,19 +10,20 @@ try:
     import ros_numpy
     import rospy
     import tf2_ros
+    import rosparam
     import time, sys
 
     # ros messages
+    from autopilot_msgs.msg import ControllerDiagnose
     from nav_msgs.msg import Path, Odometry
     from geometry_msgs.msg import Point, PoseArray, PoseStamped
     from std_msgs.msg import Header
     from geographic_msgs.msg import GeoPointStamped
     from ackermann_msgs.msg import AckermannDrive
     from sensor_msgs.msg import NavSatFix
-    from std_msgs.msg import Float32
+    from std_msgs.msg import Float32,Bool
 
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
-
     # autopilot related imports
     from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud
     from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses, normalize_angle
@@ -31,11 +32,18 @@ try:
     from autopilot_msgs.msg import ControllerDiagnose, FloatKeyValue
 
 except Exception as e:
-    import rospy
-
+    import rospy 
     rospy.logerr("No module %s", str(e))
     exit(e)
-
+    
+'''
+PID tuning parameter kp,ki,kpp!!
+'''
+#0.6,0.1,0.3 //0.65,0.25 //
+kp = rospy.get_param("kp_PID",0.01)
+ki = rospy.get_param("ki_PID",0.01)
+kd = 0.5
+kpp = 1 - kp - ki
 
 def heading_check(robot_orientation, path_orientation):
     robot_heading = normalize_angle(get_yaw(robot_orientation))
@@ -48,7 +56,6 @@ def heading_check(robot_orientation, path_orientation):
         heading_ok = True
     return heading_ok
 
-
 class PurePursuitController:
     def __init__(self):
         self.updated_odom_time = None
@@ -57,12 +64,7 @@ class PurePursuitController:
         self.robot_state = None
         self.trajectory_data = None
         self.updated_traj_time = time.time()
-
-        #PID parameters
-        self.cte = 0
-        self.sumCTE = 0
-
-        self.is_pp_pid = rospy.get_param("/PP_with_PID",False)
+        # srv = Server(sampleConfig, RQTcallback)
         # ros parameters
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
@@ -73,13 +75,24 @@ class PurePursuitController:
         trajectory_in_topic = rospy.get_param("/trajectory_in", "/global_gps_trajectory")
         odom_topic = rospy.get_param("/patrol/odom_topic", "vehicle/odom")
         gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/local")
-        self.robot_base_frame = rospy.get_param("robot_base_frame", "ego_vehicle")
+        self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
         self.wait_time_at_ends = rospy.get_param("/patrol/wait_time_on_mission_complete", 10)
         self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.search_point_distance = 5
         failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
+        self.e1 = 0
+        self.e2 = 0
 
+        try:
+            rospy.Subscriber("/pure_pursuit_diagnose",ControllerDiagnose,self.pp_diagnose_cb)
+        except:
+            pass
+
+        self.cte = 0
+        self.sumCTE = 0
+       
+        
         if failsafe_enable:
             cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
         else:
@@ -91,7 +104,6 @@ class PurePursuitController:
         self.close_pose_pub = rospy.Publisher('/close_pose', PoseStamped, queue_size=2)
         self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2, latch=True)
         self.controller_diagnose_pub = rospy.Publisher("pure_pursuit_diagnose", ControllerDiagnose, queue_size=2)
-
         # other utility variables
         self.count_mission_repeat = 0
         self.index_old = None
@@ -216,7 +228,7 @@ class PurePursuitController:
                     self.send_ack_msg(0, 0, 0)
                     rate.sleep()
                     continue
-                    # return 0cte
+                    # return 0
 
             # close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
             self.index_old, close_dis = self.find_close_point_by_distance(robot_pose, self.index_old)
@@ -305,15 +317,26 @@ class PurePursuitController:
 
             target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
             alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
-           
-            if self.is_pp_pid:
-                delta_degrees = self.pp_with_pid(lhd=lhd,alpha=alpha)
-                delta_degrees = math.degrees(delta_degrees)
+            
+            '''
+            trying different formula for appying 
+            pid on the pure pursuit controller
+            '''
 
-            else:
-                delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
-                delta_degrees = math.degrees(delta)
+            # lhd = 0.5*speed
+            delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
+            delp = kp*(self.cte + (vehicle_data.dimensions.wheel_base+lhd)*math.sin(alpha))
+            deli = ki*(self.sumCTE + self.cte)
+            delpp = kpp*delta
+            self.e2 = self.e1
+            deld = self.e2-self.e1
+            self.e1 = self.cte
+            strAngle = delp + deli + delpp
 
+            rospy.loginfo(kp)
+            rospy.loginfo(ki)
+            
+            delta_degrees = math.degrees(strAngle)
             steering_angle = np.clip(delta_degrees, -30, 30)
             speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
@@ -354,27 +377,6 @@ class PurePursuitController:
             diagnostic_msg = None
             rate.sleep()
             # return 0
-
-    def pp_with_pid(self,lhd,alpha):
-        '''
-        trying different formula for appying 
-        pid on the pure pursuit controller
-        '''
-        #0.6,0.1,0.3 //0.65,0.25 //
-        kp = rospy.get_param("kp_PID",0.01)
-        ki = rospy.get_param("ki_PID",0.01)
-        kd = 0.5
-        kpp = 1 - kp - ki
-        delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
-        delp = kp*(self.cte + (vehicle_data.dimensions.wheel_base+lhd)*math.sin(alpha))
-        deli = ki*(self.sumCTE + self.cte)
-        delpp = kpp*delta
-        self.e2 = self.e1
-        deld = self.e2-self.e1
-        self.e1 = self.cte
-        strAngle = delp + deli + delpp
-        
-        return strAngle
 
     def find_first_close_point(self, robot_pose):
         index_list = []
@@ -457,6 +459,10 @@ class PurePursuitController:
         dis = distance_list[ind]
         return ind, dis
 
+    def pp_diagnose_cb(self,data):
+        self.cte = data.cte
+        
+    
     def trajectory_callback(self, data):
         self.trajectory_data = data
         self.trajectory_len = len(self.trajectory_data.points)
@@ -496,7 +502,9 @@ class PurePursuitController:
 
 if __name__ == "__main__":
     rospy.init_node('Pure_pursuit_controller_node')
-
+    
     pure_pursuit = PurePursuitController()
+    
+    
 
     rospy.spin()
