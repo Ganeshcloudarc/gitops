@@ -58,11 +58,6 @@ class PurePursuitController:
         self.trajectory_data = None
         self.updated_traj_time = time.time()
 
-        #PID parameters
-        self.cte = 0
-        self.sumCTE = 0
-
-        self.is_pp_pid = rospy.get_param("/PP_with_PID",False)
         # ros parameters
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
@@ -216,7 +211,7 @@ class PurePursuitController:
                     self.send_ack_msg(0, 0, 0)
                     rate.sleep()
                     continue
-                    # return 0cte
+                    # return 0
 
             # close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
             self.index_old, close_dis = self.find_close_point_by_distance(robot_pose, self.index_old)
@@ -305,15 +300,8 @@ class PurePursuitController:
 
             target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
             alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
-           
-            if self.is_pp_pid:
-                delta_degrees = self.pp_with_pid(lhd=lhd,alpha=alpha)
-                delta_degrees = math.degrees(delta_degrees)
-
-            else:
-                delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
-                delta_degrees = math.degrees(delta)
-
+            delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
+            delta_degrees = math.degrees(delta)
             steering_angle = np.clip(delta_degrees, -30, 30)
             speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
@@ -354,27 +342,6 @@ class PurePursuitController:
             diagnostic_msg = None
             rate.sleep()
             # return 0
-
-    def pp_with_pid(self,lhd,alpha):
-        '''
-        trying different formula for appying 
-        pid on the pure pursuit controller
-        '''
-        #0.6,0.1,0.3 //0.65,0.25 //
-        kp = rospy.get_param("kp_PID",0.01)
-        ki = rospy.get_param("ki_PID",0.01)
-        kd = 0.5
-        kpp = 1 - kp - ki
-        delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
-        delp = kp*(self.cte + (vehicle_data.dimensions.wheel_base+lhd)*math.sin(alpha))
-        deli = ki*(self.sumCTE + self.cte)
-        delpp = kpp*delta
-        self.e2 = self.e1
-        deld = self.e2-self.e1
-        self.e1 = self.cte
-        strAngle = delp + deli + delpp
-        
-        return strAngle
 
     def find_first_close_point(self, robot_pose):
         index_list = []
