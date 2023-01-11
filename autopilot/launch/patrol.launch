@@ -32,11 +32,11 @@
     <group if="$(eval arg('hardware_in_loop'))">
        <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
            <arg name="vehicle_type" value="$(arg vehicle_type)"/>
-            <arg name="vcu_up" default="true"/>
-            <arg name="gps_up" default="true"/>
+            <arg name="vcu_up" default="false"/>
+            <arg name="gps_up" default="false"/>
             <arg name="zed_camera" value="false"/>
             <arg name="2d_lidar" value="false"/>
-            <arg name="3d_lidar" value="true"/>
+            <arg name="3d_lidar" value="$(arg obs_stop_planner)"/>
        </include>
     </group>
 
