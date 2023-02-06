@@ -67,7 +67,7 @@ class curve_detector:
             results = self.rdp(points[:index+1], epsilon)[:-1] + self.rdp(points[index:], epsilon)
         else:
             results = [points[0], points[-1]]
-
+        # rospy.logerr(len(results))
         return results
 
 
@@ -91,19 +91,26 @@ class curve_detector:
             np.sqrt((dir1**2).sum(axis=1)*(dir2**2).sum(axis=1))))
         
     def rdp_calculate(self,line):
+        '''
+        input: gps path
+        output: returns curve points
+        '''
         rdp_line = np.array(self.rdp(line, self.rdp_tolerance))
         simplified = rdp_line
         sx, sy = simplified.T
         directions = np.diff(simplified, axis=0)
         theta = self.angle(directions)
+        # rospy.logerr(len(theta))
         # Select the index of the points with the greatest theta
         # Large theta is associated with greatest change in direction.
         idx = np.where(theta>self.min_angle)[0]+1
         for xx, yy in zip(sx[idx], sy[idx]):
             self.curve_points.append((xx,yy))
+        # rospy.logerr(len(self.curve_points))
         # return sx,sy,idx
         # print(self.curve_points)
         rospy.loginfo(self.curve_points)
+        # rospy.logerr(len(self.curve_points))
         
     def gps_path_cb(self,data):
 
@@ -116,6 +123,10 @@ class curve_detector:
         return line
 
     def odom_cb(self,data):
+        '''
+        Check whether the vehicle is in curve or not
+        by getting nearest curve point
+        '''
         vehicle_x = data.pose.pose.position.x
         vehicle_y = data.pose.pose.position.y
         import numpy as np

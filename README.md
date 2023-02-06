@@ -1,7 +1,6 @@
 # Boson Motors patrol application
 These are set of packages for patrolling application on boson vehicles.
 
-
 ## Getting started
 
 - TODO 

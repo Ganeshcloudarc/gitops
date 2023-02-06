@@ -16,7 +16,4 @@
     <rosparam command="load" file="$(find obstacle_stop_planner)/params/obstacle_stop_planner.yaml"/>
     <param name="obstacle_stop_planner/scan_in" value="laser_scan"/>
     <node pkg="obstacle_stop_planner" type="obstacle_stop_planner.py" name="obstacle_stop_planner_node" output="screen" />
-
 </launch>
-
-<!-- if="$(eval arg('arg_name') == 'desired_value')"/> -->
