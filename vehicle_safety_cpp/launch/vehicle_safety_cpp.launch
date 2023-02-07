@@ -1,0 +1,9 @@
+<launch>
+  <rosparam file="$(find vehicle_safety_cpp)/params/vehicle_safety_cpp_params.yaml" command="load"/>
+  <node name="vehicle_safety_cpp_diagnostics" pkg="vehicle_safety_cpp" type="vehicle_safety_cpp" output="screen">
+  <param name="diagnostic_period" value="0.1"/> <!-- 10 Hz = 0.1; 100 Hz = 0.01-->
+  <remap from="diagnostics" to="/vehicle_safety_diagnostics"/>
+  </node>
+  <node name="vehicle_safety_analyzer" pkg="vehicle_safety_cpp" type="vehicle_safety_analyzer_cpp" output="screen"/>
+  <node name="curve_detector_cpp" pkg="vehicle_safety_cpp" type="curve_detector_cpp" output="screen"/>
+</launch>
