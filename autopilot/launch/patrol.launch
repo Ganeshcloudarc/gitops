@@ -7,11 +7,10 @@
     <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
     <arg name="record" default="true"/>
-    <arg name="failsafe_enable" default="false"/>
-    <arg name="failsafe_enable_cpp" default="true"/>
+    <arg name="failsafe_enable" default="true"/>
     <arg name="obs_stop_planner" default="true"/>
     <arg name="pp_with_pid" default="true"/>
-
+   
     <arg name="sensor_source" default='1' doc="1: Zed camera, 1: Rslidar, 2: carla"/>
     <arg name="kp" default="0.12" doc="kp:0.03,ki:0.02 for us vehicle and kp:0.12 ,ki:0.1 for india vehicles"/>
     <arg name="ki" default="0.1" doc="Donnot give value more than 0.13 for both ki and kp"/>
@@ -102,17 +101,7 @@
         <include file="$(find autopilot)/launch/failsafe_manager.launch">
             <arg name="use_zed_camera"         value="false" />
             <arg name="use_oak_camera"            value="false" />
-            <arg name="vehicle_safety_diagnostics" default="true"/>
-            <arg name="vehicle_safety_cpp_diagnostics" default="false"/>
-            <arg name="use_emergeny_stop" value ="true"/>
-        </include>
-    </group>
-    <group if="$(eval arg('failsafe_enable_cpp'))">
-        <include file="$(find autopilot)/launch/failsafe_manager.launch">
-            <arg name="use_zed_camera"         value="false" />
-            <arg name="use_oak_camera"            value="false" />
-            <arg name="vehicle_safety_diagnostics" default="false"/>
-            <arg name="vehicle_safety_cpp_diagnostics" default="true"/>
+            <arg name="vehicle_safety_diagnostics" value="true"/>
             <arg name="use_emergeny_stop" value ="true"/>
         </include>
     </group>
