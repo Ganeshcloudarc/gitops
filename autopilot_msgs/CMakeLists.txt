@@ -27,3 +27,7 @@ add_message_files(
   mavros_msgs
   sensor_msgs
 )
+
+catkin_package(
+  CATKIN_DEPENDS roscpp  message_runtime 
+)
