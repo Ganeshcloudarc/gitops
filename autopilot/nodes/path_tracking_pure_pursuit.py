@@ -19,6 +19,7 @@ try:
     from geographic_msgs.msg import GeoPointStamped
     from ackermann_msgs.msg import AckermannDrive
     from sensor_msgs.msg import NavSatFix
+    from nav_msgs.msg import Path
     from std_msgs.msg import Float32
 
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
@@ -29,7 +30,7 @@ try:
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
     from autopilot_msgs.msg import ControllerDiagnose, FloatKeyValue
-
+    # from find_direction_change import FindDir
 except Exception as e:
     import rospy
 
@@ -51,6 +52,7 @@ def heading_check(robot_orientation, path_orientation):
 
 class PurePursuitController:
     def __init__(self):
+        # self.find_dir = FindDir()
         self.updated_odom_time = None
         self.trajectory_len = None
         self.gps_robot_state = None
@@ -61,6 +63,7 @@ class PurePursuitController:
         #PID parameters
         self.cte = 0
         self.sum_cte = 0
+        self.is_reverse = None
 
         self.is_pp_pid = rospy.get_param("/pp_with_pid",False)
         # ros parameters
@@ -71,6 +74,7 @@ class PurePursuitController:
         self.avg_look_ahead = (self.min_look_ahead_dis + self.max_look_ahead_dis) / 2
         self.time_out_from_input_trajectory = rospy.get_param("/pure_pursuit/time_out", 3)
         trajectory_in_topic = rospy.get_param("/trajectory_in", "/global_gps_trajectory")
+        gps_path = rospy.get_param("global_gps_path_topic","/global_gps_path")
         odom_topic = rospy.get_param("/patrol/odom_topic", "vehicle/odom")
         gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/local")
         self.robot_base_frame = rospy.get_param("robot_base_frame", "ego_vehicle")
@@ -124,6 +128,7 @@ class PurePursuitController:
                     rospy.Subscriber(trajectory_in_topic, Trajectory, self.trajectory_callback)
                     rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
                     rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
+                    rospy.Subscriber(gps_path,Path,self.gps_path_cb)
 
                     rospy.loginfo("data received on tf and %s ", trajectory_in_topic)
                     break
@@ -160,7 +165,7 @@ class PurePursuitController:
         close_pose_msg.header.frame_id = "map"
         # main loop starts
         # robot_pose = current_robot_pose("map", self.robot_base_frame)
-
+        stop = True
         while not rospy.is_shutdown():
             # TODO
             # remove this current robot pose with odom callback, it increases speeed
@@ -234,8 +239,46 @@ class PurePursuitController:
             #     self.index_old = None
             #     continue
             #     # return 0
+            
 
             lhd = self.compute_lookahead_distance(self.robot_speed)
+            
+            # dist_to_direction_change = self.findDirectionChange(self.robot_state)
+
+            
+            # if dist_to_direction_change < lhd:
+            #     lhd = dist_to_direction_change
+                # rospy.logerr(lhd)
+                # if target_pose_msg.pose.position.x >= 0.0:
+                #     rospy.logwarn("Forward")
+                #     self.is_reverse = False
+                # else:
+                #     self.is_reverse = True
+                #     rospy.logerr("Reverse")
+            
+            dot_vector = self.findLookaheadPos(robot_pose,target_pose_msg)
+            # print(dot_vector)
+            try:
+                
+                if dot_vector > 0:
+                    self.is_reverse = False
+                    rospy.logwarn("Forward")
+                elif dot_vector < 0:
+                    # if stop == True:
+                    #     for i in range(10):
+                            
+                    #         self.send_ack_msg(0, 0, 0)
+                    #         time.sleep(1)
+                    #         stop = False
+                    
+                    self.is_reverse = True
+                    rospy.logerr("Reverse")
+                elif dot_vector == 0:
+                    rospy.logerr("Stopping the Robot")
+                    self.send_ack_msg(0, 0, 0)
+            except Exception as e:
+                rospy.logwarn(e)
+
             target_point_ind, lhd = self.find_target_index(robot_pose, self.index_old, lhd)
             close_point_ind = self.index_old
 
@@ -391,7 +434,7 @@ class PurePursuitController:
         if len(index_list) == 0:
             return False, "No close point found", 0, 0
         else:
-            return False, "Found " + str(
+            return True, "Found " + str(
                 len(index_list)) + "points are close, But No Heading is not okay for them", 0, 0
 
     # def find_close_point(self, robot_pose, old_close_index):
@@ -470,7 +513,60 @@ class PurePursuitController:
 
     def gps_callback(self, data):
         self.gps_robot_state = data
+        
+    def gps_path_cb(self,data):
+        self.global_plan = data
 
+    def findDirectionChange(self,robot_pose):
+        for pose_id in range(1,len(self.global_plan.poses)):
+            oa_x = self.global_plan.poses[pose_id].pose.position.x - self.global_plan.poses[pose_id - 1].pose.position.x
+            oa_y = self.global_plan.poses[pose_id].pose.position.y - self.global_plan.poses[pose_id - 1].pose.position.y
+            ab_x = self.global_plan.poses[pose_id + 1].pose.position.x - self.global_plan.poses[pose_id].pose.position.x
+            ab_y = self.global_plan.poses[pose_id + 1].pose.position.y - self.global_plan.poses[pose_id].pose.position.y
+            # rospy.logwarn(f'{oa_x},{oa_y},{ab_x},{ab_y},{pose_id}')
+            # rospy.logwarn("DOT PRODUCT: {}".format((oa_x * ab_x) + (oa_y * ab_y)))
+            
+            if ((oa_x * ab_x) + (oa_y * ab_y) < 0.0):
+                x = self.global_plan.poses[pose_id].pose.position.x - robot_pose.pose.pose.position.x
+                y = self.global_plan.poses[pose_id].pose.position.y - robot_pose.pose.pose.position.y
+                rospy.logwarn(math.hypot(x,y))
+                return math.hypot(x,y)
+        rospy.logerr(float('inf'))
+        return float('inf')
+    
+    def findLookaheadPos(self,robot_pose,lookAheadPose,reverse_threshold=0.1,stop_threshold=0.1):
+        # robot_pose = robot_pose.pose.pose
+        theta = get_yaw(robot_pose.orientation)
+        rx = robot_pose.position.x
+        ry = robot_pose.position.y
+        lx = lookAheadPose.pose.position.x
+        ly = lookAheadPose.pose.position.y
+        print(theta,robot_pose.position.x,robot_pose.position.y,lookAheadPose.pose.position.x,lookAheadPose.pose.position.y)
+        ruv_x,ruv_y = rx*round(math.cos(math.radians(theta)),2), ry*round(math.sin(math.radians(theta)),2)
+        # print(ruv_x,ruv_y)
+        # robot, lookahead x, robot, lookahead y
+        # rl_x, rl_y =  = x2-x1, y2-y1
+        rl_x = lx-rx
+        rl_y = ly-ry
+        a = [ruv_x,ruv_y]
+        b = [rl_x,rl_y]
+        # self.ruvDotvector = np.dot(a,b)
+        dot_product = np.dot(a,b)
+        
+        # Check conditions for reversing or stopping
+        distance = math.sqrt((lx-rx)**2 + (ly-ry)**2)
+        if dot_product < -reverse_threshold:
+            # Lookahead point is behind robot and threshold is exceeded - reverse
+            return -1
+        elif abs(dot_product) < stop_threshold and distance < stop_threshold:
+            # Robot has reached lookahead point - stop
+            return 0
+        else:
+            # Robot can continue moving forward
+            return 1
+        # print(self.ruvDotvector)
+        # return self.ruvDotvector
+    
     def compute_lookahead_distance(self, robot_speed):
         # return 3
         # return self.min_look_ahead_dis
@@ -489,7 +585,10 @@ class PurePursuitController:
 
     def send_ack_msg(self, steering_angle, speed, jerk):
         self.ackermann_msg.steering_angle = steering_angle
-        self.ackermann_msg.speed = speed
+        if self.is_reverse:
+            self.ackermann_msg.speed = -speed
+        else:
+            self.ackermann_msg.speed = speed
         self.ackermann_msg.jerk = jerk
         self.ackermann_publisher.publish(self.ackermann_msg)
 

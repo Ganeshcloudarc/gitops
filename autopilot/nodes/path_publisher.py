@@ -120,40 +120,40 @@ class PathPubGps:
         if self.mission_continue:
             distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[1].pose)
             rospy.loginfo("distance between first and last way point %s", str(distance))
-            if distance > self.avg_lhd:
-                rospy.logwarn("path's end and start points are %s meters apart , Interpolating them ", str(distance))
-                n_points = distance // self.path_resolution
-                angle = angle_btw_poses(trajectory_msg.points[1].pose, trajectory_msg.points[-1].pose)
-                # print()
-                print("angle", angle)
-                for j in range(0, int(n_points)):
-                    # odom path
-                    px = trajectory_msg.points[-1].pose.position.x
-                    py = trajectory_msg.points[-1].pose.position.y
-                    px_updated = px + self.path_resolution * math.cos(angle)
-                    py_updated = py + self.path_resolution * math.sin(angle)
-                    odom_pose = Pose()
-                    odom_pose.position.x, odom_pose.position.y, odom_pose.position.z = px_updated, py_updated, \
-                                                                                       rear_axle_center_height_from_ground
-                    odom_pose.orientation = yaw_to_quaternion(angle)
-                    # Trajectory
-                    lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long)
+            # if distance > self.avg_lhd:
+            #     rospy.logwarn("path's end and start points are %s meters apart , Interpolating them ", str(distance))
+            #     n_points = distance // self.path_resolution
+            #     angle = angle_btw_poses(trajectory_msg.points[1].pose, trajectory_msg.points[-1].pose)
+            #     # print()
+            #     print("angle", angle)
+            #     for j in range(0, int(n_points)):
+            #         # odom path
+            #         px = trajectory_msg.points[-1].pose.position.x
+            #         py = trajectory_msg.points[-1].pose.position.y
+            #         px_updated = px + self.path_resolution * math.cos(angle)
+            #         py_updated = py + self.path_resolution * math.sin(angle)
+            #         odom_pose = Pose()
+            #         odom_pose.position.x, odom_pose.position.y, odom_pose.position.z = px_updated, py_updated, \
+            #                                                                            rear_axle_center_height_from_ground
+            #         odom_pose.orientation = yaw_to_quaternion(angle)
+            #         # Trajectory
+            #         lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long)
 
-                    dis = distance_btw_poses(odom_pose, prev_pose)
-                    accumulated_distance = accumulated_distance + dis
-                    prev_pose = odom_pose
-                    # Trajectory msg filling
-                    traj_pt_msg = TrajectoryPoint()
-                    traj_pt_msg.pose = odom_pose
+            #         dis = distance_btw_poses(odom_pose, prev_pose)
+            #         accumulated_distance = accumulated_distance + dis
+            #         prev_pose = odom_pose
+            #         # Trajectory msg filling
+            #         traj_pt_msg = TrajectoryPoint()
+            #         traj_pt_msg.pose = odom_pose
 
-                    traj_pt_msg.gps_pose.position.latitude = lat
-                    traj_pt_msg.gps_pose.position.longitude = lng
-                    # traj_pt_msg.longitudinal_velocity_mps =
-                    traj_pt_msg.index = i + j
-                    traj_pt_msg.accumulated_distance_m = accumulated_distance
-                    trajectory_msg.points.append(traj_pt_msg)
-            else:
-                rospy.loginfo("path end and start points are close , no interpolation needed ")
+            #         traj_pt_msg.gps_pose.position.latitude = lat
+            #         traj_pt_msg.gps_pose.position.longitude = lng
+            #         # traj_pt_msg.longitudinal_velocity_mps =
+            #         traj_pt_msg.index = i + j
+            #         traj_pt_msg.accumulated_distance_m = accumulated_distance
+            #         trajectory_msg.points.append(traj_pt_msg)
+            # else:
+            #     rospy.loginfo("path end and start points are close , no interpolation needed ")
         else:
             distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[1].pose)
             rospy.logdebug("distance between first and last way point %s", str(distance))
