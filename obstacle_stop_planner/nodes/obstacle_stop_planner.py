@@ -348,10 +348,10 @@ class ObstacleStopPlanner:
             else:
                 robot_heading = get_yaw(robot_pose.orientation)
                 path_heading = get_yaw(self.traj_in.points[ind].pose.orientation)
-                # ##print("robot_heading", robot_heading)
-                # ##print("path_heading", path_heading)
-                # ##print("heading err:", abs(abs(robot_heading) - abs(path_heading)))
-                # ##print("math.radians(90)", math.radians(90))
+                # print("robot_heading", robot_heading)
+                # print("path_heading", path_heading)
+                # print("heading err:", abs(abs(robot_heading) - abs(path_heading)))
+                # print("math.radians(90)", math.radians(90))
                 if abs(abs(robot_heading) - abs(path_heading)) > math.radians(90):
                     rospy.logwarn("Headings are %s apart ", str(abs(robot_heading - path_heading)))
                     heading_ok = False

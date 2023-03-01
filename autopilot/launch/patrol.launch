@@ -98,6 +98,7 @@
     
     <!-- <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include> -->
 
+
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">
             <arg name="use_zed_camera"         value="false" />
@@ -117,10 +118,3 @@
         </include>
     </group>
 </launch>
-
-
-
-
-
-
-
