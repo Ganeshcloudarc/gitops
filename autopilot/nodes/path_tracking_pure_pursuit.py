@@ -542,7 +542,7 @@ class PurePursuitController:
         lx = lookAheadPose.pose.position.x
         ly = lookAheadPose.pose.position.y
         print(theta,robot_pose.position.x,robot_pose.position.y,lookAheadPose.pose.position.x,lookAheadPose.pose.position.y)
-        ruv_x,ruv_y = rx*round(math.cos(math.radians(theta)),2), ry*round(math.sin(math.radians(theta)),2)
+        ruv_x,ruv_y = math.cos(theta), math.sin(theta)
         # print(ruv_x,ruv_y)
         # robot, lookahead x, robot, lookahead y
         # rl_x, rl_y =  = x2-x1, y2-y1
@@ -599,3 +599,4 @@ if __name__ == "__main__":
     pure_pursuit = PurePursuitController()
 
     rospy.spin()
+
