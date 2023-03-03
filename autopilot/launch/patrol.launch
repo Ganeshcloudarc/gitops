@@ -11,6 +11,7 @@
     <arg name="failsafe_enable_cpp" default="true"/>
     <arg name="obs_stop_planner" default="true"/>
     <arg name="pp_with_pid" default="true"/>
+    <arg name="use_pcl_boxes" default="true"/>
 
     <arg name="sensor_source" default='1' doc="1: Zed camera, 1: Rslidar, 2: carla"/>
     <arg name="kp" default="0.12" doc="kp:0.03,ki:0.02 for us vehicle and kp:0.12 ,ki:0.1 for india vehicles"/>
@@ -65,6 +66,7 @@
         <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
         <include file="$(find obstacle_stop_planner)/launch/obstacle_stop_planner.launch">
             <arg name="mission_continue" value="$(arg mission_continue)"/>
+            <arg name="use_pcl_boxes" value="$(arg use_pcl_boxes)"/>
            <arg name="sensor_source" value="$(arg sensor_source)"/>
         </include>
         <node name="rviz_obstacle_stop_planner" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol_obstacle_stop_planner.rviz" if = "$(eval arg('rviz'))"/>

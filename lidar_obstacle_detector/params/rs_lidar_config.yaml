@@ -8,16 +8,16 @@ roi_max_z : 1
 
 roi_min_x: 0
 roi_min_y: -30
-roi_min_z: -2.5
+roi_min_z: -2
 
 neighbors : 50
 standard_deviation : 1
 
-ground_threshold: 0.2
+ground_threshold: 0.4
 
-cluster_threshold: 0.6
+cluster_threshold: 0.7
 cluster_max_size: 5000
-cluster_min_size: 10
+cluster_min_size: 9
 
 displacement_threshold: 1.0
 iou_threshold: 1.0
