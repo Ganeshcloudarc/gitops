@@ -30,10 +30,8 @@ try:
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
     from autopilot_msgs.msg import ControllerDiagnose, FloatKeyValue
-    # from find_direction_change import FindDir
 except Exception as e:
     import rospy
-
     rospy.logerr("No module %s", str(e))
     exit(e)
 
@@ -49,10 +47,11 @@ def heading_check(robot_orientation, path_orientation):
         heading_ok = True
     return heading_ok
 
+def getLineNumber():
+    return sys._getframe().f_back.f_lineno
 
 class PurePursuitController:
     def __init__(self):
-        # self.find_dir = FindDir()
         self.updated_odom_time = None
         self.trajectory_len = None
         self.gps_robot_state = None
@@ -259,25 +258,19 @@ class PurePursuitController:
             dot_vector = self.findLookaheadPos(robot_pose,target_pose_msg)
             # print(dot_vector)
             try:
-                
                 if dot_vector > 0:
                     self.is_reverse = False
                     rospy.logwarn("Forward")
                 elif dot_vector < 0:
-                    # if stop == True:
-                    #     for i in range(10):
-                            
-                    #         self.send_ack_msg(0, 0, 0)
-                    #         time.sleep(1)
-                    #         stop = False
-                    
                     self.is_reverse = True
                     rospy.logerr("Reverse")
                 elif dot_vector == 0:
                     rospy.logerr("Stopping the Robot")
                     self.send_ack_msg(0, 0, 0)
+                else:
+                    pass
             except Exception as e:
-                rospy.logwarn(e)
+                rospy.logwarn(f'Debug: {rospy.get_name}, {getLineNumber()}, {e}')
 
             target_point_ind, lhd = self.find_target_index(robot_pose, self.index_old, lhd)
             close_point_ind = self.index_old
@@ -541,7 +534,6 @@ class PurePursuitController:
         ry = robot_pose.position.y
         lx = lookAheadPose.pose.position.x
         ly = lookAheadPose.pose.position.y
-        print(theta,robot_pose.position.x,robot_pose.position.y,lookAheadPose.pose.position.x,lookAheadPose.pose.position.y)
         ruv_x,ruv_y = math.cos(theta), math.sin(theta)
         # print(ruv_x,ruv_y)
         # robot, lookahead x, robot, lookahead y
@@ -564,8 +556,6 @@ class PurePursuitController:
         else:
             # Robot can continue moving forward
             return 1
-        # print(self.ruvDotvector)
-        # return self.ruvDotvector
     
     def compute_lookahead_distance(self, robot_speed):
         # return 3
