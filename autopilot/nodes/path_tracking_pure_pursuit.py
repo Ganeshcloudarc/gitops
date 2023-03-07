@@ -7,7 +7,7 @@ try:
     import math
     import numpy as np
     from numpy import argmin, zeros
-    import ros_numpy
+    # import ros_numpy
     import rospy
     import tf2_ros
     import time, sys
