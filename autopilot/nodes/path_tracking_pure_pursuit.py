@@ -128,7 +128,7 @@ class PurePursuitController:
                     rospy.Subscriber(trajectory_in_topic, Trajectory, self.trajectory_callback)
                     rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
                     rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
-                    rospy.Subscriber(gps_path,Path,self.gps_path_cb)
+                    # rospy.Subscriber(gps_path,Path,self.gps_path_cb)
 
                     rospy.loginfo("data received on tf and %s ", trajectory_in_topic)
                     break
@@ -165,7 +165,6 @@ class PurePursuitController:
         close_pose_msg.header.frame_id = "map"
         # main loop starts
         # robot_pose = current_robot_pose("map", self.robot_base_frame)
-        stop = True
         while not rospy.is_shutdown():
             # TODO
             # remove this current robot pose with odom callback, it increases speeed
