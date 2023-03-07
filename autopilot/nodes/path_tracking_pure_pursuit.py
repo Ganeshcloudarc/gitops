@@ -62,7 +62,7 @@ class PurePursuitController:
         #PID parameters
         self.cte = 0
         self.sum_cte = 0
-        self.is_reverse = None
+        self.is_reverse = False
 
         self.is_pp_pid = rospy.get_param("/pp_with_pid",False)
         # ros parameters
@@ -82,6 +82,7 @@ class PurePursuitController:
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.search_point_distance = 5
         failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
+        self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
 
         if failsafe_enable:
             cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
@@ -254,24 +255,25 @@ class PurePursuitController:
                 # else:
                 #     self.is_reverse = True
                 #     rospy.logerr("Reverse")
-            
-            dot_vector = self.findLookaheadPos(robot_pose,target_pose_msg)
-            # print(dot_vector)
-            try:
-                if dot_vector > 0:
-                    self.is_reverse = False
-                    rospy.logwarn("Forward")
-                elif dot_vector < 0:
-                    self.is_reverse = True
-                    rospy.logerr("Reverse")
-                elif dot_vector == 0:
-                    rospy.logerr("Stopping the Robot")
-                    self.send_ack_msg(0, 0, 0)
-                else:
-                    pass
-            except Exception as e:
-                rospy.logwarn(f'Debug: {rospy.get_name}, {getLineNumber()}, {e}')
-
+            if self.allow_reversing:
+                dot_vector = self.findLookaheadPos(robot_pose,target_pose_msg)
+                # print(dot_vector)
+                try:
+                    if dot_vector > 0:
+                        self.is_reverse = False
+                        rospy.logwarn("Forward")
+                    elif dot_vector < 0:
+                        self.is_reverse = True
+                        rospy.logerr("Reverse")
+                    elif dot_vector == 0:
+                        rospy.logerr("Stopping the Robot")
+                        self.send_ack_msg(0, 0, 0)
+                    else:
+                        pass
+                except Exception as e:
+                    rospy.logwarn(f'WARN : {rospy.get_name()}, {getLineNumber()}, {e}')
+            else:
+                self.is_reverse = False
             target_point_ind, lhd = self.find_target_index(robot_pose, self.index_old, lhd)
             close_point_ind = self.index_old
 

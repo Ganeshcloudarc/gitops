@@ -11,6 +11,7 @@
     <arg name="failsafe_enable_cpp" default="true"/>
     <arg name="obs_stop_planner" default="true"/>
     <arg name="pp_with_pid" default="true"/>
+    <arg name="allow_reversing" default="true"/>
 
     <arg name="sensor_source" default='1' doc="1: Zed camera, 1: Rslidar, 2: carla"/>
     <arg name="kp" default="0.12" doc="kp:0.03,ki:0.02 for us vehicle and kp:0.12 ,ki:0.1 for india vehicles"/>
@@ -19,6 +20,7 @@
     <param name="kp_pid" value="$(arg kp)"/>
     <param name="ki_pid" value="$(arg ki)"/>
 
+    <param name="/patrol/allow_reversing" value="$(arg allow_reversing)"/>
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
     <param name="/patrol/mission_continue" value ="$(arg mission_continue)"/>
     <param name="/patrol/mission_trips" value ="$(arg mission_trips)"/>
