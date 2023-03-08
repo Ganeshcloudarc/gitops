@@ -155,6 +155,8 @@ class GlobalGpsPathPub:
         home_lat = long_lat_list[0][1]
         home_long = long_lat_list[0][0]
         home_position = self.set_home_position(long_lat_list[0][1], long_lat_list[0][0])
+        rospy.loginfo('Origin point set')
+        time.sleep(0.5)
         xy_list = []
         for i in range(len(long_lat_list)):
             x, y = ll2xy(long_lat_list[i][1], long_lat_list[i][0], home_lat, home_long)
@@ -260,7 +262,10 @@ class GlobalGpsPathPub:
         # Setting home position for mavros node
         home_lat = data['coordinates'][0][1]
         home_long = data['coordinates'][0][0]
-        home_position = self.set_home_position(home_lat, home_lat)
+        home_alt = data['gps_coordinates'][0]['altitude']
+        home_position = self.set_home_position(home_lat, home_lat, home_alt)
+        rospy.loginfo('Origin point set')
+        time.sleep(0.5)
 
         # Ros messages
         trajectory_msg = Trajectory()
