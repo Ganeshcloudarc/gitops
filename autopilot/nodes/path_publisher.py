@@ -263,7 +263,7 @@ class GlobalGpsPathPub:
         home_lat = data['coordinates'][0][1]
         home_long = data['coordinates'][0][0]
         home_alt = data['gps_coordinates'][0]['altitude']
-        home_position = self.set_home_position(home_lat, home_lat, home_alt)
+        home_position = self.set_home_position(home_lat, home_long, home_alt)
         rospy.loginfo('Origin point set')
         time.sleep(0.5)
 
