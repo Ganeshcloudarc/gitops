@@ -142,11 +142,18 @@ class ObstacleStopPlanner:
 
             if self.scan_data_received and self._traj_manager.get_len() > 0 and self.robot_pose:
                 rospy.loginfo("scan data, global path and robot_pose  are received")
-                break
+                if self.use_pcl_boxes:
+                    if self.bboxes:
+                        rospy.loginfo("bonding boxes are received")
+                        break
+                    else:
+                        rospy.logwarn("waiting for bounding boxes")
+                else:
+                    break
             else:
                 rospy.logwarn(
                     f"waiting for data  scan :{self.scan_data_received}, global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
-                rate.sleep()
+            rate.sleep()
 
         rate = rospy.Rate(100)
         while not rospy.is_shutdown():
@@ -231,17 +238,19 @@ class ObstacleStopPlanner:
                         self._traj_in.points[prev_processed_ind].accumulated_distance_m > self._radius_to_search / 2:
 
                     path_pose = self._traj_in.points[ind].pose
-                    pose_xy = np.array([[path_pose.position.x, path_pose.position.y]])  # , path_pose.position.z]])
-                    try:
-                        collision_points = kd_tree.query_radius(pose_xy, r=self._radius_to_search)
-                        prev_processed_ind = ind
-                    except Exception as error:
-                        rospy.logwarn(f"could not query KD tree,{error}")
-                    if len(list(collision_points[0])) > 0:
-                        obstacle_found = True
-                        break
+                    if not self.use_pcl_boxes:
+                        pose_xy = np.array([[path_pose.position.x, path_pose.position.y]])  # , path_pose.position.z]])
+                        try:
+                            collision_points = kd_tree.query_radius(pose_xy, r=self._radius_to_search)
+                            prev_processed_ind = ind
+                        except Exception as error:
+                            rospy.logwarn(f"could not query KD tree,{error}")
+                        if len(list(collision_points[0])) > 0:
+                            obstacle_found = True
+                            break
                 else:
                     if len(self.bboxes.boxes) > 0:
+
                         try:
                             close_bbx_id, close_dis = self.find_close_object(self.bboxes,
                                                                             [path_pose.position.x, path_pose.position.y])
@@ -379,6 +388,23 @@ class ObstacleStopPlanner:
         pt.y = box_list[0][1]
         polygon.polygon.points.append(pt)
         self.collision_points_polygon.publish(polygon)
+
+    def publish_bboxs(self, bboxes):
+        polygon = PolygonStamped()
+        polygon.header.frame_id = "map"
+        for bbox in bboxes.boxes:
+            box_list = bbox_to_corners(bbox)
+
+            for x, y in box_list:
+                pt = Point()
+                pt.x = x
+                pt.y = y
+                polygon.polygon.points.append(pt)
+            pt = Point()
+            pt.x = box_list[0][0]
+            pt.y = box_list[0][1]
+            polygon.polygon.points.append(pt)
+        self.box_corner_pub.publish(polygon)
 
     def find_close_object(self, bboxes, point):
         dis_list = []
