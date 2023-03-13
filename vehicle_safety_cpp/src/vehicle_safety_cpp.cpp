@@ -11,8 +11,8 @@
 #include <boost/geometry.hpp>
 #include <boost/geometry/algorithms/assign.hpp>
 #include <boost/geometry/geometries/adapted/boost_polygon/point.hpp>
-#include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/geometry/geometries/multi_polygon.hpp>
+#include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/geometry/geometries/polygon.hpp>
 #include <boost/geometry/io/dsv/write.hpp>
 #include <boost/geometry/io/io.hpp>
@@ -80,7 +80,7 @@ class VehicleSafety {
   // Todo : Keep default values if param not available
   int battery_soc{-1};
   int store_batt_level{-1};
-  int motor_rpm {0}; //motor rpm will be zero when no can data
+  int motor_rpm{0};  // motor rpm will be zero when no can data
   int BATT_SOC_TH = nh.param("/vehicle_safety/BATT_TH", BATT_SOC_TH);
   int CTE_THR_AT_STRAIGHT =
       nh.param("/vehicle_safety/CTE_THR", CTE_THR_AT_STRAIGHT);
@@ -106,7 +106,10 @@ class VehicleSafety {
   float HEAD_THR = nh.param("/vehicle_safety/HEAD_THR", HEAD_THR);
   float GPS_FIX_THR = nh.param("/vehicle_safety/GPS_FIX_THR", GPS_FIX_THR);
   bool use_geo_fence = nh.param("/vehicle_safety/use_geo_fence", use_geo_fence);
-
+  bool use_inner_geo_fence =
+      nh.param("/vehicle_safety/use_inner_geo_fence", use_inner_geo_fence);
+  bool is_inside_geo_fence;
+  bool is_with_in_no_go_zone;
   double time_to_launch;
   long time_on_tracking_cb;
 
@@ -116,8 +119,6 @@ class VehicleSafety {
   autopilot_msgs::ControllerDiagnose pp_diagnose_data;
   pilot_msgs::VehicleInfo can_data;
   int flag1 = 0, reset_gps = 0, reset_head = 0, reset_geo_fence = 0;
-  bool is_inside_geo_fence;
-  bool is_with_in_no_go_zone;
 
   Matrix<double, 3, 3> m_prev;
 
@@ -159,7 +160,8 @@ class VehicleSafety {
     can_data_sub =
         nh.subscribe("vehicle_info", 1, &VehicleSafety::can_data_cb, this);
 
-    // nh.getParam("/vehicle_safety/no_go_zone_coordinates", no_go_zone_coords_xmlrpc);
+    // nh.getParam("/vehicle_safety/no_go_zone_coordinates",
+    // no_go_zone_coords_xmlrpc);
   }
 
   void is_curve_cb(const std_msgs::Bool &msg) {
@@ -294,15 +296,18 @@ class VehicleSafety {
   }
 
   void global_gps_callback(const sensor_msgs::NavSatFix &msg) {
-    nh.getParam("/vehicle_safety/no_go_zone_coordinates", no_go_zone_coords_xmlrpc);
+    nh.getParam("/vehicle_safety/no_go_zone_coordinates",
+                no_go_zone_coords_xmlrpc);
     cov_value = msg.position_covariance;
     double lat = msg.latitude;
     double lon = msg.longitude;
     is_inside_geo_fence = isWithInGeoFence(lat, lon);
-    is_with_in_no_go_zone = isWithinNoGoZone(no_go_zone_coords_xmlrpc,lat,lon);
+    is_with_in_no_go_zone =
+        isWithinNoGoZone(no_go_zone_coords_xmlrpc, lat, lon);
     // ROS_WARN_STREAM(" NoGoZone: " << is_with_in_no_go_zone );
 
-    ROS_WARN_STREAM("Geofence: " << is_inside_geo_fence << " NoGoZone: " << is_with_in_no_go_zone );
+    ROS_WARN_STREAM("Geofence: " << is_inside_geo_fence
+                                 << " NoGoZone: " << is_with_in_no_go_zone);
     reset_geo_fence = 1;
   }
 
@@ -493,6 +498,9 @@ class VehicleSafety {
 
   void geo_fence_diagnostics(
       diagnostic_updater::DiagnosticStatusWrapper &stat) {
+    if (!use_inner_geo_fence) {
+      is_with_in_no_go_zone = false;
+    }
     if (reset_geo_fence == 1) {
       if (use_geo_fence) {
         if (is_inside_geo_fence && !is_with_in_no_go_zone) {
@@ -529,7 +537,8 @@ class VehicleSafety {
     polygon_type poly;
     vector<point_xy> points;
 
-    //TODO @iam-vishnu. Do the below process outside this function. Don't repeat always.
+    // TODO @iam-vishnu. Do the below process outside this function. Don't
+    // repeat always.
     for (int i = 0; i < pt.size(); i++) {
       boost::geometry::assign_values(pt2, pt[i][0], pt[i][1]);
       // ROS_INFO_STREAM("INFO STREAM " << pt[i][0] << "," << pt[i][1]);
@@ -546,20 +555,19 @@ class VehicleSafety {
     return false;
   }
 
- bool isWithinNoGoZone(const XmlRpc::XmlRpcValue no_go_zone_coords_xmlrpc,double lat, double lon)
-{
-
-  for (int i = 0; i < no_go_zone_coords_xmlrpc.size(); ++i)
-    {
-        XmlRpc::XmlRpcValue polygon_coords_xmlrpc = no_go_zone_coords_xmlrpc[i];
-        std::vector<std::vector<double>> polygon_coords;
-        for (int j = 0; j < polygon_coords_xmlrpc.size(); ++j)
-        {
-            XmlRpc::XmlRpcValue point_coords_xmlrpc = polygon_coords_xmlrpc[j];
-            std::vector<double> point_coords{static_cast<double>(point_coords_xmlrpc[0]), static_cast<double>(point_coords_xmlrpc[1])};
-            polygon_coords.push_back(point_coords);
-        }
-        no_go_zone_coordinates.push_back(polygon_coords);
+  bool isWithinNoGoZone(const XmlRpc::XmlRpcValue no_go_zone_coords_xmlrpc,
+                        double lat, double lon) {
+    for (int i = 0; i < no_go_zone_coords_xmlrpc.size(); ++i) {
+      XmlRpc::XmlRpcValue polygon_coords_xmlrpc = no_go_zone_coords_xmlrpc[i];
+      std::vector<std::vector<double>> polygon_coords;
+      for (int j = 0; j < polygon_coords_xmlrpc.size(); ++j) {
+        XmlRpc::XmlRpcValue point_coords_xmlrpc = polygon_coords_xmlrpc[j];
+        std::vector<double> point_coords{
+            static_cast<double>(point_coords_xmlrpc[0]),
+            static_cast<double>(point_coords_xmlrpc[1])};
+        polygon_coords.push_back(point_coords);
+      }
+      no_go_zone_coordinates.push_back(polygon_coords);
     }
 
     // Convert no_go_zone_coordinates to Boost MultiPolygon
@@ -568,30 +576,28 @@ class VehicleSafety {
     typedef bg::model::multi_polygon<polygon_t> multipolygon_t;
     multipolygon_t no_go_zone;
 
-    for (auto& polygon_coords : no_go_zone_coordinates)
-    {
-        polygon_t polygon;
-        for (auto& point_coords : polygon_coords)
-        {
-            point_t point(point_coords[0], point_coords[1]);
-            bg::append(polygon.outer(), point);
-        }
-        boost::geometry::correct(polygon);
-        // boost::geometry::append(no_go_zone, polygon); // Add the polygon to no_go_zone
-        no_go_zone.push_back(polygon);
+    for (auto &polygon_coords : no_go_zone_coordinates) {
+      polygon_t polygon;
+      for (auto &point_coords : polygon_coords) {
+        point_t point(point_coords[0], point_coords[1]);
+        bg::append(polygon.outer(), point);
+      }
+      boost::geometry::correct(polygon);
+      // boost::geometry::append(no_go_zone, polygon); // Add the polygon to
+      // no_go_zone
+      no_go_zone.push_back(polygon);
     }
 
     // Check if the point is within the no-go zone
-    point_t point(lat,lon);
+    point_t point(lat, lon);
     if (boost::geometry::within(point, no_go_zone)) {
       return true;
       // ROS_ERROR_STREAM("---"<< true);
     }
-  // ROS_ERROR_STREAM("---"<< false);
+    // ROS_ERROR_STREAM("---"<< false);
     return false;
   }
-    // return bg::within(point, no_go_zone);
-
+  // return bg::within(point, no_go_zone);
 
   vector<vector<double>> geoFence() {
     XmlRpc::XmlRpcValue trajectory;
@@ -651,18 +657,19 @@ class VehicleSafety {
       stat_summ_stat = ERROR;
       stat_summ_msg = "Low Battery";
       stat.summary(ERROR, stat_summ_msg);
-      ROS_ERROR_STREAM_THROTTLE(100,stat_summ_msg);
+      ROS_ERROR_STREAM_THROTTLE(100, stat_summ_msg);
     } else if (battery_soc > BATT_SOC_TH) {
       log_msg = "Battery OK";
       stat_summ_stat = OK;
       stat_summ_msg = "Battery % OK";
       stat.summary(OK, stat_summ_msg);
-      ROS_INFO_STREAM_THROTTLE(100,stat_summ_msg);
+      ROS_INFO_STREAM_THROTTLE(100, stat_summ_msg);
     } else {
       ;
     }
     // }
-    ROS_INFO_STREAM_THROTTLE(100, "SOC: " << battery_soc << ", Batt Th: " << BATT_SOC_TH);
+    ROS_INFO_STREAM_THROTTLE(
+        100, "SOC: " << battery_soc << ", Batt Th: " << BATT_SOC_TH);
     stat.add("Battery", battery_soc);
     stat.add("Battery_TH", BATT_SOC_TH);
   }
