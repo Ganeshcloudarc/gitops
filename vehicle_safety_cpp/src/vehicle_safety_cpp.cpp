@@ -159,7 +159,7 @@ class VehicleSafety {
     can_data_sub =
         nh.subscribe("vehicle_info", 1, &VehicleSafety::can_data_cb, this);
 
-    nh.getParam("/vehicle_safety/no_go_zone_coordinates", no_go_zone_coords_xmlrpc);
+    // nh.getParam("/vehicle_safety/no_go_zone_coordinates", no_go_zone_coords_xmlrpc);
   }
 
   void is_curve_cb(const std_msgs::Bool &msg) {
@@ -294,6 +294,7 @@ class VehicleSafety {
   }
 
   void global_gps_callback(const sensor_msgs::NavSatFix &msg) {
+    nh.getParam("/vehicle_safety/no_go_zone_coordinates", no_go_zone_coords_xmlrpc);
     cov_value = msg.position_covariance;
     double lat = msg.latitude;
     double lon = msg.longitude;
@@ -494,13 +495,13 @@ class VehicleSafety {
       diagnostic_updater::DiagnosticStatusWrapper &stat) {
     if (reset_geo_fence == 1) {
       if (use_geo_fence) {
-        if (is_inside_geo_fence) {
-          stat.summary(OK, "OK: Vehicle is inside geofence");
+        if (is_inside_geo_fence && !is_with_in_no_go_zone) {
+          stat.summary(OK, "OK: Vehicle is inside Go Zone");
           stat.add("Status", "OK");
         }
 
         else {
-          stat.summary(ERROR, "ERROR: Vehicle is outside of geofence");
+          stat.summary(ERROR, "ERROR: Vehicle is in No Go Zone");
           stat.add("Status", "STOP");
         }
       }

@@ -9,9 +9,9 @@ import rospy
 import rospy
 from std_msgs.msg import String, Bool
 from nav_msgs.msg import Path
-from scipy import spatial
-import scipy.spatial
-from scipy.spatial import distance
+# from scipy import spatial
+# import scipy.spatial
+# from scipy.spatial import distance
 from nav_msgs.msg import Odometry
 from matplotlib.animation import FuncAnimation
 
