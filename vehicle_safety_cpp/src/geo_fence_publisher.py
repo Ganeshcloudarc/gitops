@@ -46,7 +46,7 @@ class geoFencePub:
                     point.x, point.y = ll2xy(lat, lon,home_lat , home_long)
                     polygon_st.polygon.points.append(point)
                 self.geo_polygon_pub.publish(polygon_st)
-            print("Published")
+            rospy.loginfo("Published Geofence")
 
 if __name__ == "__main__":
     rospy.init_node('geo_fence_publisher')
