@@ -3,7 +3,7 @@
 import numpy as np
 from numpy import random
 import numpy
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import rospy
 # from RDP import rdp
 import rospy
@@ -13,7 +13,7 @@ from nav_msgs.msg import Path
 # import scipy.spatial
 # from scipy.spatial import distance
 from nav_msgs.msg import Odometry
-from matplotlib.animation import FuncAnimation
+# from matplotlib.animation import FuncAnimation
 
 line = []
 # https://stackoverflow.com/questions/14631776/calculate-turning-points-pivot-points-in-trajectory-path
