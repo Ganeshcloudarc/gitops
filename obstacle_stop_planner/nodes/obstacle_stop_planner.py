@@ -10,7 +10,7 @@ try:
     import numpy as np
     from sklearn.neighbors import KDTree
     import copy
-    # import ros_numpy
+    import ros_numpy
     import rospy
     import tf2_ros
     import time
