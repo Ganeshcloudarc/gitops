@@ -261,7 +261,7 @@ class ObstacleStopPlanner:
                             else:
                                 pass
                         except Exception as e:
-                            rospy.logerr(f"Error in find_close_object", e)
+                            rospy.logerr(f"Error in find_close_object: {e}")
 
             collision_index = ind
             collision_points = list(collision_points[0])
