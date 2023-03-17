@@ -10,7 +10,7 @@ try:
     import numpy as np
     from sklearn.neighbors import KDTree
     import copy
-    import ros_numpy
+    # import ros_numpy
     import rospy
     import tf2_ros
     import time
@@ -255,13 +255,14 @@ class ObstacleStopPlanner:
                             close_bbx_id, close_dis = self.find_close_object(self.bboxes,
                                                                             [path_pose.position.x, path_pose.position.y])
                             self.publish_bbox(self.bboxes.boxes[close_bbx_id])
-                        except:
-                            pass
-                        if close_dis < self._radius_to_search:
-                            obstacle_found = True
-                            break
-                        else:
-                            pass
+                            if close_dis < self._radius_to_search:
+                                obstacle_found = True
+                                break
+                            else:
+                                pass
+                        except Exception as e:
+                            rospy.logerr(f"Error in find_close_object", e)
+
             collision_index = ind
             collision_points = list(collision_points[0])
             print("self.index_old after loop", self._close_idx)
