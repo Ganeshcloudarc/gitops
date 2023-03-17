@@ -420,7 +420,7 @@ class ObstacleStopPlanner:
         returns minimum  distance to the point
         """
         # print("box", box)
-        box_list = bbox_to_corners(box)
+        # box_list = bbox_to_corners(box)
         dis_list = []
         # print("point", point)
         # print("first", point[0])
