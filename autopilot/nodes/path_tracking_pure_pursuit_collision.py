@@ -35,6 +35,8 @@ except Exception as e:
     rospy.logerr("No module %s", str(e))
     exit(e)
 
+def getLineNumber():
+    return sys._getframe().f_back.f_lineno
 
 class PurePursuitController:
     def __init__(self):
@@ -64,6 +66,7 @@ class PurePursuitController:
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
 
         failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
+        self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
 
         if failsafe_enable:
             cmd_topic = rospy.get_param("patrol/cmd_topic", "/vehicle/cmd_drive_safe")
@@ -192,7 +195,27 @@ class PurePursuitController:
                 #     self.send_ack_msg(steering_angle, speed, 0)
                 target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
                 alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
-
+                
+                if self.allow_reversing:
+                    dot_vector = self.findLookaheadPos(robot_pose,target_pose)
+                    # print(dot_vector)
+                    try:
+                        if dot_vector > 0:
+                            self.is_reverse = False
+                            rospy.loginfo_throttle(10,"Forward")
+                        elif dot_vector < 0:
+                            self.is_reverse = True
+                            rospy.loginfo_throttle(10,"Reverse")
+                        elif dot_vector == 0:
+                            rospy.logerr("Stopping the Robot")
+                            self.send_ack_msg(0, 0, 0)
+                        else:
+                            pass
+                    except Exception as e:
+                        rospy.logwarn(f'WARN : {rospy.get_name()}, {getLineNumber()}, {e}')
+                else:
+                    self.is_reverse = False                
+                
                 if self.is_pp_pid:
                     delta_degrees = self.pp_with_pid(lhd=lhd,alpha=alpha)
                     delta_degrees = math.degrees(delta_degrees)
@@ -317,6 +340,35 @@ class PurePursuitController:
     def gps_callback(self, data):
         self.gps_robot_state = data
 
+    def findLookaheadPos(self,robot_pose,lookAheadPose,reverse_threshold=0.1,stop_threshold=0.1):
+        # robot_pose = robot_pose.pose.pose
+        theta = get_yaw(robot_pose.orientation)
+        rx = robot_pose.position.x
+        ry = robot_pose.position.y
+        lx = lookAheadPose.pose.position.x
+        ly = lookAheadPose.pose.position.y
+        ruv_x,ruv_y = math.cos(theta), math.sin(theta)
+        # print(ruv_x,ruv_y)
+        # robot, lookahead x, robot, lookahead y
+        # rl_x, rl_y =  = x2-x1, y2-y1
+        rl_x = lx-rx
+        rl_y = ly-ry
+        a = [ruv_x,ruv_y]
+        b = [rl_x,rl_y]
+        # self.ruvDotvector = np.dot(a,b)
+        dot_product = np.dot(a,b)
+        
+        # Check conditions for reversing or stopping
+        distance = math.sqrt((lx-rx)**2 + (ly-ry)**2)
+        if dot_product < -reverse_threshold:
+            # Lookahead point is behind robot and threshold is exceeded - reverse
+            return -1
+        elif abs(dot_product) < stop_threshold and distance < stop_threshold:
+            # Robot has reached lookahead point - stop
+            return 0
+        else:
+            # Robot can continue moving forward
+            return 1
 
     def compute_lookahead_distance(self, robot_speed):
         # return 3
@@ -335,7 +387,10 @@ class PurePursuitController:
 
     def send_ack_msg(self, steering_angle, speed, jerk):
         self.ackermann_msg.steering_angle = steering_angle
-        self.ackermann_msg.speed = speed
+        if self.is_reverse:
+            self.ackermann_msg.speed = -speed
+        else:
+            self.ackermann_msg.speed = speed
         self.ackermann_msg.jerk = jerk
         self.ackermann_publisher.publish(self.ackermann_msg)
 

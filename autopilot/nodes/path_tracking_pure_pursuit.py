@@ -254,25 +254,7 @@ class PurePursuitController:
                 # else:
                 #     self.is_reverse = True
                 #     rospy.logerr("Reverse")
-            if self.allow_reversing:
-                dot_vector = self.findLookaheadPos(robot_pose,target_pose_msg)
-                # print(dot_vector)
-                try:
-                    if dot_vector > 0:
-                        self.is_reverse = False
-                        rospy.logwarn("Forward")
-                    elif dot_vector < 0:
-                        self.is_reverse = True
-                        rospy.logerr("Reverse")
-                    elif dot_vector == 0:
-                        rospy.logerr("Stopping the Robot")
-                        self.send_ack_msg(0, 0, 0)
-                    else:
-                        pass
-                except Exception as e:
-                    rospy.logwarn(f'WARN : {rospy.get_name()}, {getLineNumber()}, {e}')
-            else:
-                self.is_reverse = False
+            
             target_point_ind, lhd = self.find_target_index(robot_pose, self.index_old, lhd)
             close_point_ind = self.index_old
 
@@ -342,6 +324,26 @@ class PurePursuitController:
 
             target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
             alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
+           
+            if self.allow_reversing:
+                dot_vector = self.findLookaheadPos(robot_pose,target_pose_msg)
+                # print(dot_vector)
+                try:
+                    if dot_vector > 0:
+                        self.is_reverse = False
+                        rospy.loginfo_throttle(10,"Forward")
+                    elif dot_vector < 0:
+                        self.is_reverse = True
+                        rospy.loginfo_throttle(10,"Reverse")
+                    elif dot_vector == 0:
+                        rospy.logerr("Stopping the Robot")
+                        self.send_ack_msg(0, 0, 0)
+                    else:
+                        pass
+                except Exception as e:
+                    rospy.logwarn(f'WARN : {rospy.get_name()}, {getLineNumber()}, {e}')
+            else:
+                self.is_reverse = False
            
             if self.is_pp_pid:
                 delta_degrees = self.pp_with_pid(lhd=lhd,alpha=alpha)

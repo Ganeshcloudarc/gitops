@@ -19,7 +19,7 @@ try:
     # ros messages
     from nav_msgs.msg import Path, Odometry
     from jsk_recognition_msgs.msg import BoundingBoxArray
-    from zed_interfaces.msg import ObjectsStamped, Object
+    # from zed_interfaces.msg import ObjectsStamped, Object
     from geometry_msgs.msg import Point, PoseArray, Pose, TransformStamped, PoseStamped
     from visualization_msgs.msg import Marker, MarkerArray
     from std_msgs.msg import Float32MultiArray, Header
