@@ -13,18 +13,19 @@ class geoFencePub:
             '/geo_fence_polygon_2', gmsg.PolygonStamped, queue_size=1, latch=True)
         rospy.Subscriber('/mavros/global_position/set_gp_origin', GeoPointStamped,
                              self.home_position_callback)
-        if rospy.has_param('/vehicle_safety/no_go_zone_coordinates'):
-            self.no_go_geo_fence_coordinates = rospy.get_param('/vehicle_safety/no_go_zone_coordinates')
+        self.no_go_geo_fence_coordinates = None
                 
     def home_position_callback(self, data):
-            self.home_gps_location = {
-            'latitude': data.position.latitude,
-            'longitude': data.position.longitude,
-            'altitude': data.position.altitude
-            }
-            rospy.logdebug("home position data received %s",
-                        str(self.home_gps_location))
-            self.publish_geo_fence()
+        if rospy.has_param('/vehicle_safety/no_go_zone_coordinates'):
+            self.no_go_geo_fence_coordinates = rospy.get_param('/vehicle_safety/no_go_zone_coordinates')
+        self.home_gps_location = {
+        'latitude': data.position.latitude,
+        'longitude': data.position.longitude,
+        'altitude': data.position.altitude
+        }
+        rospy.logdebug("home position data received %s",
+                    str(self.home_gps_location))
+        self.publish_geo_fence()
 
     def publish_geo_fence(self):
         
