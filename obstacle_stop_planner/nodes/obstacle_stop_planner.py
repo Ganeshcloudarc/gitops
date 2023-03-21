@@ -248,20 +248,20 @@ class ObstacleStopPlanner:
                         if len(list(collision_points[0])) > 0:
                             obstacle_found = True
                             break
-                else:
-                    if len(self.bboxes.boxes) > 0:
+                    else:
+                        if len(self.bboxes.boxes) > 0:
 
-                        try:
-                            close_bbx_id, close_dis = self.find_close_object(self.bboxes,
-                                                                            [path_pose.position.x, path_pose.position.y])
-                            self.publish_bbox(self.bboxes.boxes[close_bbx_id])
-                            if close_dis < self._radius_to_search:
-                                obstacle_found = True
-                                break
-                            else:
-                                pass
-                        except Exception as e:
-                            rospy.logerr(f"Error in find_close_object: {e}")
+                            try:
+                                close_bbx_id, close_dis = self.find_close_object(self.bboxes,
+                                                                                [path_pose.position.x, path_pose.position.y])
+                                self.publish_bbox(self.bboxes.boxes[close_bbx_id])
+                                if close_dis < self._radius_to_search:
+                                    obstacle_found = True
+                                    break
+                                else:
+                                    pass
+                            except Exception as e:
+                                rospy.logerr(f"Error in find_close_object: {e}")
 
             collision_index = ind
             collision_points = list(collision_points[0])
@@ -409,8 +409,9 @@ class ObstacleStopPlanner:
 
     def find_close_object(self, bboxes, point):
         dis_list = []
-        for bbox in bboxes.boxes:
-            dis = self.min_distance_to_object(bbox, point)
+        for box in bboxes.boxes:
+            # dis = self.min_distance_to_object(bbox, point)
+            dis = math.hypot((point[0] - box.pose.position.x) ** 2 + (point[1] - box.pose.position.y) ** 2)
             dis_list.append(dis)
         close_bbox_id = np.argmin(dis_list)
         return close_bbox_id, dis_list[close_bbox_id]
