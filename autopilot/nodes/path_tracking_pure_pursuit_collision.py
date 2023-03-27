@@ -11,7 +11,7 @@ try:
     import rospy
     import tf2_ros
     import time
-
+    import sys
     # ros messages
     from nav_msgs.msg import Path, Odometry
     from geometry_msgs.msg import Point, PoseArray, PoseStamped
