@@ -131,7 +131,7 @@ class SaveWayPoints:
     
     def vehicle_safety_diagnose_cb(self, data):
         for field in data.status:
-            if field.name == "vehicle_safety_diagnostics: GPS":
+            if "GPS" in field.name:
                 if field.level == ERROR:
                     self.RTK_fail_status = True
                 else:
