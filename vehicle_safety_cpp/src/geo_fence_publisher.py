@@ -9,7 +9,14 @@ from geographic_msgs.msg import GeoPointStamped
 class geoFencePub:
     def __init__(self):
         self.home_gps_location = False
-        self.geo_polygon_pub = rospy.Publisher(
+        self.use_geo_fence = rospy.get_param(
+            '/vehicle_safety/use_geo_fence', False)
+        self.geo_fence_coordinates = rospy.get_param(
+            '/vehicle_safety/geo_fence_coordinates')
+        if self.use_geo_fence:
+            self.geofence_polygon_pub = rospy.Publisher(
+                '/geo_fence_polygon', gmsg.PolygonStamped, queue_size=1, latch=True)
+        self.nogozone_polygon_pub = rospy.Publisher(
             '/geo_fence_polygon_2', gmsg.PolygonStamped, queue_size=1, latch=True)
         rospy.Subscriber('/mavros/global_position/set_gp_origin', GeoPointStamped,
                              self.home_position_callback)
@@ -37,6 +44,16 @@ class geoFencePub:
             home_lat = self.home_gps_location['latitude']
             home_long = self.home_gps_location['longitude']
 
+            for lat, lon in self.geo_fence_coordinates:
+                point = gmsg.Point()
+                point.x, point.y = ll2xy(lat, lon, home_lat, home_long)
+                polygon_st.polygon.points.append(point)
+            self.geofence_polygon_pub.publish(polygon_st)
+            rospy.loginfo("geo fence is published")
+            
+            polygon_st = gmsg.PolygonStamped() #reset the polygon
+            polygon_st.header.frame_id = 'map'
+            
             # print(no_go_geo_fence_coordinates[0])
             for i in self.no_go_geo_fence_coordinates:
                 print(i)
@@ -46,7 +63,7 @@ class geoFencePub:
                     point = gmsg.Point()
                     point.x, point.y = ll2xy(lat, lon,home_lat , home_long)
                     polygon_st.polygon.points.append(point)
-                self.geo_polygon_pub.publish(polygon_st)
+                self.nogozone_polygon_pub.publish(polygon_st)
             rospy.loginfo("Published Geofence")
 
 if __name__ == "__main__":
