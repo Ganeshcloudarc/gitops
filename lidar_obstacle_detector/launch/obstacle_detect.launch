@@ -4,9 +4,9 @@
  <!-- <arg name="points_in"  default="/zed2i/zed_node/point_cloud/cloud_registered"/> -->
  <arg name="config_file" default="rs_lidar_config.yaml"/>
  <!-- <arg name="config_file" default="zed_config.yaml"/> -->
- <arg name="rqt_reconfigure" default="false"/>
+ <arg name="rqt_reconfigure" default="true"/>
 
- <arg name="bbox_target_frame" default="map"/>
+ <arg name="bbox_target_frame" default="rslidar"/>
  <arg name="rviz" default="true"/>
 
   <node name="obstacle_detector_node" pkg="lidar_obstacle_detector" type="obstacle_detector_node" output="screen">
