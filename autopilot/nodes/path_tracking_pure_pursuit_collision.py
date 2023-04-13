@@ -51,12 +51,16 @@ class PurePursuitController:
         #PID parameters
         self.cte = 0
         self.sumCTE = 0
+        self.is_reverse = False
 
         self.is_pp_pid = rospy.get_param("/pp_with_pid",False)
 
         # ros parameters
+        self.max_speed = rospy.get_param("/patrol/max_forward_speed", 1.8) # default value of max speed is max forward speed.
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
+        self.max_backward_speed = abs(rospy.get_param("/patrol/max_backward_speed",1.0)) # doing abs() as reversing uses same logic as forward wrt to speed
+        self.min_backward_speed = abs(rospy.get_param("/patrol/min_backward_speed",0.8))
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
         self.time_out_from_input_trajectory = rospy.get_param("/pure_pursuit/time_out", 3)
@@ -203,9 +207,11 @@ class PurePursuitController:
                         if dot_vector > 0:
                             self.is_reverse = False
                             rospy.loginfo_throttle(10,"Forward")
+                            rospy.logwarn("forward")
                         elif dot_vector < 0:
                             self.is_reverse = True
                             rospy.loginfo_throttle(10,"Reverse")
+                            rospy.logerr("reverse")
                         elif dot_vector == 0:
                             rospy.logerr("Stopping the Robot")
                             self.send_ack_msg(0, 0, 0)
@@ -227,7 +233,10 @@ class PurePursuitController:
                 # delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
                 # delta_degrees = math.degrees(delta)
                 steering_angle = np.clip(delta_degrees, -30, 30)
-                speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
+                if self.is_reverse:
+                    speed = min(self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps, self.max_backward_speed) # To avoid max speed from path_publisher.
+                else:
+                    speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
                 rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
                 rospy.loginfo('lhd: %s, alpha: %s , robot_speed: %s ', str(lhd), str(alpha), str(self.robot_speed))
                 if speed <= 0:
@@ -374,8 +383,12 @@ class PurePursuitController:
         # return 3
         # return self.min_look_ahead_dis
         # https://github.com/bosonrobotics/autopilot_boson/issues/22
-        if robot_speed > self.max_forward_speed:
-            lhd = (robot_speed * self.min_look_ahead_dis) / self.max_forward_speed
+        if self.is_reverse:
+            self.max_speed = self.max_backward_speed
+        else:
+            self.max_speed = self.max_forward_speed
+        if robot_speed > self.max_speed:
+            lhd = (robot_speed * self.min_look_ahead_dis) / self.max_speed
             if self.min_look_ahead_dis <= lhd <= self.max_look_ahead_dis:
                 return lhd
             elif lhd <= self.min_look_ahead_dis:
