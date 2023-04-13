@@ -8,9 +8,9 @@ import rospy
 import rospy
 from std_msgs.msg import String
 from nav_msgs.msg import Path
-from scipy import spatial
-import scipy.spatial
-from scipy.spatial import distance
+# from scipy import spatial
+# import scipy.spatial
+# from scipy.spatial import distance
 from nav_msgs.msg import Odometry
 
 line = []
