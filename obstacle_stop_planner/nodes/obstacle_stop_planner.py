@@ -18,13 +18,13 @@ try:
 
     # ros messages
     from nav_msgs.msg import Path, Odometry
-    from jsk_recognition_msgs.msg import BoundingBoxArray
+    from jsk_recognition_msgs.msg import BoundingBoxArray,BoundingBox
     from zed_interfaces.msg import ObjectsStamped, Object
-    from geometry_msgs.msg import Point, PoseArray, Pose, TransformStamped, PoseStamped
     from visualization_msgs.msg import Marker, MarkerArray
     from std_msgs.msg import Float32MultiArray, Header
     from sensor_msgs.msg import PointCloud2, LaserScan
     from std_msgs.msg import Float32
+    from geometry_msgs.msg import Point, PoseArray, Pose, TransformStamped, PoseStamped, Polygon, PolygonStamped
 
     # utils
     from laser_geometry import LaserProjection
@@ -34,7 +34,7 @@ try:
     from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 
     # autopilot related imports
-    from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud
+    from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud, bbox_to_corners, transform_lidar_objects
     from autopilot_utils.pose_helper import distance_btw_poses, get_yaw
     from autopilot_utils.trajectory_smoother import TrajectorySmoother
     from vehicle_common.vehicle_config import vehicle_data
@@ -44,10 +44,8 @@ try:
 
 except Exception as e:
     import rospy
-
     rospy.logerr("Module error %s", str(e))
     exit()
-
 
 def min_distance_to_object(pose, corners):
     dist_list = []
@@ -114,6 +112,12 @@ class ObstacleStopPlanner:
         rospy.Subscriber(global_traj_topic, Trajectory, self.global_traj_callback)
         rospy.Subscriber(scan_topic, LaserScan, self.scan_callback, queue_size=1)
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
+        self.use_pcl_boxes = rospy.get_param("use_pcl_boxes", False)
+        if self.use_pcl_boxes:
+            rospy.Subscriber("/filtered_detector/jsk_bboxes", BoundingBoxArray, self.pcl_bboxes_callback)
+            self.bbox_pub = rospy.Publisher("collision_bbox", BoundingBox, queue_size=1)
+            # self.box_corner_pub = rospy.Publisher("corner_boxes", PolygonStamped, queue_size=1)
+            self.collision_points_polygon = rospy.Publisher("collision_points_polygon", PolygonStamped, queue_size=1)
 
         # ros publishers
         local_traj_in_topic = rospy.get_param("obstacle_stop_planner/traj_out", "local_gps_trajectory")
@@ -138,11 +142,18 @@ class ObstacleStopPlanner:
 
             if self.scan_data_received and self._traj_manager.get_len() > 0 and self.robot_pose:
                 rospy.loginfo("scan data, global path and robot_pose  are received")
-                break
+                if self.use_pcl_boxes:
+                    if self.bboxes:
+                        rospy.loginfo("bonding boxes are received")
+                        break
+                    else:
+                        rospy.logwarn("waiting for bounding boxes")
+                else:
+                    break
             else:
                 rospy.logwarn(
                     f"waiting for data  scan :{self.scan_data_received}, global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
-                rate.sleep()
+            rate.sleep()
 
         rate = rospy.Rate(100)
         while not rospy.is_shutdown():
@@ -200,11 +211,12 @@ class ObstacleStopPlanner:
                     rate.sleep()
 
                     break
-            try:
-                kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
-            except:
-                rospy.logerr("Could not fill KDtree")
-                pass
+            if not self.use_pcl_boxes:
+                try:
+                    kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
+                except:
+                    rospy.logerr("Could not fill KDtree")
+                    pass
                 # rate.sleep()
                 # continue
             prev_processed_ind = self._close_idx
@@ -226,15 +238,31 @@ class ObstacleStopPlanner:
                         self._traj_in.points[prev_processed_ind].accumulated_distance_m > self._radius_to_search / 2:
 
                     path_pose = self._traj_in.points[ind].pose
-                    pose_xy = np.array([[path_pose.position.x, path_pose.position.y]])  # , path_pose.position.z]])
-                    try:
-                        collision_points = kd_tree.query_radius(pose_xy, r=self._radius_to_search)
-                        prev_processed_ind = ind
-                    except Exception as error:
-                        rospy.logwarn(f"could not query KD tree,{error}")
-                    if len(list(collision_points[0])) > 0:
-                        obstacle_found = True
-                        break
+                    if not self.use_pcl_boxes:
+                        pose_xy = np.array([[path_pose.position.x, path_pose.position.y]])  # , path_pose.position.z]])
+                        try:
+                            collision_points = kd_tree.query_radius(pose_xy, r=self._radius_to_search)
+                            prev_processed_ind = ind
+                        except Exception as error:
+                            rospy.logwarn(f"could not query KD tree,{error}")
+                        if len(list(collision_points[0])) > 0:
+                            obstacle_found = True
+                            break
+                    else:
+                        if len(self.bboxes.boxes) > 0:
+
+                            try:
+                                close_bbx_id, close_dis = self.find_close_object(self.bboxes,
+                                                                                [path_pose.position.x, path_pose.position.y])
+                                self.publish_bbox(self.bboxes.boxes[close_bbx_id])
+                                if close_dis < self._radius_to_search:
+                                    obstacle_found = True
+                                    break
+                                else:
+                                    pass
+                            except Exception as e:
+                                rospy.logerr(f"Error in find_close_object: {e}")
+
             collision_index = ind
             collision_points = list(collision_points[0])
             print("self.index_old after loop", self._close_idx)
@@ -339,6 +367,72 @@ class ObstacleStopPlanner:
         self._traj_manager.update(data)
         self._traj_end_index = self._traj_manager.get_len()
 
+    def pcl_bboxes_callback(self, data):
+        if data.header.frame_id == "map":
+            self.bboxes = data
+            # self.publish_bboxs(self.bboxes)
+        else:
+            self.bboxes = transform_lidar_objects(data, "map")
+            rospy.logwarn("Bounding boxes are in  map frame")
+
+    def publish_bbox(self, bbox):
+        polygon = PolygonStamped()
+        polygon.header.frame_id = "map"
+        box_list = bbox_to_corners(bbox)
+        for x, y in box_list:
+            pt = Point()
+            pt.x = x
+            pt.y = y
+            polygon.polygon.points.append(pt)
+        pt = Point()
+        pt.x = box_list[0][0]
+        pt.y = box_list[0][1]
+        polygon.polygon.points.append(pt)
+        self.collision_points_polygon.publish(polygon)
+
+    def publish_bboxs(self, bboxes):
+        polygon = PolygonStamped()
+        polygon.header.frame_id = "map"
+        for bbox in bboxes.boxes:
+            box_list = bbox_to_corners(bbox)
+
+            for x, y in box_list:
+                pt = Point()
+                pt.x = x
+                pt.y = y
+                polygon.polygon.points.append(pt)
+            pt = Point()
+            pt.x = box_list[0][0]
+            pt.y = box_list[0][1]
+            polygon.polygon.points.append(pt)
+        self.box_corner_pub.publish(polygon)
+
+    def find_close_object(self, bboxes, point):
+        dis_list = []
+        for box in bboxes.boxes:
+            # dis = self.min_distance_to_object(bbox, point)
+            dis = math.hypot((point[0] - box.pose.position.x) ** 2 + (point[1] - box.pose.position.y) ** 2)
+            dis_list.append(dis)
+        close_bbox_id = np.argmin(dis_list)
+        return close_bbox_id, dis_list[close_bbox_id]
+
+    def min_distance_to_object(self, box, point):
+        """f
+        returns minimum  distance to the point
+        """
+        # print("box", box)
+        # box_list = bbox_to_corners(box)
+        dis_list = []
+        # print("point", point)
+        # print("first", point[0])
+        dis = math.hypot((point[0] - box.pose.position.x) ** 2 + (point[1] - box.pose.position.y) ** 2)
+        dis_list.append(dis)
+        # for x, y in box_list:
+        #     dis = math.hypot((point[0] - x) ** 2 + (point[1] - y) ** 2)
+        #     dis_list.append(dis)
+        # print("dis_LIST: <dis_list)
+        return min(dis_list)
+    
     def find_close_point(self, robot_pose, old_close_index):
         close_dis = distance_btw_poses(robot_pose, self.traj_in.points[old_close_index].pose)
         for ind in range(old_close_index + 1, self.traj_end_index):

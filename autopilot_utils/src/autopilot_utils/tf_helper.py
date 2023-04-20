@@ -299,7 +299,7 @@ def transform_lidar_objects(bbox_arr_data, to_frame):
         return None, None
     for i in range(len(bbox_arr_data.boxes)):
         bbox_arr_data.boxes[i].pose = \
-            tf2_geometry_msgs.do_transform_pose(gmsg.PoseStamped(pose=bbox_arr_data.boxes[i].pose), trans)
+            tf2_geometry_msgs.do_transform_pose(gmsg.PoseStamped(pose=bbox_arr_data.boxes[i].pose), trans).pose
         bbox_arr_data.boxes[i].header.frame_id = to_frame
     bbox_arr_data.header.frame_id = to_frame
     bbox_arr_data.header.stamp = rospy.Time.now()
@@ -325,11 +325,11 @@ def bbox_to_corners(bbox):
     for x_, y_ in trans_list:
         # print(x_)
         pt = gmsg.Point()
-        pt.x = bbox.pose.position.x + x_ * bbox.dimensions[0]
-        pt.y = bbox.pose.position.y + y_ * bbox.dimensions[1]
+        pt.x = bbox.pose.position.x + x_ * bbox.dimensions.x
+        pt.y = bbox.pose.position.y + y_ * bbox.dimensions.y
         # print("x", pt.x)
         # print("x", type(pt.y))
-        print(np.array([pt.x, pt.y]))
+        # print(np.array([pt.x, pt.y]))
         result = np.dot(R, np.array([pt.x, pt.y]))
         corners_list.append(result)
     return corners_list
