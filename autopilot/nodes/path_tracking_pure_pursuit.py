@@ -373,6 +373,7 @@ class PurePursuitController:
             elif self.is_reverse:
                 speed = -min(self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps, self.max_backward_speed) # To avoid max speed from path_publisher.
                 log_tracking_message = f'Tracking path in Reverse with speed {speed}'
+                self.send_ack_msg(steering_angle, speed, 0)
             else:
                 speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
                 log_tracking_message = f'Tracking path in Forward with speed {speed}'
