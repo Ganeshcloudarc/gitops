@@ -331,7 +331,7 @@ class PurePursuitController:
             alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
            
             dot_vector = self.findLookaheadPos(robot_pose,target_pose_msg)
-            rospy.logwarn(dot_vector)
+            # rospy.logwarn(dot_vector)
             try:
                 if dot_vector > 0:
                     self.is_reverse = False
