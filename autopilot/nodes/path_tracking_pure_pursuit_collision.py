@@ -204,7 +204,7 @@ class PurePursuitController:
                 target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
                 alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
                 
-                dot_vector = self.findLookaheadPos(robot_pose, target_pose_msg)
+                dot_vector = self.findLookaheadPos(robot_pose, target_pose)
 
                 if dot_vector > 0:
                     self.is_reverse = False
