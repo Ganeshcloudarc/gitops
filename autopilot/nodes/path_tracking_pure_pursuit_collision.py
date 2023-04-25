@@ -204,33 +204,24 @@ class PurePursuitController:
                 target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
                 alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
                 
-                dot_vector = self.findLookaheadPos(robot_pose,target_pose_msg)
-                # rospy.logwarn(dot_vector)
-                try:
-                    if dot_vector > 0:
-                        self.is_reverse = False
-                        rospy.loginfo_throttle(10,"Forward")
-                    elif dot_vector < 0:
-                        self.is_reverse = True
-                        rospy.loginfo_throttle(10,"Reverse")
-                    elif dot_vector == 0:
-                        rospy.logerr("Stopping the Robot")
-                        self.send_ack_msg(0, 0, 0)
-                    else:
-                        pass
-                except Exception as e:
-                    rospy.logwarn(f'WARN : {rospy.get_name()}, {getLineNumber()}, {e}')
-                
-                if self.is_reverse and not self.allow_reversing:
+                dot_vector = self.findLookaheadPos(robot_pose, target_pose_msg)
+
+                if dot_vector > 0:
                     self.is_reverse = False
-                    stop_on_command = True
-                    rospy.logerr_throttle(10,"allow_reversing flag not set. Stopping the Robot")
-                    log_tracking_message = "allow_reversing flag not set. Stopping the Robot"
-                    
-                elif self.is_reverse and self.allow_reversing:
-                    self.is_reverse = True
+                    rospy.loginfo_throttle(10, "Forward")
+                elif dot_vector < 0:
+                    if self.allow_reversing: # safety check to stop on reverse conditions when allow_reversing is set to false.
+                        self.is_reverse = True
+                        rospy.loginfo_throttle(10, "Reverse")
+                    else:
+                        self.is_reverse = False
+                        stop_on_command = True
+                elif dot_vector == 0:
+                    rospy.logerr("Stopping the Robot")
+                    self.send_ack_msg(0, 0, 0)
+                    self.is_reverse = False
                 else:
-                    self.is_reverse = False                
+                    pass              
                 
                 if self.is_pp_pid:
                     delta_degrees = self.pp_with_pid(lhd=lhd,alpha=alpha)
@@ -245,10 +236,13 @@ class PurePursuitController:
                 steering_angle = np.clip(delta_degrees, -30, 30)
                 if stop_on_command:
                     speed = 0
+                    log_tracking_message = "allow_reversing flag not set. Stopping the Robot"
+                    rospy.logerr_throttle(10, "allow_reversing flag not set. Stopping the Robot")
                     self.send_ack_msg(steering_angle, speed, 1)
                 elif self.is_reverse:
                     speed = -min(self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps, self.max_backward_speed) # To avoid max speed from path_publisher.
                     log_tracking_message = f'Tracking path in Reverse with speed {speed}'
+                    self.send_ack_msg(steering_angle, speed, 0)
                 else:
                     speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
                     log_tracking_message = f'Tracking path in Forward with speed {speed}'
