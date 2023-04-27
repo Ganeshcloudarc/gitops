@@ -206,7 +206,7 @@ class PurePursuitController:
                 
                 dot_vector = self.findLookaheadPos(robot_pose, target_pose)
 
-                if dot_vector > 0:
+                if dot_vector >= 0:
                     self.is_reverse = False
                     rospy.loginfo_throttle(10, "Forward")
                 elif dot_vector < 0:
@@ -216,10 +216,10 @@ class PurePursuitController:
                     else:
                         self.is_reverse = False
                         stop_on_command = True
-                elif dot_vector == 0:
-                    rospy.logerr("Stopping the Robot")
-                    self.send_ack_msg(0, 0, 0)
-                    self.is_reverse = False
+                # elif dot_vector == 0:
+                #     rospy.logerr("Stopping the Robot")
+                #     self.send_ack_msg(0, 0, 0)
+                #     self.is_reverse = False
                 else:
                     pass              
                 
@@ -377,16 +377,17 @@ class PurePursuitController:
         dot_product = np.dot(a,b)
         
         # Check conditions for reversing or stopping
-        distance = math.sqrt((lx-rx)**2 + (ly-ry)**2)
-        if dot_product < -reverse_threshold:
-            # Lookahead point is behind robot and threshold is exceeded - reverse
-            return -1
-        elif abs(dot_product) < stop_threshold and distance < stop_threshold:
-            # Robot has reached lookahead point - stop
-            return 0
-        else:
-            # Robot can continue moving forward
-            return 1
+        # distance = math.sqrt((lx-rx)**2 + (ly-ry)**2)
+        # if dot_product < -reverse_threshold:
+        #     # Lookahead point is behind robot and threshold is exceeded - reverse
+        #     return -1
+        # elif abs(dot_product) < stop_threshold and distance < stop_threshold:
+        #     # Robot has reached lookahead point - stop
+        #     return 0
+        # else:
+        #     # Robot can continue moving forward
+        #     return 1
+        return dot_product
 
     def compute_lookahead_distance(self, robot_speed):
         # return 3
