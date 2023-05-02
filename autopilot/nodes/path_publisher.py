@@ -35,7 +35,7 @@ class GlobalGpsPathPub:
         # parameters for path publisher
         self.max_forward_speed = rospy.get_param('/patrol/max_forward_speed', 1.5)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
-        distance_to_slowdown_on_endsdistance_to_slowdown_on_ends = rospy.get_param("/path_publisher/distance_to_slowdown_on_ends", 3)
+        distance_to_slowdown_on_ends = rospy.get_param("/path_publisher/distance_to_slowdown_on_ends", 3)
         self.mission_continue = rospy.get_param("patrol/mission_continue", True)
         self.max_dis_btw_points = rospy.get_param("path_publisher/max_dis_btw_points", 0.5)
         self.path_resolution = rospy.get_param("path_publisher/path_resolution", 0.1)
