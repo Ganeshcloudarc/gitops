@@ -99,40 +99,12 @@ class PurePursuitController:
 
         self.ackermann_msg = AckermannDrive()
 
-        trajectory_data, tf_data = None, None
-        rate = rospy.Rate(2)
-        while not rospy.is_shutdown():
-            if not trajectory_data:
-                try:
-                    trajectory_data = rospy.wait_for_message(trajectory_in_topic, Trajectory, timeout=1)
-                except:
-                    trajectory_data = None
-                    rospy.logwarn("Waiting for %s", str(trajectory_in_topic))
-                else:
-                    rospy.logdebug("Topic %s is active", str(trajectory_in_topic))
-            if not tf_data:
-                try:
-                    tf_data = current_robot_pose("map", self.robot_base_frame)
-                except:
-                    tf_data = None
-                    rospy.logwarn("Waiting for TF data between map and %s", self.robot_base_frame)
-                else:
-                    rospy.logdebug("TF data is available  between map and %s", self.robot_base_frame)
-
-            if trajectory_data and tf_data:
-                if trajectory_data.header.frame_id == "map":  # tf_data.header.frame_id:
-                    rospy.Subscriber(trajectory_in_topic, Trajectory, self.trajectory_callback)
-                    rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
-                    rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
-
-                    rospy.loginfo("data received on tf and %s ", trajectory_in_topic)
-                    break
-                else:
-                    rospy.logfatal('tf frames of path and odometry are not same: ')
-                    sys.exit('tf frames of path and odometry are not same"')
-            rate.sleep()
+        rospy.Subscriber(trajectory_in_topic, Trajectory, self.trajectory_callback)
+        rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
+        rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
+        rospy.logdebug(f"Subscriber initiated, {trajectory_in_topic} , {odom_topic}, {gps_topic}")
         time.sleep(1)
-
+        rate = rospy.Rate(1)
         while not rospy.is_shutdown():
             if self.trajectory_data and self.robot_state and self.gps_robot_state:
                 rospy.loginfo("trajectory_data and robot_state and gps_robot_state are available")
@@ -140,8 +112,6 @@ class PurePursuitController:
             else:
                 rospy.logwarn("waiting for trajectory_data or robot_state or gps_robot_state")
                 rate.sleep()
-        # rospy.Timer(rospy.Duration(0.0001), self.main_loop)
-        # rospy.Timer(rospy.Duration(0.1), self.timer)
         self.main_loop()
 
     def main_loop(self):
