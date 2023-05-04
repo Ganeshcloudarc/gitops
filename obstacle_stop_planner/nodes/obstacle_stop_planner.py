@@ -34,7 +34,7 @@ try:
     from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 
     # autopilot related imports
-    from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud, bbox_to_corners, transform_lidar_objects
+    from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud, bbox_to_corners, transform_lidar_objects, transform_zed_objects
     from autopilot_utils.pose_helper import distance_btw_poses, get_yaw
     from autopilot_utils.trajectory_smoother import TrajectorySmoother
     from vehicle_common.vehicle_config import vehicle_data
@@ -57,6 +57,8 @@ def min_distance_to_object(pose, corners):
 
 class ObstacleStopPlanner:
     def __init__(self):
+        self.objects_number = None
+        self.zed_objects = None
         self._close_idx = None
         self._traj_in = None
         self._traj_end_index = None
@@ -104,7 +106,8 @@ class ObstacleStopPlanner:
         self._radius_to_search = vehicle_data.dimensions.overall_width / 2 + radial_off_set_to_vehicle_width
 
         self._base_to_front = vehicle_data.dimensions.wheel_base + vehicle_data.dimensions.front_overhang
-
+        self.use_zed_detections = rospy.get_param("obstacle_stop_planner/use_zed_object_detection", True)
+        self.zed_objects_topic = rospy.get_param("obstacle_stop_planner/zed_object_topic", "/zed2/zed_node/obj_det/objects")
         # ros subscribers
         global_traj_topic = rospy.get_param("obstacle_stop_planner/traj_in", "global_gps_trajectory")
         scan_topic = rospy.get_param("obstacle_stop_planner/scan_in", "laser_scan")
@@ -118,8 +121,11 @@ class ObstacleStopPlanner:
             self.bbox_pub = rospy.Publisher("collision_bbox", BoundingBox, queue_size=1)
             # self.box_corner_pub = rospy.Publisher("corner_boxes", PolygonStamped, queue_size=1)
             self.collision_points_polygon = rospy.Publisher("collision_points_polygon", PolygonStamped, queue_size=1)
-
+        if self.use_zed_detections:
+            rospy.logdebug("Runnign zed Obs")
+            rospy.Subscriber(self.zed_objects_topic, ObjectsStamped, self.zed_objects_callback, queue_size=1)
         # ros publishers
+        self.transformed_zed_objects_publisher = rospy.Publisher('/obstacle_stop_planner/transformed_zed_obj', ObjectsStamped, queue_size=1)
         local_traj_in_topic = rospy.get_param("obstacle_stop_planner/traj_out", "local_gps_trajectory")
         self.local_traj_publisher = rospy.Publisher(local_traj_in_topic, Trajectory, queue_size=10)
         self.collision_points_publisher = rospy.Publisher('obstacle_stop_planner/collision_points', PointCloud2,
@@ -238,6 +244,19 @@ class ObstacleStopPlanner:
                         self._traj_in.points[prev_processed_ind].accumulated_distance_m > self._radius_to_search / 2:
 
                     path_pose = self._traj_in.points[ind].pose
+                    if self.use_zed_detections:
+                        close_obj_from_zed = self.find_close_object_zed(self.zed_objects, [path_pose.position.x, path_pose.position.y])
+                        # rospy.logerr(f'------------ZED OBS DIST -----------------{close_obj_from_zed}')
+                        try:
+                            
+                            if close_obj_from_zed < self._radius_to_search:
+                                rospy.logerr_throttle(10,f'------------Obstacle found on Camera -----------------{close_obj_from_zed}')
+                                obstacle_found = True
+                                break
+                            else:
+                                pass
+                        except TypeError as t:
+                            rospy.logerr_throttle(10, "empty data from zed")
                     if not self.use_pcl_boxes:
                         pose_xy = np.array([[path_pose.position.x, path_pose.position.y]])  # , path_pose.position.z]])
                         try:
@@ -338,6 +357,47 @@ class ObstacleStopPlanner:
         self.robot_head_pose.position.y = data.pose.pose.position.y + self._base_to_front * np.sin(pose_heading)
         self.robot_head_pose.position.z = data.pose.pose.position.z
         self.robot_head_pose.orientation = data.pose.pose.orientation
+        
+    def zed_objects_callback(self, data):
+        data_in_map_frame = None
+        # for i in data.objects:
+        #     print(i)
+        if data.header.frame_id == "map":
+            data_in_map_frame = data
+        else:
+            data_in_map_frame = transform_zed_objects(data, "map")
+        # data_in_map_frame = data
+        # self.zed_objects = data
+        if data_in_map_frame is not None:
+            self.transformed_zed_objects_publisher.publish(data_in_map_frame)
+            self.zed_objects = data_in_map_frame
+
+    def find_close_object_zed(self, objects, point):
+        zed_obs_dis_data = []
+        zed_obs_dis_data_min = None
+        '''
+        the axes are defined according to the ROS standard: X Forward, Y LEFT, Z UP, so the distance of an object from the camera is on the X axis.
+        The position of the object is the centroid of the positions off all the 3D points that compose the object itself.
+        In case of partial object detection the centroid is calculated according to the visible data, if the tracking is active and the partial object matches an previously seen object, the centroid position is "smoothed".
+        '''
+        for object in objects.objects:
+            # rospy.logerr(f'{object.position[0]},{object.position[1]},{object.label}, {point[0]},{point[1]}')
+            # rospy.logerr(f'{object.label}')
+            dis = math.hypot((point[0] - object.position[0]) ** 2 + (point[1] - object.position[1]) ** 2)
+            zed_obs_dis_data.append(dis)
+            try:
+                # rospy.logwarn(f'distances : {zed_obs_dis_data}')
+                zed_obs_dis_data_min = np.argmin(zed_obs_dis_data)
+            except Exception as e:
+                rospy.logerr(f'Exception from find_close_obj_zed {e}')
+                
+        self.objects_number = len(objects.objects)
+        # rospy.logwarn(f'no of objects: {self.objects_number}')
+        if zed_obs_dis_data_min is not None:
+            # rospy.logwarn(zed_obs_dis_data[zed_obs_dis_data_min])
+            return zed_obs_dis_data[zed_obs_dis_data_min]
+        else:
+            return float('inf')
 
     def scan_callback(self, data):
         start = time.time()
