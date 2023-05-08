@@ -116,6 +116,7 @@ class ObstacleStopPlanner:
         rospy.Subscriber(scan_topic, LaserScan, self.scan_callback, queue_size=1)
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
         self.use_pcl_boxes = rospy.get_param("use_pcl_boxes", False)
+        self.use_obs_v1 = rospy.get_param("/patrol/enable_obs_v1", True)
         if self.use_pcl_boxes:
             rospy.Subscriber("/filtered_detector/jsk_bboxes", BoundingBoxArray, self.pcl_bboxes_callback)
             self.bbox_pub = rospy.Publisher("collision_bbox", BoundingBox, queue_size=1)
@@ -245,6 +246,7 @@ class ObstacleStopPlanner:
 
                     path_pose = self._traj_in.points[ind].pose
                     if self.use_zed_detections:
+                        rospy.logdebug_once("RUNNING ZED")
                         close_obj_from_zed = self.find_close_object_zed(self.zed_objects, [path_pose.position.x, path_pose.position.y])
                         # rospy.logerr(f'------------ZED OBS DIST -----------------{close_obj_from_zed}')
                         try:
@@ -257,7 +259,8 @@ class ObstacleStopPlanner:
                                 pass
                         except TypeError as t:
                             rospy.logerr_throttle(10, "empty data from zed")
-                    if not self.use_pcl_boxes:
+                    if self.use_obs_v1:
+                        rospy.logdebug_once("RUNNING OBS V1")
                         pose_xy = np.array([[path_pose.position.x, path_pose.position.y]])  # , path_pose.position.z]])
                         try:
                             collision_points = kd_tree.query_radius(pose_xy, r=self._radius_to_search)
@@ -267,7 +270,8 @@ class ObstacleStopPlanner:
                         if len(list(collision_points[0])) > 0:
                             obstacle_found = True
                             break
-                    else:
+                    if self.use_pcl_boxes:
+                        rospy.logdebug_once("RUNNING OBS V2")
                         if len(self.bboxes.boxes) > 0:
 
                             try:

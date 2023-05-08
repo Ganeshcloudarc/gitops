@@ -10,8 +10,11 @@
     <arg name="failsafe_enable" default="false"/>
     <arg name="failsafe_enable_cpp" default="true"/>
     <arg name="obs_stop_planner" default="true"/>
+    <arg name="enable_zed_obs" default="true"/>
+    <arg name="enable_obs_v1" default="false"/>
+    <arg name="use_pcl_boxes" default="false"/>
+    <!-- OBS CONFIG END -->
     <arg name="pp_with_pid" default="true"/>
-    <arg name="use_pcl_boxes" default="true"/>
     <arg name="allow_reversing" default="true"/>
 
     <arg name="sensor_source" default='1' doc="1: Zed camera, 1: Rslidar, 2: carla"/>
@@ -31,7 +34,7 @@
     <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
     <param name='/patrol/odom_topic' value = 'vehicle/odom'/>
     <param name="/robot_base_frame" value ="base_link"/>
-
+    <param name="/patrol/enable_obs_v1" value="$(arg enable_obs_v1)"/>
  
     <group if="$(eval arg('hardware_in_loop'))">
        <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
@@ -69,6 +72,7 @@
         <include file="$(find obstacle_stop_planner)/launch/obstacle_stop_planner.launch">
             <arg name="mission_continue" value="$(arg mission_continue)"/>
             <arg name="use_pcl_boxes" value="$(arg use_pcl_boxes)"/>
+            <arg name="enable_zed_obs" value="$(arg enable_zed_obs)"/>
            <arg name="sensor_source" value="$(arg sensor_source)"/>
         </include>
         <node name="rviz_obstacle_stop_planner" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol_obstacle_stop_planner.rviz" if = "$(eval arg('rviz'))"/>
