@@ -107,7 +107,7 @@ class ObstacleStopPlanner:
 
         self._base_to_front = vehicle_data.dimensions.wheel_base + vehicle_data.dimensions.front_overhang
         self.use_zed_detections = rospy.get_param("obstacle_stop_planner/use_zed_object_detection", True)
-        self.zed_objects_topic = rospy.get_param("obstacle_stop_planner/zed_object_topic", "/zed2/zed_node/obj_det/objects")
+        self.zed_objects_topic = rospy.get_param("obstacle_stop_planner/zed_object_topic", "/zed2i/zed_node/obj_det/objects")
         # ros subscribers
         global_traj_topic = rospy.get_param("obstacle_stop_planner/traj_in", "global_gps_trajectory")
         scan_topic = rospy.get_param("obstacle_stop_planner/scan_in", "laser_scan")
