@@ -10,7 +10,6 @@
     <arg name="failsafe_enable" default="false"/>
     <arg name="failsafe_enable_cpp" default="true"/>
     <arg name="obs_stop_planner" default="true"/>
-    <arg name="camera_name" default="zed2i"/> <!--zed2-->
     <arg name="enable_zed_obs" default="true"/>
     <arg name="enable_obs_v1" default="false"/>
     <arg name="use_pcl_boxes" default="false"/>
@@ -42,7 +41,7 @@
            <arg name="vehicle_type" value="$(arg vehicle_type)"/>
             <arg name="vcu_up" default="false"/>
             <arg name="gps_up" default="false"/>
-            <arg name="zed_camera" value="false"/>
+            <arg name="zed_camera" value="$(arg enable_zed_obs)"/>
             <arg name="2d_lidar" value="false"/>
             <arg name="3d_lidar" value="$(arg obs_stop_planner)"/>
        </include>
@@ -124,11 +123,6 @@
             <arg name="vehicle_safety_diagnostics" default="false"/>
             <arg name="vehicle_safety_cpp_diagnostics" default="true"/>
             <arg name="use_emergeny_stop" value ="true"/>
-        </include>
-    </group>
-
-    <group if="$(eval arg('enable_zed_obs'))">
-        <include file="$(find zed_wrapper)/launch/$(arg camera_name).launch">
         </include>
     </group>
 </launch>
