@@ -146,34 +146,45 @@ class ObstacleStopPlanner:
         rate = rospy.Rate(1)
         while not rospy.is_shutdown():
             # robot_pose = current_robot_pose("map", self.robot_base_frame)
-
-            if self.scan_data_received and self._traj_manager.get_len() > 0 and self.robot_pose:
-                rospy.loginfo("scan data, global path and robot_pose  are received")
-                if self.use_pcl_boxes:
-                    if self.bboxes:
-                        rospy.loginfo("bonding boxes are received")
-                        break
+            if self._traj_manager.get_len() > 0 and self.robot_pose:
+                rospy.loginfo("global path and robot_pose are received")
+                if self.use_obs_v1 or self.use_pcl_boxes:
+                    if self.scan_data_received:# and self._traj_manager.get_len() > 0 and self.robot_pose:
+                        rospy.loginfo("scan data is received")
+                        if self.use_pcl_boxes:
+                            if self.bboxes:
+                                rospy.loginfo("bonding boxes are received")
+                                break
+                            else:
+                                rospy.logwarn("waiting for bounding boxes")
+                        else:
+                            break
                     else:
-                        rospy.logwarn("waiting for bounding boxes")
+                        rospy.logwarn(
+                            f"waiting for data  scan :{self.scan_data_received}")
                 else:
                     break
             else:
                 rospy.logwarn(
-                    f"waiting for data  scan :{self.scan_data_received}, global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
+                    f" waiting for global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
             rate.sleep()
 
         rate = rospy.Rate(100)
         while not rospy.is_shutdown():
             loop_start_time = time.time()
-            # checks whether data from sensors are updated.
+            # checks whether data from lidar sensor is updated.
+            
             if loop_start_time - self.odom_data_in_time > self._TIME_OUT_FROM_ODOM:
                 rospy.logwarn("No update on odom (robot position)")
                 rate.sleep()
                 continue
-            if loop_start_time - self.laser_data_in_time > self._TIME_OUT_FROM_LASER:
-                rospy.logwarn(f"No update on laser data from last {loop_start_time - self.laser_data_in_time}")
-                rate.sleep()
-                continue
+            if self.use_obs_v1 or self.use_pcl_boxes:
+                if loop_start_time - self.laser_data_in_time > self._TIME_OUT_FROM_LASER:
+                    rospy.logwarn(f"No update on laser data from last {loop_start_time - self.laser_data_in_time}")
+                    rate.sleep()
+                    continue
+                
+            # Add check to camera data too
 
             # check for the close index on the trajectory
             if self._close_idx is None:
@@ -218,7 +229,7 @@ class ObstacleStopPlanner:
                     rate.sleep()
 
                     break
-            if not self.use_pcl_boxes:
+            if self.use_obs_v1:
                 try:
                     kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
                 except:
