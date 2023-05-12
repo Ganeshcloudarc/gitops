@@ -70,7 +70,9 @@ class ObstacleStopPlanner:
         # self.index_old = None
 
         self.laser_data_in_time = None
+        self.zed_data_in_time = None
         self.scan_data_received = None
+        self.bboxes = None
         self.pc_np = None
         self.tree = None
         self.robot_pose = None
@@ -101,6 +103,7 @@ class ObstacleStopPlanner:
 
         self._TIME_OUT_FROM_LASER = 2  # in secs
         self._TIME_OUT_FROM_ODOM = 2
+        self._TIME_OUT_FROM_ZED = 2
         # TODO consider vehicle diagonal to check for collision detection radius
         # distance within below value to laser point would make collision.
         self._radius_to_search = vehicle_data.dimensions.overall_width / 2 + radial_off_set_to_vehicle_width
@@ -139,6 +142,51 @@ class ObstacleStopPlanner:
         self.count_mission_repeat = 0
 
         self.main_loop()
+        
+    def do_initial_sensor_check(self):
+        
+        is_lidar_sensor_healthy = False
+        is_zed_sensor_healthy = False
+        is_global_path_ok = False
+        
+        if self._traj_manager.get_len() > 0 and self.robot_pose:
+            rospy.loginfo("global path and robot_pose are received")
+            is_global_path_ok = True
+            if self.use_obs_v1 or self.use_pcl_boxes:
+                if self.scan_data_received:# and self._traj_manager.get_len() > 0 and self.robot_pose:
+                    rospy.loginfo("scan data is received")
+                    is_lidar_sensor_healthy = True
+                    if self.use_pcl_boxes:
+                        if self.bboxes:
+                            rospy.loginfo("bonding boxes are received")
+                            is_lidar_sensor_healthy = True
+                        else:
+                            rospy.logwarn("waiting for bounding boxes")
+                            is_lidar_sensor_healthy = False
+                    else:
+                        is_lidar_sensor_healthy = True
+                else:
+                    rospy.logwarn(
+                        f"waiting for data  scan :{self.scan_data_received}")
+                    is_lidar_sensor_healthy = False
+            else:
+                is_lidar_sensor_healthy = True
+            if self.use_zed_detections:
+                if self.zed_objects:
+                    rospy.loginfo("data from zed received")
+                    is_zed_sensor_healthy = True
+                else:
+                    rospy.logwarn("Waiting for zed data")
+                    is_zed_sensor_healthy = False
+            else:
+                is_zed_sensor_healthy = True
+        else:
+            rospy.logwarn(
+                f" waiting for global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
+            is_global_path_ok = False
+        
+        sensor_status = is_lidar_sensor_healthy and is_zed_sensor_healthy and is_global_path_ok
+        return sensor_status
 
     def main_loop(self):
         # TODO: publish stop, slow_down margin's circle
@@ -146,27 +194,9 @@ class ObstacleStopPlanner:
         rate = rospy.Rate(1)
         while not rospy.is_shutdown():
             # robot_pose = current_robot_pose("map", self.robot_base_frame)
-            if self._traj_manager.get_len() > 0 and self.robot_pose:
-                rospy.loginfo("global path and robot_pose are received")
-                if self.use_obs_v1 or self.use_pcl_boxes:
-                    if self.scan_data_received:# and self._traj_manager.get_len() > 0 and self.robot_pose:
-                        rospy.loginfo("scan data is received")
-                        if self.use_pcl_boxes:
-                            if self.bboxes:
-                                rospy.loginfo("bonding boxes are received")
-                                break
-                            else:
-                                rospy.logwarn("waiting for bounding boxes")
-                        else:
-                            break
-                    else:
-                        rospy.logwarn(
-                            f"waiting for data  scan :{self.scan_data_received}")
-                else:
-                    break
-            else:
-                rospy.logwarn(
-                    f" waiting for global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
+            sensor_status = self.do_initial_sensor_check()
+            if sensor_status:
+                break
             rate.sleep()
 
         rate = rospy.Rate(100)
@@ -183,8 +213,11 @@ class ObstacleStopPlanner:
                     rospy.logwarn(f"No update on laser data from last {loop_start_time - self.laser_data_in_time}")
                     rate.sleep()
                     continue
-                
-            # Add check to camera data too
+            if self.use_zed_detections:
+                if (loop_start_time - self.zed_data_in_time > self._TIME_OUT_FROM_ZED):
+                    rospy.logwarn(f"No update on ZED data from last {loop_start_time - self.zed_data_in_time}")
+                    rate.sleep()
+                    continue
 
             # check for the close index on the trajectory
             if self._close_idx is None:
@@ -377,6 +410,8 @@ class ObstacleStopPlanner:
         self.robot_head_pose.orientation = data.pose.pose.orientation
         
     def zed_objects_callback(self, data):
+        start = time.time()
+        self.zed_data_in_time = time.time()
         data_in_map_frame = None
         # for i in data.objects:
         #     print(i)
@@ -389,6 +424,8 @@ class ObstacleStopPlanner:
         if data_in_map_frame is not None:
             self.transformed_zed_objects_publisher.publish(data_in_map_frame)
             self.zed_objects = data_in_map_frame
+
+        rospy.logdebug(f"time taken for laser scan callback: {time.time() - start} ")
 
     def find_close_object_zed(self, objects, point):
         zed_obs_dis_data = []
