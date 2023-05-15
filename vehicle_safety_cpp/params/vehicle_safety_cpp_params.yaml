@@ -7,7 +7,7 @@ vehicle_safety:
   WHITE_LIST : ["vehicle_safety_cpp_diagnostics: GPS","vehicle_safety_cpp_diagnostics: TrackingController","vehicle_safety_cpp_diagnostics: Emergency","vehicle_safety_cpp_diagnostics: GeoFence","vehicle_safety_cpp_diagnostics: CAN_Batt_Diagnostics"] # vehicle will stop, if these errors came up
   BLACK_LIST : ["vehicle_safety_cpp_diagnostics: Heading"] # vehicle will ignore and continue running, if the errors coming from these list.
   use_geo_fence : true
-  use_inner_geo_fence : true
+  use_inner_geo_fence : false
   geo_fence_coordinates: [
     [13.585564444929537, 79.96123159196975],
     [13.584881054339391, 79.9613978024903],
