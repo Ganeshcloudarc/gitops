@@ -151,13 +151,13 @@ class SaveWayPoints:
                             rospy.loginfo("Origin gps location:- longitude: %s latitude: %s altitude: %s covariance:%s",
                                         str(self.gps_data_msg.longitude), str(self.gps_data_msg.latitude),
                                         str(self.gps_data_msg.altitude), str(self.gps_data_msg.position_covariance))
-                            self.final_waypoints_list.append([self.gps_data_msg.longitude, self.gps_data_msg.latitude])
-                            self.imu_list.append(self.imu_data)
-                            odom_msg = Odometry()
-                            odom_msg.pose.pose.orientation = self.odom_data_msg.pose.pose.orientation
-                            self.odometry_list.append(
-                                message_converter.convert_ros_message_to_dictionary(odom_msg))  # change it to self.odom_msg
-                            self.gps_list.append(self.gps_data)
+                            # self.final_waypoints_list.append([self.gps_data_msg.longitude, self.gps_data_msg.latitude])
+                            # self.imu_list.append(self.imu_data)
+                            # odom_msg = Odometry()
+                            # odom_msg.pose.pose.orientation = self.odom_data_msg.pose.pose.orientation
+                            # self.odometry_list.append(
+                            #     message_converter.convert_ros_message_to_dictionary(odom_msg))  # change it to self.odom_msg
+                            # self.gps_list.append(self.gps_data)
                             self.prev_long = self.gps_data_msg.longitude
                             self.prev_lat = self.gps_data_msg.latitude
                             geo_point = GeoPointStamped()
