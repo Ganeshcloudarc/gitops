@@ -87,7 +87,7 @@ class FailSafeAutoPilot
 
         if(fail_status == true)
         {
-            ROS_ERROR_THROTTLE(20,"Stopping the Vehicle");
+            ROS_ERROR_THROTTLE(2,"Stopping the Vehicle");
             string str="";
             for(int i=0; i<reason.size(); i++)
             {
@@ -97,7 +97,7 @@ class FailSafeAutoPilot
             vehicle_stop_command_msg.node = ros::this_node::getName();
             vehicle_stop_command_msg.message = "ERROR: " + str;
             vehicle_stop_command_msg.status = true;
-            ROS_ERROR_STREAM_THROTTLE(10,"" << vehicle_stop_command_msg.message);
+            ROS_ERROR_STREAM_THROTTLE(2,"" << vehicle_stop_command_msg.message);
             fail_status = false;
         }
 
