@@ -134,10 +134,10 @@ class TrajectoryManager:
         Returns path(Path) of Trajectory.
         """
         path_msg = Path()
-        path_msg.header.frame_id = self._traj_len.header.frame_id
+        path_msg.header.frame_id = self._traj_in.header.frame_id
         for i in range(self._traj_len):
             pose_stamped = PoseStamped()
-            pose_stamped.header.frame_id = self._traj_len.header.frame_id
+            pose_stamped.header.frame_id = self._traj_in.header.frame_id
             pose_stamped.pose = self._traj_in.points[i].pose
             path_msg.poses.append(pose_stamped)
         return path_msg
@@ -148,7 +148,7 @@ class TrajectoryManager:
 
         """
         marker_arr_msg = MarkerArray()
-        marker_arr_msg.header.frame_id = self._traj_in.header.frame_id
+        # marker_arr_msg.header.frame_id = self._traj_in.header.frame_id
         marker = Marker()
         marker.header.frame_id = self._traj_in.header.frame_id
         marker.action = marker.DELETEALL
@@ -156,7 +156,7 @@ class TrajectoryManager:
         for i in range(self._traj_len):
             traj_point = self._traj_in.points[i]
             marker = Marker()
-            marker.header.frame_id = self._traj_len.header.frame_id
+            marker.header.frame_id = self._traj_in.header.frame_id
             marker.type = marker.TEXT_VIEW_FACING
             marker.text = str(round(traj_point.longitudinal_velocity_mps, 2))
             marker.id = i

@@ -7,11 +7,11 @@ try:
     import math
     import numpy as np
     from numpy import argmin, zeros
-    import ros_numpy
+    # import ros_numpy
     import rospy
     import tf2_ros
     import time
-
+    import sys
     # ros messages
     from nav_msgs.msg import Path, Odometry
     from geometry_msgs.msg import Point, PoseArray, PoseStamped
@@ -35,6 +35,8 @@ except Exception as e:
     rospy.logerr("No module %s", str(e))
     exit(e)
 
+def getLineNumber():
+    return sys._getframe().f_back.f_lineno
 
 class PurePursuitController:
     def __init__(self):
@@ -49,12 +51,16 @@ class PurePursuitController:
         #PID parameters
         self.cte = 0
         self.sumCTE = 0
+        self.is_reverse = False
 
         self.is_pp_pid = rospy.get_param("/pp_with_pid",False)
 
         # ros parameters
+        self.max_speed = rospy.get_param("/patrol/max_forward_speed", 1.8) # default value of max speed is max forward speed.
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
+        self.max_backward_speed = abs(rospy.get_param("/patrol/max_backward_speed",1.0)) # doing abs() as reversing uses same logic as forward wrt to speed
+        self.min_backward_speed = abs(rospy.get_param("/patrol/min_backward_speed",0.8))
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
         self.time_out_from_input_trajectory = rospy.get_param("/pure_pursuit/time_out", 3)
@@ -64,6 +70,7 @@ class PurePursuitController:
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
 
         failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
+        self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
 
         if failsafe_enable:
             cmd_topic = rospy.get_param("patrol/cmd_topic", "/vehicle/cmd_drive_safe")
@@ -81,40 +88,12 @@ class PurePursuitController:
 
         target_pose_msg = PoseStamped()
         self.ackermann_msg = AckermannDrive()
-
-        trajectory_data, tf_data = None, None
-        rate = rospy.Rate(2)
-        while not rospy.is_shutdown():
-            if not trajectory_data:
-                try:
-                    trajectory_data = rospy.wait_for_message(trajectory_in_topic, Trajectory, timeout=1)
-                except:
-                    trajectory_data = None
-                    rospy.logwarn("Waiting for %s", str(trajectory_in_topic))
-                else:
-                    rospy.logdebug("Topic %s is active", str(trajectory_in_topic))
-            if not tf_data:
-                try:
-                    tf_data = current_robot_pose("map", self.robot_base_frame)
-                except:
-                    tf_data = None
-                    rospy.logwarn("Waiting for TF data between map and %s", self.robot_base_frame)
-                else:
-                    rospy.logdebug("TF data is available  between map and %s", self.robot_base_frame)
-
-            if trajectory_data and tf_data:
-                if trajectory_data.header.frame_id == "map":  # tf_data.header.frame_id:
-                    rospy.Subscriber(trajectory_in_topic, Trajectory, self.trajectory_callback)
-                    rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
-                    rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
-
-                    rospy.loginfo("data received on tf and %s ", trajectory_in_topic)
-                    break
-                else:
-                    rospy.logfatal('tf frames of path and odometry are not same: ')
-                    sys.exit('tf frames of path and odometry are not same"')
-                    rate.sleep()
+        rospy.Subscriber(trajectory_in_topic, Trajectory, self.trajectory_callback)
+        rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
+        rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
+        rospy.logdebug(f"Subscriber initiated, {trajectory_in_topic} , {odom_topic}, {gps_topic}")
         time.sleep(1)
+        rate = rospy.Rate(1)
         while not rospy.is_shutdown():
             if self.trajectory_data and self.robot_state and self.gps_robot_state:
                 rospy.loginfo("trajectory_data and robot_state and gps_robot_state are avilable")
@@ -125,7 +104,11 @@ class PurePursuitController:
 
         diagnostic_msg = ControllerDiagnose()
         diagnostic_msg.name = "Pure Pursuit Node"
-        rate = rospy.Rate(100)
+        rate = rospy.Rate(20)
+        
+        log_tracking_message = "Initialized log"
+        stop_on_command = False # To check whether to stop incase of any anamoly
+        
         while not rospy.is_shutdown():
             try:
 
@@ -192,7 +175,26 @@ class PurePursuitController:
                 #     self.send_ack_msg(steering_angle, speed, 0)
                 target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
                 alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
+                
+                dot_vector = self.findLookaheadPos(robot_pose, target_pose)
 
+                if dot_vector >= 0:
+                    self.is_reverse = False
+                    rospy.loginfo_throttle(10, "Forward")
+                elif dot_vector < 0:
+                    if self.allow_reversing: # safety check to stop on reverse conditions when allow_reversing is set to false.
+                        self.is_reverse = True
+                        rospy.loginfo_throttle(10, "Reverse")
+                    else:
+                        self.is_reverse = False
+                        stop_on_command = True
+                # elif dot_vector == 0:
+                #     rospy.logerr("Stopping the Robot")
+                #     self.send_ack_msg(0, 0, 0)
+                #     self.is_reverse = False
+                else:
+                    pass              
+                
                 if self.is_pp_pid:
                     delta_degrees = self.pp_with_pid(lhd=lhd,alpha=alpha)
                     delta_degrees = math.degrees(delta_degrees)
@@ -204,19 +206,30 @@ class PurePursuitController:
                 # delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
                 # delta_degrees = math.degrees(delta)
                 steering_angle = np.clip(delta_degrees, -30, 30)
-                speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
+                if stop_on_command:
+                    speed = 0
+                    log_tracking_message = "allow_reversing flag not set. Stopping the Robot"
+                    rospy.logerr_throttle(10, "allow_reversing flag not set. Stopping the Robot")
+                    self.send_ack_msg(steering_angle, speed, 1)
+                elif self.is_reverse:
+                    speed = -min(self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps, self.max_backward_speed) # To avoid max speed from path_publisher.
+                    log_tracking_message = f'Tracking path in Reverse with speed {speed}'
+                    self.send_ack_msg(steering_angle, speed, 0)
+                else:
+                    speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
+                    log_tracking_message = f'Tracking path in Forward with speed {speed}'
+                    # stop vehicle is speed is negative when is_reverse is false.(just a safety check)
+                    if speed <= 0:
+                        self.send_ack_msg(steering_angle, speed, 1)
+                    else:
+                        self.send_ack_msg(steering_angle, speed, 0)
                 rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
                 rospy.loginfo('lhd: %s, alpha: %s , robot_speed: %s ', str(lhd), str(alpha), str(self.robot_speed))
-                if speed <= 0:
-                    self.send_ack_msg(steering_angle, speed, 1)
-                else:
-                    self.send_ack_msg(steering_angle, speed, 0)
-
 
                 # fill the control diagnose topic
             
                 diagnostic_msg.level = diagnostic_msg.OK
-                diagnostic_msg.message = "Tracking path"
+                diagnostic_msg.message = log_tracking_message # "Tracking path"
                 diagnostic_msg.stamp = rospy.Time.now()
                 diagnostic_msg.look_ahead = lhd
                 diagnostic_msg.cte = close_dis
@@ -317,13 +330,47 @@ class PurePursuitController:
     def gps_callback(self, data):
         self.gps_robot_state = data
 
+    def findLookaheadPos(self,robot_pose,lookAheadPose,reverse_threshold=0.1,stop_threshold=0.1):
+        # robot_pose = robot_pose.pose.pose
+        theta = get_yaw(robot_pose.orientation)
+        rx = robot_pose.position.x
+        ry = robot_pose.position.y
+        lx = lookAheadPose.pose.position.x
+        ly = lookAheadPose.pose.position.y
+        ruv_x,ruv_y = math.cos(theta), math.sin(theta)
+        # print(ruv_x,ruv_y)
+        # robot, lookahead x, robot, lookahead y
+        # rl_x, rl_y =  = x2-x1, y2-y1
+        rl_x = lx-rx
+        rl_y = ly-ry
+        a = [ruv_x,ruv_y]
+        b = [rl_x,rl_y]
+        # self.ruvDotvector = np.dot(a,b)
+        dot_product = np.dot(a,b)
+        
+        # Check conditions for reversing or stopping
+        # distance = math.sqrt((lx-rx)**2 + (ly-ry)**2)
+        # if dot_product < -reverse_threshold:
+        #     # Lookahead point is behind robot and threshold is exceeded - reverse
+        #     return -1
+        # elif abs(dot_product) < stop_threshold and distance < stop_threshold:
+        #     # Robot has reached lookahead point - stop
+        #     return 0
+        # else:
+        #     # Robot can continue moving forward
+        #     return 1
+        return dot_product
 
     def compute_lookahead_distance(self, robot_speed):
         # return 3
         # return self.min_look_ahead_dis
         # https://github.com/bosonrobotics/autopilot_boson/issues/22
-        if robot_speed > self.max_forward_speed:
-            lhd = (robot_speed * self.min_look_ahead_dis) / self.max_forward_speed
+        if self.is_reverse:
+            self.max_speed = self.max_backward_speed
+        else:
+            self.max_speed = self.max_forward_speed
+        if robot_speed > self.max_speed:
+            lhd = (robot_speed * self.min_look_ahead_dis) / self.max_speed
             if self.min_look_ahead_dis <= lhd <= self.max_look_ahead_dis:
                 return lhd
             elif lhd <= self.min_look_ahead_dis:
