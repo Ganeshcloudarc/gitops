@@ -62,7 +62,7 @@
   <build_depend>autopilot_msgs</build_depend>
   <exec_depend>autopilot_msgs</exec_depend>
   <build_depend>pilot_msgs</build_depend>
-    <exec_depend>pilot_msgs</exec_depend>
+  <exec_depend>pilot_msgs</exec_depend>
   <build_depend>pilot</build_depend>
   <exec_depend>pilot</exec_depend>
   <!-- <build_export_depend>autopilot_msgs</build_export_depend> -->

@@ -2,20 +2,19 @@ cmake_minimum_required(VERSION 3.0.2)
 project(vehicle_safety_cpp)
 set(CMAKE_CXX_STANDARD 17)
 
-#set(pilot_msgs_DIR "/home/jeswinsamuel/catkin_ws/src/pilot/")
-# add_subdirectory("/home/jeswinsamuel/catkin_ws/src/pilot/pilot/CMakeLists.txt")
+
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
   roslib
-  # pilot_msgs PATHS /home/jeswinsamuel/catkin_ws/src/pilot
+  
   autopilot_msgs
 
   # vehicle_stop_command
   # pilot
 )
-# set(pilot_msgs_DIR "/home/jeswinsamuel/catkin_ws/src/pilot")
+
 
 catkin_package(
   LIBRARIES ${PROJECT_NAME} 
