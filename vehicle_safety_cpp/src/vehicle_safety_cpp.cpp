@@ -306,7 +306,7 @@ class VehicleSafety {
         isWithinNoGoZone(no_go_zone_coords_xmlrpc, lat, lon);
     // ROS_WARN_STREAM(" NoGoZone: " << is_with_in_no_go_zone );
 
-    ROS_WARN_STREAM("Geofence: " << is_inside_geo_fence
+    ROS_WARN_STREAM_THROTTLE(10,"Geofence: " << is_inside_geo_fence
                                  << " NoGoZone: " << is_with_in_no_go_zone);
     reset_geo_fence = 1;
   }
@@ -429,11 +429,11 @@ class VehicleSafety {
           if (error_counter_for_tracking_controller >
               error_counter_for_tracking_controller_th) {
             stat.summary(ERROR, "No update on Tracking Controller");
-            ROS_ERROR("No update on Tracking Controller");
+            ROS_ERROR_THROTTLE(1,"No update on Tracking Controller");
           } else {
             error_counter_for_tracking_controller += 1;
             stat.summary(WARN, "No update on Tracking Controller");
-            ROS_WARN("No update on Tracking Controller");
+            ROS_WARN_THROTTLE(1,"No update on Tracking Controller");
           }
         }
         stat.add("Motor RPM", motor_rpm);
