@@ -3,14 +3,19 @@
 <!--    to do add different desciption file-->
     <arg name="footprint_pub" default="true"/>
     <arg name="odom_pub" default="true"/>
+    <arg name="gps_pub" default="true"/>
 
     <param name ="/base_frame" value ="base_link"/>
     <param name ='/odometry_in' value ="/mavros/global_position/local" />
+    <param name="/gps_in" value ="/mavros/global_position/global"/>
     <param name="/send_odom" value="$(arg odom_pub)" />
+    <param name="/send_gps" value="$(arg gps_pub)" />
     <param name="/send_footprint" value="$(arg footprint_pub)" />
     <param name="/odometry_out" value="/vehicle/odom" />
+    <param name="/gps_out" value="/vehicle/gps"/>
     <param name="/foorprint_out" value="/vehicle/foot_print" />
     <param name="vehicle_type" value="$(arg vehicle_type)"/>
+
 <!--<group if="$(eval team == 'Red')">-->
     <rosparam command="load" file="$(find vehicle_common)/params/half_cabin_config.yaml" ns="vehicle" if = "$(eval vehicle_type == 'half_cabin')"/>
     <rosparam command="load" file="$(find vehicle_common)/params/porter_config.yaml" ns="vehicle" if = "$(eval vehicle_type == 'porter')"/>

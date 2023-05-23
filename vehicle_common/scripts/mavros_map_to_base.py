@@ -11,6 +11,8 @@ try:
     from geometry_msgs.msg import TransformStamped, Pose, Quaternion, Vector3, PoseStamped, Polygon, \
         PolygonStamped, Point
     from vehicle_common.vehicle_config import vehicle_data
+    from pyproj import Geod
+    from sensor_msgs.msg import NavSatFix
 except ImportError as error:
     print("No module named:", error)
 
@@ -29,10 +31,17 @@ rear_axle_center_height_from_ground = rospy.get_param("/vehicle/dimensions/tyre_
 
 vehicle_frame = rospy.get_param("/base_frame", "base_link")
 odom_in_topic = rospy.get_param("/odometry_in", '/mavros/global_position/local')
+gps_in_topic = rospy.get_param("/gps_in", '/mavros/global_position/global')
+
 send_odom = rospy.get_param("/send_odom", True)  # send odom from base link
+send_gps = rospy.get_param("/send_gps", True)  # send odom from base link
+
 send_foot_print = rospy.get_param("/send_footprint", True)
 send_odom_topic_name = rospy.get_param("/odometry_out", "/vehicle/odom")
+send_gps_topic_name = rospy.get_param("/gps_out", "/vehicle/gps")
 send_footprint_topic_name = rospy.get_param("/foorprint_out", "/vehicle/foot_print")
+# send_foot_print = rospy.get_param("/send_footprint", True)
+
 tf_broad_caster = tf2_ros.TransformBroadcaster()
 tf_msg = TransformStamped()
 fcu_offset_vehicle = (wheel_base + front_axle_to_fcu_position[0])
@@ -43,11 +52,13 @@ foot_print_specs = [
     [wheel_base + front_overhang, vehicle_width / 2],
     [-rear_overhang, vehicle_width / 2],
 ]
-
+geod = Geod(ellps="WGS84")
+global yaw 
+yaw = None
 
 def odom_callback(data):
     """ subscriber for odom, it publishes tf and odom from vehicle base link(rear axil center)"""
-
+    global yaw
     _, _, yaw = tf_conversions.transformations.euler_from_quaternion(
         [data.pose.pose.orientation.x, data.pose.pose.orientation.y,
          data.pose.pose.orientation.z, data.pose.pose.orientation.w]
@@ -80,6 +91,18 @@ def odom_callback(data):
         rospy.logdebug("footprint sent")
 
 
+def gps_callback(data):
+    if yaw:
+        # heading to Azumuth 
+        deg = 360 - math.degrees(yaw ) + 90
+        lon, lat,_ = geod.fwd(lons=data.longitude, lats=data.latitude, az=deg, dist=-fcu_offset_vehicle)
+        data.longitude = lon
+        data.latitude = lat
+        gps_publisher.publish(data)
+        rospy.logdebug("gps published")
+        
+
+
 def transform_footprint(x, y, yaw):
     polygon_st = PolygonStamped()
     polygon_st.header.frame_id = 'map'
@@ -105,6 +128,10 @@ if __name__ == '__main__':
     if send_odom:
         odom_publisher = rospy.Publisher(send_odom_topic_name, Odometry, queue_size=2)
     if send_foot_print:
-        foot_prin_pub = rospy.Publisher("/vehicle/foot_print", PolygonStamped, queue_size=2)
+        foot_prin_pub = rospy.Publisher(send_footprint_topic_name, PolygonStamped, queue_size=2)
+    if send_gps:
+        gps_publisher = rospy.Publisher(send_gps_topic_name, NavSatFix, queue_size=2)
     rospy.Subscriber(odom_in_topic, Odometry, odom_callback)
+    rospy.Subscriber(gps_in_topic, NavSatFix, gps_callback)
+
     rospy.spin()
