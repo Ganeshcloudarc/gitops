@@ -13,7 +13,7 @@
     <param name="/send_footprint" value="$(arg footprint_pub)" />
     <param name="/odometry_out" value="/vehicle/odom" />
     <param name="/gps_out" value="/vehicle/gps"/>
-    <param name="/foorprint_out" value="/vehicle/foot_print" />
+    <param name="/footprint_out" value="/vehicle/foot_print" />
     <param name="vehicle_type" value="$(arg vehicle_type)"/>
 
 <!--<group if="$(eval team == 'Red')">-->

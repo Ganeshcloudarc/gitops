@@ -39,7 +39,7 @@ send_gps = rospy.get_param("/send_gps", True)  # send odom from base link
 send_foot_print = rospy.get_param("/send_footprint", True)
 send_odom_topic_name = rospy.get_param("/odometry_out", "/vehicle/odom")
 send_gps_topic_name = rospy.get_param("/gps_out", "/vehicle/gps")
-send_footprint_topic_name = rospy.get_param("/foorprint_out", "/vehicle/foot_print")
+send_footprint_topic_name = rospy.get_param("/footprint_out", "/vehicle/foot_print")
 # send_foot_print = rospy.get_param("/send_footprint", True)
 
 tf_broad_caster = tf2_ros.TransformBroadcaster()
