@@ -55,7 +55,8 @@ class ObstacleDetectorNode
   ros::NodeHandle nh;
   tf2_ros::Buffer tf2_buffer;
   tf2_ros::TransformListener tf2_listener;
-  
+  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
+  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config>::CallbackType f;
 
   ros::Subscriber sub_lidar_points;
   ros::Publisher pub_cloud_ground;
@@ -86,6 +87,7 @@ void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& con
   CLUSTER_MIN_SIZE = config.cluster_min_size;
   DISPLACEMENT_THRESH = config.displacement_threshold;
   IOU_THRESH = config.iou_threshold;
+  ROS_DEBUG_STREAM("Cluster Threshold" << CLUSTER_THRESH);
 }
 
 ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
@@ -111,20 +113,20 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
   pub_jsk_bboxes = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>(jsk_bboxes_topic, 1);
   pub_autoware_objects = nh.advertise<autoware_msgs::DetectedObjectArray>(autoware_objects_topic, 1);
 
-  // bool use_recon;
-  // private_nh.getParam("rqt_reconfigure", use_recon);
-  // if (use_recon)
-  // {
-  //   ROS_INFO("rqt is true");
+  bool use_recon;
+  private_nh.getParam("rqt_reconfigure", use_recon);
+  if (use_recon)
+  {
+    ROS_INFO("rqt is true");
   //   dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
   //   dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config>::CallbackType f;
 
   //   // // Dynamic Parameter Server & Function
-  //   f = boost::bind(&dynamicParamCallback, _1, _2);
-  //   server.setCallback(f);
-  // }
-  // else
-  // {
+    f = boost::bind(&dynamicParamCallback, _1, _2);
+    server.setCallback(f);
+  }
+  else
+  {
     ROS_INFO("rqt is False");
     private_nh.getParam("use_pca_box", USE_PCA_BOX);
     private_nh.getParam("use_tracking", USE_TRACKING);
@@ -153,8 +155,10 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
     private_nh.getParam("iou_threshold", IOU_THRESH);
     private_nh.getParam("neighbors", NEIGHOBORS);
     private_nh.getParam("standard_deviation", STANDARD_DEVIATION);
+    ROS_DEBUG_STREAM("Cluster Threshold" << CLUSTER_THRESH);
 
-  // }
+
+  }
   
   // Create point processor
   obstacle_detector = std::make_shared<ObstacleDetector<pcl::PointXYZ>>();
