@@ -2,17 +2,23 @@ cmake_minimum_required(VERSION 3.0.2)
 project(vehicle_safety_cpp)
 set(CMAKE_CXX_STANDARD 17)
 
+
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  roslib
+  
   autopilot_msgs
-  # vehicle_stop_command
 
+  # vehicle_stop_command
+  # pilot
 )
 
+
 catkin_package(
-  CATKIN_DEPENDS roscpp std_msgs
+  LIBRARIES ${PROJECT_NAME} 
+  CATKIN_DEPENDS roscpp roslib std_msgs autopilot_msgs 
   INCLUDE_DIRS include
 )
 
@@ -38,16 +44,18 @@ target_link_libraries(curve_detector_cpp ${catkin_LIBRARIES} DouglasPeucker)
 
 add_executable(vehicle_safety_cpp src/vehicle_safety_cpp.cpp)
 target_link_libraries(vehicle_safety_cpp ${catkin_LIBRARIES})
+add_dependencies(vehicle_safety_cpp ${catkin_EXPORTED_TARGETS})
 
 # add_dependencies(vehicle_safety_cpp_generate_messages_cpp autopilot_msgs) 
 
 # add_dependencies(listener ${catkin_EXPORTED_TARGETS})
 # add_dependencies(vehicle_safety_cpp ${catkin_EXPORTED_TARGETS})
 
-include_directories(include ${catkin_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} {PROJECT_NAME})
 
 add_executable(vehicle_safety_analyzer_cpp src/vehicle_safety_analyzer_cpp.cpp)
 target_link_libraries(vehicle_safety_analyzer_cpp ${catkin_LIBRARIES})
+add_dependencies(vehicle_safety_analyzer_cpp ${catkin_EXPORTED_TARGETS})
 
 # target_link_libraries(curve_detector ${catkin_LIBRARIES})
 
