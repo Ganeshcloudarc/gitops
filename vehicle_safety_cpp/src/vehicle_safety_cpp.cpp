@@ -88,6 +88,7 @@ class VehicleSafety {
       nh.param("/vehicle_safety/CTE_THR_AT_CURVE", CTE_THR_AT_CURVE);
   bool emergency_stop = false;
   int TRACKING_CONTROLLER_TIMEOUT = 5;
+  int GPS_FIX_CB_TIMEOUT = 1; //timout in sec to check gps callback
   float prev_coordinates_lat, prev_coordinates_long;
   float curr_coordinates_lat = 0, curr_coordinates_long = 0;
   double gps_accuracy = -1, sensor_accuracy_value, GPS_ACC_IDEAL, GPS_ACC_THR;
@@ -111,7 +112,8 @@ class VehicleSafety {
   bool is_inside_geo_fence;
   bool is_with_in_no_go_zone;
   double time_to_launch;
-  long time_on_tracking_cb;
+  time_t time_on_tracking_cb = 0;
+  time_t time_on_gps_fix_cb = 0;
 
   int mavros_head;
   vector<int> ignore_heading = {0, 45, 90, 135, 180, 225, 270, 315, 360};
@@ -251,6 +253,7 @@ class VehicleSafety {
   void heading_failsafe(const mavros_msgs::GPSRAW &data) {
     reset_head = 1;
     gps1_fix = data.fix_type;
+    time_on_gps_fix_cb = time(0);
     // Calculating the heading using the new and previous coordinates
     double delta_lat = data.lat - curr_coordinates_lat;
     double delta_long = data.lon - curr_coordinates_long;
@@ -330,7 +333,7 @@ class VehicleSafety {
 
     gps_accuracy = sensor_accuracy(cov_value);
 
-    if (reset_gps == 1) {
+    if (time_on_gps_fix_cb != 0) {
       if (gps_accuracy != -1) {
         if (gps_accuracy < 0 || gps_accuracy > 100) {
           stat.add("GPS ACCURACY LOW", gps_accuracy);
@@ -345,6 +348,8 @@ class VehicleSafety {
         stat.add("GPS ACCURACY NONE", gps_accuracy);
       }
 
+      if ((time(0) - time_on_gps_fix_cb) < GPS_FIX_CB_TIMEOUT) {
+
       // if (gps1_fix == 6 && gps2_fix == 6)
 
       if (std::find(gps1_fix_list.begin(), gps1_fix_list.end(), gps1_fix) !=
@@ -357,9 +362,9 @@ class VehicleSafety {
         stat.add("GPS2 Fix Type", gps2_fix);
         stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
         stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
-        start_time = NULL;
+        start_time = 0;
       } else if (gps1_fix == 5 && gps2_fix == 6) {
-        if (start_time == NULL) {
+        if (start_time == 0) {
           start_time = time(0);
         }
         if ((time(0) - start_time) > GPS_FIX_THR) {
@@ -381,27 +386,23 @@ class VehicleSafety {
         stat.add("GPS2 Fix Type", gps2_fix);
         stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
         stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
-        int val = time(0) - time_on_tracking_cb;
-        stat.summaryf(ERROR, "No update: on GPS Tracking from last:  %d secs",
-                      val);
       }
     } else {
-      int data = (time(0) - start_time_gps);
+      int data = (time(0) - time_on_gps_fix_cb);
       stat.summaryf(ERROR, "No update on GPS Tracking from last: %d secs",
                     data);
     }
-    reset_gps = 0;
-    gps1_fix = -1;
-    gps2_fix = -1;
-    position_covariance = -1;
+  } else {
+      stat.summary(ERROR, "Waiting for GPS Callback Data");
+    }
   }
 
   void cte_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat) {
     auto start = std::chrono::system_clock::now();
 
-    if (time_on_tracking_cb) {
+    if (time_on_tracking_cb != 0) {
       if ((time(0) - time_on_tracking_cb) < TRACKING_CONTROLLER_TIMEOUT) {
-        if (flag1 == 1) {
+        // if (flag1 == 1) {
           if (pp_diagnose_data.level == ERROR) {
             stat.summary(ERROR, pp_diagnose_data.message);
           } else if (pp_diagnose_data.level == WARN) {
@@ -413,29 +414,27 @@ class VehicleSafety {
           else {
             if (pp_diagnose_data.cte > CTE_THR) {
               stat.summary(ERROR, "HIGH CTE");
-              stat.add("CTE Value", pp_diagnose_data.cte);
-              stat.add("CTE_THR", CTE_THR);
             } else {
               stat.summary(OK, "CTE OK");
-              stat.add("CTE Value", pp_diagnose_data.cte);
-              stat.add("CTE_THR", CTE_THR);
             }
+            stat.add("CTE Value", pp_diagnose_data.cte);
+            stat.add("CTE_THR", CTE_THR);
           }
-          error_counter_for_tracking_controller = 0;
-        }
+        //   error_counter_for_tracking_controller = 0;
+        // }
 
-        else {
-          // eliminate false detections due to VS high freq.
-          if (error_counter_for_tracking_controller >
-              error_counter_for_tracking_controller_th) {
-            stat.summary(ERROR, "No update on Tracking Controller");
-            ROS_ERROR_THROTTLE(1,"No update on Tracking Controller");
-          } else {
-            error_counter_for_tracking_controller += 1;
-            stat.summary(WARN, "No update on Tracking Controller");
-            ROS_WARN_THROTTLE(1,"No update on Tracking Controller");
-          }
-        }
+        // else {
+        //   // eliminate false detections due to VS high freq.
+        //   if (error_counter_for_tracking_controller >
+        //       error_counter_for_tracking_controller_th) {
+        //     stat.summary(ERROR, "No update on Tracking Controller");
+        //     ROS_ERROR_THROTTLE(1,"No update on Tracking Controller");
+        //   } else {
+        //     error_counter_for_tracking_controller += 1;
+        //     stat.summary(WARN, "No update on Tracking Controller");
+        //     ROS_WARN_THROTTLE(1,"No update on Tracking Controller");
+        //   }
+        // }
         stat.add("Motor RPM", motor_rpm);
       }
 
@@ -448,7 +447,7 @@ class VehicleSafety {
       stat.summary(ERROR, "Waiting for Tracking Controller diagnose");
     }
 
-    flag1 = 0;
+    // flag1 = 0;
   }
 
   void heading_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat) {
