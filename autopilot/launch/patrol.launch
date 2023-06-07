@@ -48,6 +48,7 @@
     </group>
 
      <group unless="$(eval arg('hardware_in_loop'))">
+       <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
        <include file="$(find vehicle_description)/launch/boson_sim.launch">
             <arg name="vehicle_type" value="$(arg vehicle_type)"/>
        </include>
