@@ -438,11 +438,13 @@ class ObstacleStopPlanner:
         for object in objects.objects:
             # rospy.logerr(f'{object.position[0]},{object.position[1]},{object.label}, {point[0]},{point[1]}')
             # rospy.logerr(f'{object.label}')
-            dis = math.hypot((point[0] - object.position[0]) ** 2 + (point[1] - object.position[1]) ** 2)
+            # dis = math.hypot((point[0] - object.position[0]) ** 2 + (point[1] - object.position[1]) ** 2)
+            dis = math.hypot(point[0] - object.position[0], point[1] - object.position[1])
             zed_obs_dis_data.append(dis)
             try:
                 # rospy.logwarn(f'distances : {zed_obs_dis_data}')
-                zed_obs_dis_data_min = np.argmin(zed_obs_dis_data)
+                if len(zed_obs_dis_data) > 0:
+                    zed_obs_dis_data_min = np.argmin(zed_obs_dis_data)
             except Exception as e:
                 rospy.logerr(f'Exception from find_close_obj_zed {e}')
                 
