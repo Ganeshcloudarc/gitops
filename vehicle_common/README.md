@@ -81,7 +81,7 @@ ROS version of desciption of vehicle is called URDF(universal robot desciption f
 
 ### Adding new frame
 To add new sensor, Create a frame under the base_link key in config file[YAML](params/half_cabin_config.yaml).
-EX: Suppose you are helios lidar sensor with frame_id: helios_lidar_frame. 
+EX: Suppose you want to add helios lidar sensor with frame_id: helios_lidar_frame, add the below lines to config file. and provide proper x,y,zm roll,pitch and yaw specifications.
 ```
  base_link: # robot base frame
    helios_lidar_frame: # sensor  frame newly added
