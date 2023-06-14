@@ -92,7 +92,7 @@ EX: Suppose you want to add helios lidar sensor with frame_id: helios_lidar_fram
     pitch: 0.0
     yaw: 0.0
 ```
-In the vehicle_description.xacro[URDF](urdf/vehicle_description.xacro). add a new link with name with same frame_id
+In the [vehicle_description.xacro](urdf/vehicle_description.xacro). add a new link with name with same frame_id
 
 ex : 
 
