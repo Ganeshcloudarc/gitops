@@ -5,27 +5,28 @@ This a YAML file, having information about vehicle dimentions, sensor related in
 
 vehicle dimentions ref:
 ![](images/vehicle_params_naming.png)
-- You can chage the [YAML](params/vehicle_config.yaml) file fields under `dimentions` depending upon the vehicle dimentions following above vehicle naming convention.
--  sensor info and locations from front_wheel axle center need tp filled under `sensors` in the [YAML](params/vehicle_config.yaml) file.
+- You can chage the [YAML](params/half_cabin_config.yaml) file fields under `dimentions` depending upon the vehicle dimentions following above vehicle naming convention.
+-  sensor info and locations from front_wheel axle center need tp filled under `sensors` in the [YAML](params/half_cabin_config.yaml) file.
 
 <details>
-<summary>View vehicle_config.yaml</summary>
+<summary>View half_cabin_config.yaml</summary>
 
 ```
-dimensions: # for yellow porter ref https://trucks.cardekho.com/en/trucks/piaggio/porter-700/specifications
-  overall_length    : 3.544 # all the mesurments in MKS(meters, kgs, seconds)
-  overall_width     : 1.460
-  overall_height     : 1.75
-  wheel_base        : 1.82
-  track_width       : 1.40
-  front_overhang    : 1.0
-  rear_overhang     : 0.7
-  ground_clearance  : 0.2
+dimensions: # from mechanical team <saidinesh@bosonmotors.com>
+  overall_length    : 3.883 # all the mesurments in MKS(meters, kgs, seconds)
+  overall_width     : 1.725
+  overall_height     : 2.095
+  wheel_base        :  2.080
+  track_width       : 1.446
+  front_overhang    : 1.170
+  rear_overhang     : 0.633
+  ground_clearance  : 0.183
   payload           : 750 # kgs
-  tyre_radius       : 0.3
+  tyre_radius       : 0.338
   tyre_section_width :  0.145
+  gear_ratio         : 10.214
 
-speed:
+motion_limits:
   max_forward_speed      : 3  # m/s
   min_forward_speed      : 0.3 # m/s
   max_backward_speed : -3
@@ -35,52 +36,40 @@ speed:
   max_steering_angle : 30 # degrees
   min_steering_angle : -30 # degrees
 
-## center of gravity also a point
-COG_position:
-  - 0.4
-  - 1
-  - 0.5   # [X, Y, Z] distances from rear wheel axle center
-
 robot_origin_frame: "base_link" # name of link at rear wheel
 
-sensors: 
-  # sensor info and locations from front_wheel axle center
-  fcu:
-    model: "pixhawk4"
-    sensor_frame: "fcu_link"
-    position :
-      - 0.2
-      - 0
-      - 0    # [X, Y, Z] distances from front wheel axle center to fcu
-    orientation:
-      - 0
-      - 0
-      - 0 # [row, pitch, yaw] of fcu in radians wrt front wheel axle center
+base_link:   # center of the rear axle.
+  gps_link:  # center of the rear axle to gps position, center point of two gps modules.
+    x: 2.080
+    y: 0.0
+    z: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
 
-  zed_camera:
-    model : "zed2i"
-    sensor_frame : "zed2i_base_link"
-    position:
-        - 0.4
-        - 0
-        - 0.4    # [X, Y, Z] distances from front wheel axle center to camera_center
-    orientation:
-        - 0
-        - 0
-        - 0 # [row, pitch, yaw] of zed camera in radians wrt front wheel axle center
+  zed2i_base_link: # center of the rear axle to zed camera 
+    x: 2.8
+    y: 0.0
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
 
-  lidar:
-    model: "rs_lidar"
-    sensor_frame : "rs_lidar"
-    position:
-      - 0.4
-      - 0
-      - 0.2    # [X, Y, Z] distances from front wheel axle center to lidar
-    orientation:
-      - 0
-      - 0
-      - 0 # [row, pitch, yaw] of lidar in radians wrt front wheel axle center
+  rslidar: # center of the rear axle to rslidar(3d lidar)
+    x: 2.8
+    y: 0.0
+    z: 0.2
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
 
+  rplidar: # center of the rear axle to rplidar (2d lidar )
+    x: 2.8
+    y: 0.0
+    z: 0.1
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
 ```
 </details>
 
@@ -88,22 +77,68 @@ sensors:
 ## URDF file
 ROS version of desciption of vehicle is called URDF(universal robot desciption file).
 
-- All the sensor locations data and their tf frames and locations are kept in this file. which is very usefull when transforming frames from one another.
+- All sensors Transforms realtive to base_link will be taken from config file in the URDF file.
 
-## map to base_link tf broadcaster
+### Adding new frame
+To add new sensor, Create a frame under the base_link key in config file[YAML](params/half_cabin_config.yaml).
+EX: Suppose you are helios lidar sensor with frame_id: helios_lidar_frame. 
+```
+ base_link: # robot base frame
+   helios_lidar_frame: # sensor  frame newly added
+    x: 2.8 # 
+    y: 0.0
+    z: 0.1
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+```
+In the vehicle_description.xacro[URDF](urdf/vehicle_description.xacro). add a new link with name with same frame_id
+
+ex : 
+
+`<link name="xyz_lidar_frame"/>`
+
+Add new joint as below, consider to change the sub-key value to be same as frame_id. ie vehicle_info['base_link']`['helios_lidar_frame']`['x']
+
+Ex:
+```
+  <joint name="2d_lidar_link" type="fixed">
+    <!-- <origin xyz="2.8 0 0.1" rpy="0 0 0" /> -->
+    <origin
+        xyz="${vehicle_info['base_link']['helios_lidar_frame']['x']}
+             ${vehicle_info['base_link']['helios_lidar_frame']['y']}
+             ${vehicle_info['base_link']['helios_lidar_frame']['z']}"
+
+        rpy="${vehicle_info['base_link']['helios_lidar_frame']['roll']}
+             ${vehicle_info['base_link']['helios_lidar_frame']['pitch']}
+             ${vehicle_info['base_link']['helios_lidar_frame']['yaw']}"
+    />
+    <parent link="base_link" />
+    <child link="helios_lidar_frame" />
+  </joint>
+  ```
+
+  Then save it and launch the [vehicle_desciptio.launch](launch/vehicle_description.launch) to refect the changes, make sure you have selected proper vehicle type and modified the correspoding config file.
+
+
+
+## Map to base_link tf broadcaster [Node]
 A node subscribes to odometry from mavros, publisher a proper tf (base_link as rear_axle of vehicle), Odometry (with child_frame base_link (rear_axle center)), and a Footprint of vehicle.
 
 ### Parameters:
 
 * `base_frame` (string, default: base_link) - base frame of vehicle
 * `odometry_in`(string, default: /mavros/local_position/odom) -  odometry topic name from mavros 
+* `gps_in` (string, default: /mavros/global/position/global) Gps topic from mavros.
 * `send_odom` (boolean, default: true) -true to publish odometry 
+* `send_gps` (boolean, default: true) -true to publish GPS. 
 * `send_footprint`(boolean, default: true) - to publish vehicle footprint
 * `odometry_out`(string, default: /vehicle/odom) - name of odometry topic with child frame as base_link(rear_axle)
+* `gps_out`(string, default: /vehicle/gps) - name of gps topic with child frame as base_link(rear_axle)
 * `foorprint_out`(string, default: /vehicle/foot_print) - name of footprint topic which is of vehicle size.
 
 ## Python API for vehicle info
-You can able to access all the feilds in [YAML](params/vehicle_config.yaml) with DOT operator.
+You can able to access all the feilds in [YAML](params/half_cabin_config.yaml) with DOT operator.
 
 ### Example
 
