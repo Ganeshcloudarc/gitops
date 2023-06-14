@@ -1,6 +1,5 @@
 <launch>
-    <arg name="vehicle_type" default="porter"/>
-<!--    to do add different desciption file-->
+    <arg name="vehicle_type" default="half_cabin"/>
     <arg name="footprint_pub" default="true"/>
     <arg name="odom_pub" default="true"/>
     <arg name="gps_pub" default="true"/>
@@ -16,12 +15,19 @@
     <param name="/footprint_out" value="/vehicle/foot_print" />
     <param name="vehicle_type" value="$(arg vehicle_type)"/>
 
-<!--<group if="$(eval team == 'Red')">-->
-    <rosparam command="load" file="$(find vehicle_common)/params/half_cabin_config.yaml" ns="vehicle" if = "$(eval vehicle_type == 'half_cabin')"/>
-    <rosparam command="load" file="$(find vehicle_common)/params/porter_config.yaml" ns="vehicle" if = "$(eval vehicle_type == 'porter')"/>
+    <group if="$(eval vehicle_type == 'half_cabin')">
+        <arg name="config_param_file" default="$(find vehicle_common)/params/half_cabin_config.yaml"/>
+        <rosparam command="load" file="$(arg config_param_file)" ns="vehicle" />
+        <param name="robot_description" command="$(find xacro)/xacro '$(find vehicle_common)/urdf/vehicle_description.xacro'  config_file:=$(arg config_param_file)"/>
+    </group>
 
-<!-- TODO keep the boson sim urdf file here, so that we will have the same desciption file-->
-  <param name="robot_description" command="$(find xacro)/xacro '$(find vehicle_common)/urdf/vehicle_description.xacro' "/>
+    <group if="$(eval vehicle_type == 'porter')">
+       <arg name="config_param_file" default="$(find vehicle_common)/params/porter_config.yaml"/>
+        <rosparam command="load" file="$(arg config_param_file)" ns="vehicle" />
+        <param name="robot_description" command="$(find xacro)/xacro  '$(find vehicle_common)/urdf/vehicle_description.xacro' config_file:=$(arg config_param_file)"/>
+    
+    </group>
+
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher">
   	<param name="publish_frequency" value="50"/>
   </node>

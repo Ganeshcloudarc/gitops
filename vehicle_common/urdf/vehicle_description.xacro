@@ -1,42 +1,72 @@
 <?xml version="1.0"?>
 
 <robot name="boson_vehicle" xmlns:xacro="http://ros.org/wiki/xacro">
-
+  <xacro:arg name="config_file" default="$(find vehicle_common)/params/half_cabin_config.yaml"/>
+  <xacro:property name="config_file_property" value = "$(arg config_file)"/>
   <xacro:property name="M_PI"     value="3.1415926535897931" />
-  <xacro:property name="yaml_file" value="$(find vehicle_common)/params/vehicle_config.yaml" />
-  <xacro:property name="vehicle_data" value="${load_yaml(yaml_file)}"/>
-
-<!--  <xacro:property name="val1" value="${props['val1']}" />-->
-<!--  <xacro:property name="gps_link_origin_xyz" value="${vehicle_data['fcu']['orientation'][0]} ${vehicle_data['fcu']['orientation'][1]} ${vehicle_data['fcu']['orientation'][2]}" />-->
-<!--  <xacro:property name="gps_link_origin_rpy" value="${vehicle_data['fcu']['orientation']}" />-->
-<!--  <xacro:property name="gps_link" value="${vehicle_data['robot_origin_frame']} " />-->
+  <xacro:property name="vehicle_info" value="${xacro.load_yaml(config_file_property)}"/>
 
   <link name="base_link"/>
 
   <link name="gps_link"/>
   <joint name="gps_joint" type="fixed">
-    <origin xyz="2 0 0.1" rpy="0 0 0" />
+    <origin
+        xyz="${vehicle_info['base_link']['gps_link']['x']}
+             ${vehicle_info['base_link']['gps_link']['y']}
+             ${vehicle_info['base_link']['gps_link']['z']}"
+
+        rpy="${vehicle_info['base_link']['gps_link']['roll']}
+             ${vehicle_info['base_link']['gps_link']['pitch']}
+             ${vehicle_info['base_link']['gps_link']['yaw']}"
+    />
     <parent link="base_link" />
     <child link="gps_link" />
   </joint>
 
-  <link name="zed_camera"/>
+  <link name="zed2i_base_link"/>
   <joint name="zed_camera_link" type="fixed">
-    <origin xyz="2.8 0 0.5" rpy="0 0 0" />
+    <!-- <origin xyz="2.8 0 0.5" rpy="0 0 0" /> -->
+    <origin
+        xyz="${vehicle_info['base_link']['zed2i_base_link']['x']}
+             ${vehicle_info['base_link']['zed2i_base_link']['y']}
+             ${vehicle_info['base_link']['zed2i_base_link']['z']}"
+
+        rpy="${vehicle_info['base_link']['zed2i_base_link']['roll']}
+             ${vehicle_info['base_link']['zed2i_base_link']['pitch']}
+             ${vehicle_info['base_link']['zed2i_base_link']['yaw']}"
+    />
     <parent link="base_link" />
-    <child link="zed_camera" />
+    <child link="zed2i_base_link" />
   </joint>
 
   <link name="rslidar"/>
   <joint name="3d_lidar_link" type="fixed">
-    <origin xyz="2.8 0 0.2" rpy="0 0 0" />
+    <!-- <origin xyz="2.8 0 0.2" rpy="0 0 0" /> -->
+    <origin
+        xyz="${vehicle_info['base_link']['rslidar']['x']}
+             ${vehicle_info['base_link']['rslidar']['y']}
+             ${vehicle_info['base_link']['rslidar']['z']}"
+
+        rpy="${vehicle_info['base_link']['rslidar']['roll']}
+             ${vehicle_info['base_link']['rslidar']['pitch']}
+             ${vehicle_info['base_link']['rslidar']['yaw']}"
+    />
     <parent link="base_link" />
     <child link="rslidar" />
   </joint>
 
   <link name="rplidar"/>
   <joint name="2d_lidar_link" type="fixed">
-    <origin xyz="2.8 0 0.1" rpy="0 0 0" />
+    <!-- <origin xyz="2.8 0 0.1" rpy="0 0 0" /> -->
+    <origin
+        xyz="${vehicle_info['base_link']['rplidar']['x']}
+             ${vehicle_info['base_link']['rplidar']['y']}
+             ${vehicle_info['base_link']['rplidar']['z']}"
+
+        rpy="${vehicle_info['base_link']['rplidar']['roll']}
+             ${vehicle_info['base_link']['rplidar']['pitch']}
+             ${vehicle_info['base_link']['rplidar']['yaw']}"
+    />
     <parent link="base_link" />
     <child link="rplidar" />
   </joint>

@@ -238,7 +238,7 @@ class GlobalGpsPathPub:
                 traj_msg.points[i].longitudinal_velocity_mps = max(
                     self.speed_reduce_factor * np.interp(abs(delta_degrees),
                                                          [self.steering_limits_to_slow_down,
-                                                          vehicle_data.speed.max_steering_angle],
+                                                          vehicle_data.motion_limits.max_steering_angle],
                                                          [self.max_forward_speed,
                                                           self.min_forward_speed]), self.min_forward_speed)
             # print("speed",traj_msg.points[i].longitudinal_velocity_mps )
@@ -371,12 +371,12 @@ class GlobalGpsPathPub:
                 trajectory_msg.points[i].longitudinal_velocity_mps = max(
                     self.speed_reduce_factor * np.interp(abs(delta_degrees),
                                                          [self.steering_limits_to_slow_down,
-                                                          vehicle_data.speed.max_steering_angle],
+                                                          vehicle_data.motion_limits.max_steering_angle],
                                                          [self.max_forward_speed,
                                                           self.min_forward_speed]), self.min_forward_speed)
                 # trajectory_msg.points[i].longitudinal_velocity_mps =  np.interp(abs(delta_degrees),
                 #                                                     [self.steering_limits_to_slow_down,
-                #                                                     vehicle_data.speed.max_steering_angle],
+                #                                                     vehicle_data.motion_limits.max_steering_angle],
                 #                                                     [self.max_forward_speed,
                 #                                                     self.min_forward_speed])
 
