@@ -436,30 +436,25 @@ class ObstacleStopPlanner:
         In case of partial object detection the centroid is calculated according to the visible data, if the tracking is active and the partial object matches an previously seen object, the centroid position is "smoothed".
         '''      
         for object in objects.objects:
-            # rospy.logerr(f'{object.position[0]},{object.position[1]},{object.label}, {point[0]},{point[1]}')
-            # rospy.logerr(f'{object.label}')
-            # dis = math.hypot((point[0] - object.position[0]) ** 2 + (point[1] - object.position[1]) ** 2)
             dis = math.hypot(point[0] - object.position[0], point[1] - object.position[1])
-            #if center point distance is less than threshold directly pass the distance
-            # else check for corners too for redundancy of Obs.
+            '''
+            if center point(xyz) distance is less than threshold directly pass the distance
+            else check for corners too for redundancy of Obs.
+            '''
             if dis < self._radius_to_search: 
                 zed_obs_dis_data.append(dis)
             else: 
                 for corners in object.bounding_box_3d.corners:
-                    rospy.logerr(f'{corners.kp[0], corners.kp[1], corners.kp[2]}')
                     dis = math.hypot(point[0] - corners.kp[0], point[1] - corners.kp[1])
                     zed_obs_dis_data.append(dis)
             try:
-                # rospy.logwarn(f'distances : {zed_obs_dis_data}')
                 if len(zed_obs_dis_data) > 0:
                     zed_obs_dis_data_min = np.argmin(zed_obs_dis_data)
             except Exception as e:
                 rospy.logerr(f'Exception from find_close_obj_zed {e}')
                 
         self.objects_number = len(objects.objects)
-        # rospy.logwarn(f'no of objects: {self.objects_number}')
         if zed_obs_dis_data_min is not None:
-            # rospy.logwarn(zed_obs_dis_data[zed_obs_dis_data_min])
             return zed_obs_dis_data[zed_obs_dis_data_min]
         else:
             return float('inf')
