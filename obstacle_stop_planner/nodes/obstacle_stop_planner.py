@@ -440,7 +440,15 @@ class ObstacleStopPlanner:
             # rospy.logerr(f'{object.label}')
             # dis = math.hypot((point[0] - object.position[0]) ** 2 + (point[1] - object.position[1]) ** 2)
             dis = math.hypot(point[0] - object.position[0], point[1] - object.position[1])
-            zed_obs_dis_data.append(dis)
+            #if center point distance is less than threshold directly pass the distance
+            # else check for corners too for redundancy of Obs.
+            if dis < self._radius_to_search: 
+                zed_obs_dis_data.append(dis)
+            else: 
+                for corners in object.bounding_box_3d.corners:
+                    rospy.logerr(f'{corners.kp[0], corners.kp[1], corners.kp[2]}')
+                    dis = math.hypot(point[0] - corners.kp[0], point[1] - corners.kp[1])
+                    zed_obs_dis_data.append(dis)
             try:
                 # rospy.logwarn(f'distances : {zed_obs_dis_data}')
                 if len(zed_obs_dis_data) > 0:
