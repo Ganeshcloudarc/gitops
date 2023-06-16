@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
-try:
+try : 
+
     import rospy
     import rospkg
     from nav_msgs.msg import Path
+    from geojson import LineString as ls 
+    from nav_msgs.msg import Path, Odometry 
     from geographic_msgs.msg import GeoPointStamped, GeoPose
     from mavros_msgs.msg import HomePosition
     from geometry_msgs.msg import Pose, PoseStamped, Quaternion, PolygonStamped
@@ -11,9 +14,11 @@ try:
     from visualization_msgs.msg import Marker, MarkerArray
     import json, time, math, sys, os
     import numpy as np
+    from json import dump 
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
     from autopilot_utils.geonav_conversions import xy2ll, ll2xy
+    from autopilot_utils.rdp_helper import rdp_calculate, distance__ 
     from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses, yaw_to_quaternion
     from autopilot_utils.trajectory_helper import trajectory_to_path, trajectory_to_marker
     from autopilot_utils.trajectory_common import TrajectoryManager
@@ -21,18 +26,25 @@ try:
     from fastkml import geometry
     import geometry_msgs.msg as gmsg
 
-
-except Exception as e:
-    import rospy
-
-    rospy.logerr("module named %s", str(e))
-    exit()
-
+except Exception as e: 
+    import rospy 
+    rospy.logerr("module named %s", str(e)) 
+    exit() 
 
 class GlobalGpsPathPub:
     def __init__(self, mission_file_dir):
+        self.interploted_x=[] 
+        self.interploted_y=[] 
+        self.interploted=[]
+        self.coordinate =[] 
+        self.coordinate_x =[] 
+        self.coordinate_y =[] 
+        self.curve_dist = rospy.get_param("path_publisher/curve_dist",10)
+        self.smooth_path = rospy.get_param("path_publisher/smooth_path",False)
+        self.curve_angle = rospy.get_param("path_publisher/rdp_angle",0.09)
         self._traj_manager = TrajectoryManager()
         # parameters for path publisher
+        # self.path_res = rospy.get_param("path_publisher/path_resolution",0.1)
         self.max_forward_speed = rospy.get_param('/patrol/max_forward_speed', 1.5)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
         distance_to_slowdown_on_ends = rospy.get_param("/path_publisher/distance_to_slowdown_on_ends", 3)
@@ -70,13 +82,82 @@ class GlobalGpsPathPub:
         for x, y in xy_list:
             point = gmsg.Point()
             point.x, point.y = x, y
-            polygon_st.polygon.points.append(point)
+            polygon_st.polygon.points.append(point) 
         return polygon_st
 
     def from_json(self):
-        data = None
+        data = None 
+        json_data = [] 
         try:
+           
             data = json.load(open(self.mission_file_dir))
+            if (self.smooth_path == True) : 
+                rospy.loginfo("smooth path is true")
+                # reading the json file 
+                for i in data['coordinates']:
+                    json_data.append(i) 
+                
+                #ll2xy 
+                for i in range(len(json_data)): 
+                    # x, y = ll2xy(long_lat_list[i][1], long_lat_list[i][0], home_lat, home_long)
+                    json_data_x,json_data_y = ll2xy (json_data[i][1],json_data[i][0],json_data[0][1],json_data[0][0])
+                    self.coordinate.append([json_data_x,json_data_y]) 
+                    self.coordinate_x.append([json_data_x]) 
+                    self.coordinate_y.append([json_data_y])   
+                rdp_thr = np.pi*self.curve_angle
+                self.curve_points = rdp_calculate(self.coordinate,rdp_thr) 
+                self.curve_points.insert(0,self.coordinate[0])
+                self.curve_points.append(self.coordinate[-1])
+                for i in range(len(self.curve_points)-1): 
+                    dist_val = distance__(self.curve_points[i],self.curve_points[i+1])  
+                    if dist_val >= self.curve_dist :  
+                        #  linear interpolation 
+                        rospy.loginfo("linear interpolation ")
+                        a,b = self.curve_points[i][0],self.curve_points[i][1] 
+                        a1,b1 = self.curve_points[i+1][0],self.curve_points[i+1][1] 
+                        changex = a1-a 
+                        changey = b1-b
+                        
+                        angle_line = math.atan2(changey, changex) 
+                        no_of_points = dist_val / self.path_resolution
+                        
+                        for j in range(int(no_of_points)): 
+                            if j == 0: 
+                                px_upd = a + self.path_resolution * math.cos(angle_line) 
+                                py_upd = b + self.path_resolution * math.sin(angle_line)  
+                                self.interploted.append([px_upd,py_upd]) 
+                            
+                            else: 
+                                px = self.interploted[-1][0]
+                                py = self.interploted[-1][1]
+                                px_upd = px + self.path_resolution * math.cos(angle_line) 
+                                py_upd = py + self.path_resolution * math.sin(angle_line)
+                                self.interploted.append([px_upd,py_upd])  
+                    else: 
+                        rospy.loginfo("setting the same turning points ")
+                        element_1 = self.curve_points[i] 
+                        index1 = self.coordinate.index(element_1)
+                        
+                        element_2 = self.curve_points[i+1] 
+                        index2 = self.coordinate.index(element_2)
+                        for i in range(index1,index2+1):  
+                            self.interploted.append([self.coordinate[i][0],self.coordinate[i][1]])
+                # xy to ll  
+                json_coord = []
+                json_coord.append(json_data[0])
+                for i in range(len(self.interploted)): 
+                    llx,lly = xy2ll(self.interploted[i][0],self.interploted[i][1],json_data[0][1],json_data[0][0]) 
+                    json_coord.append([lly,llx])
+
+                # json convertion 
+                line_string = ls(json_coord)  
+                data = line_string
+                rospy.loginfo("json is updated") 
+                
+            else : 
+                print(self.smooth_path)
+                rospy.loginfo("smooth_path is false")
+
         except Exception as error:
             rospy.logerr('Error In Reading mission file ' + str(error))
             rospy.signal_shutdown('Error In Reading mission file ' + str(error))
@@ -247,6 +328,7 @@ class GlobalGpsPathPub:
         self._traj_manager.update(traj_msg)
         self.gps_path_pub.publish(self._traj_manager.to_path())
         self.trajectory_velocity_marker_pub.publish(trajectory_to_marker(traj_msg, 1.5))
+        rospy.loginfo("PUBLISHED GLOBAL GPS PATH")
 
     def from_odometry(self, data):
         data_keys = data.keys()
@@ -262,7 +344,7 @@ class GlobalGpsPathPub:
         # Setting home position for mavros node
         home_lat = data['coordinates'][0][1]
         home_long = data['coordinates'][0][0]
-        home_alt = data['gps_coordinates'][0]['altitude']
+        home_alt = data['gps_coordinates'][0]['altitude'] 
         home_position = self.set_home_position(home_lat, home_long, home_alt)
         rospy.loginfo('Origin point set')
         time.sleep(0.5)
@@ -281,6 +363,7 @@ class GlobalGpsPathPub:
             # Odom based path
             lon, lat = data['coordinates'][i][0], data['coordinates'][i][1]
             odom_position = data['odometry'][i]['pose']['pose']['position']
+            # print("odom position",odom_position)
             odom_orientation = data['odometry'][i]['pose']['pose']['orientation']
             odom_pose = Pose()
             odom_pose.position.x, odom_pose.position.y, odom_pose.position.z = odom_position['x'], odom_position['y'], \
@@ -388,16 +471,16 @@ class GlobalGpsPathPub:
         rospy.loginfo("global_trajectory_published")
         rospy.loginfo('Details of ' + str(i) + " are published from file " + str(mission_file))
 
-    def target_index(self, robot_pose, close_point_ind):
+    def target_index(self, robot_pose, close_point_ind): 
         """
         search index of target point in the reference path. The following implementation was inspired from
         http://dyros.snu.ac.kr/wp-content/uploads/2021/02/Ahn2021_Article_AccuratePathTrackingByAdjustin-1.pdf
         Args:
             robot_pose:  pose of robot
-            close_point_ind : index of close point to the vehicle
+            close_point_ind : index of close point to the vehicle 
         Returns:
             close_index, target_index, lookahead_distance, cross_track_dis,
-        """
+        """ 
         lhd = self.compute_lookahead_distance(abs(self.robot_state.twist.twist.linear.x))
         close_dis = self.trajectory_data.points[close_point_ind].accumulated_distance_m
         for ind in range(close_point_ind, len(self.trajectory_data.points)):
@@ -405,10 +488,12 @@ class GlobalGpsPathPub:
             if path_acc_distance > lhd:
                 return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
         return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
+   
 
+if __name__ == "__main__": 
 
-if __name__ == "__main__":
     rospy.init_node("global_gps_path_publisher")
+
     mission_file = rospy.get_param('/patrol/mission_file', 'default.json')
     if "/" in mission_file:
         mission_file_dir = mission_file
@@ -439,5 +524,5 @@ if __name__ == "__main__":
     else:
         rospy.logerr(f"No proper extension to input mission file, path: {mission_file_dir}")
         rospy.signal_shutdown(f"No proper extension to input mission file, path: {mission_file_dir}")
-
+    
     rospy.spin()
