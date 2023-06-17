@@ -10,15 +10,29 @@ find_package(catkin REQUIRED COMPONENTS
   roslib
   
   autopilot_msgs
+  message_generation
 
   # vehicle_stop_command
   # pilot
+)
+add_message_files(
+  FILES
+  val.msg
+)
+add_service_files( 
+   FILES 
+   trigger.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
 )
 
 
 catkin_package(
   LIBRARIES ${PROJECT_NAME} 
-  CATKIN_DEPENDS roscpp roslib std_msgs autopilot_msgs 
+  CATKIN_DEPENDS roscpp roslib std_msgs autopilot_msgs  message_runtime 
   INCLUDE_DIRS include
 )
 
