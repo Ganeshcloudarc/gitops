@@ -3,8 +3,10 @@
     <arg name="mission_continue" default="false"/>
     <arg name="sensor_source" default="1" doc="0: zed_camera, 1: rslidar, 2: rplidar "/>
     <arg name="use_pcl_boxes" default="true"/>
+    <arg name="enable_zed_obs" default="true"/>
     <param name = "/obstacle_stop_planner/mission_continue" value = "$(arg mission_continue)"/>
     <param name="use_pcl_boxes" value="$(arg use_pcl_boxes)"/>
+    <param name="enable_zed_obs" value="$(arg enable_zed_obs)"/>
     
     <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
         <arg name="rviz" value="false"/>
@@ -16,6 +18,7 @@
 
     <rosparam command="load" file="$(find obstacle_stop_planner)/params/obstacle_stop_planner.yaml"/>
     <param name="obstacle_stop_planner/scan_in" value="laser_scan"/>
+    <param name="/obstacle_stop_planner/use_zed_object_detection" value="$(arg enable_zed_obs)"/>
 
 
     <node pkg="obstacle_stop_planner" type="obstacle_stop_planner.py" name="obstacle_stop_planner_node" output="screen" />

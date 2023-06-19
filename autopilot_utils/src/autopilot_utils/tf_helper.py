@@ -265,7 +265,7 @@ def transform_zed_objects(object_data, to_frame):
     try:
         trans = tfBuffer.lookup_transform(to_frame, object_data.header.frame_id, rospy.Time(0))
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-        rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, object_data.header.frame_id))
+        rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s because of %s' % (to_frame, object_data.header.frame_id, e))
         return None
     for i in range(len(object_data.objects)):
         object_data.objects[i].position = convert_point_by_transform(object_data.objects[i].position, trans)

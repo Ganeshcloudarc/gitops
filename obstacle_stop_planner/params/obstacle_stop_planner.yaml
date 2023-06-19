@@ -7,6 +7,8 @@ obstacle_stop_planner:
   robot_min_speed_th : 0.8
 
   traj_in  : "global_gps_trajectory"
+  use_zed_object_detection: True
+  zed_object_topic : "/zed2i/zed_node/obj_det/objects"
   # scan_in  : "laser_scan"
   traj_out : "local_gps_trajectory"
   speed_min_threshold : 0.5 # speed less than this would not move vehicle.
