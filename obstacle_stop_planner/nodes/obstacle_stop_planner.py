@@ -425,7 +425,7 @@ class ObstacleStopPlanner:
             self.transformed_zed_objects_publisher.publish(data_in_map_frame)
             self.zed_objects = data_in_map_frame
 
-        rospy.logdebug(f"time taken for laser scan callback: {time.time() - start} ")
+        rospy.logdebug(f"time taken for zed objects callback: {time.time() - start} ")
 
     def find_close_object_zed(self, objects, point):
         zed_obs_dis_data = []
@@ -447,11 +447,11 @@ class ObstacleStopPlanner:
                 for corners in object.bounding_box_3d.corners:
                     dis = math.hypot(point[0] - corners.kp[0], point[1] - corners.kp[1])
                     zed_obs_dis_data.append(dis)
-            try:
-                if len(zed_obs_dis_data) > 0:
-                    zed_obs_dis_data_min = np.argmin(zed_obs_dis_data)
-            except Exception as e:
-                rospy.logerr(f'Exception from find_close_obj_zed {e}')
+        try:
+            if len(zed_obs_dis_data) > 0:
+                zed_obs_dis_data_min = np.argmin(zed_obs_dis_data)
+        except Exception as e:
+            rospy.logerr(f'Exception from find_close_obj_zed {e}')
                 
         self.objects_number = len(objects.objects)
         if zed_obs_dis_data_min is not None:
