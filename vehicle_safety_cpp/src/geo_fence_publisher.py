@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-
 import rospy
 from std_msgs.msg import String
 import geometry_msgs.msg as gmsg
 from autopilot_utils.geonav_conversions import *
 from geographic_msgs.msg import GeoPointStamped
+from vehicle_safety_cpp.srv import trigger,triggerResponse  
+#srv on trigger on the updated coordinates in publishment
+
 
 class geoFencePub:
     def __init__(self):
-        self.home_gps_location = False
+        self.funcall()
+        self.home_gps_location = False 
         self.use_geo_fence = rospy.get_param(
             '/vehicle_safety/use_geo_fence', False)
+        rospy.logdebug("service created")     
         self.geo_fence_coordinates = rospy.get_param(
             '/vehicle_safety/geo_fence_coordinates')
         if self.use_geo_fence:
@@ -31,8 +35,20 @@ class geoFencePub:
         'altitude': data.position.altitude
         }
         rospy.logdebug("home position data received %s",
-                    str(self.home_gps_location))
+                    str(self.home_gps_location)) 
         self.publish_geo_fence()
+
+    #service call no updating the no_go_zone_coordinates 
+    def service_request(self,req):
+        if rospy.has_param('/vehicle_safety/no_go_zone_coordinates'):
+            self.no_go_geo_fence_coordinates = rospy.get_param('/vehicle_safety/no_go_zone_coordinates')
+            rospy.loginfo("updating the new params in geofence") 
+            self.publish_geo_fence() 
+            rospy.loginfo("updated")
+            return triggerResponse(response = 1)
+            
+        
+        
 
     def publish_geo_fence(self):
         
@@ -59,14 +75,21 @@ class geoFencePub:
                 print(i)
                 for j in i:
                     lat, lon = j[0], j[1]
-                    # print(lat, lon)
+                    # print(lat, lon) 
                     point = gmsg.Point()
                     point.x, point.y = ll2xy(lat, lon,home_lat , home_long)
                     polygon_st.polygon.points.append(point)
                 self.nogozone_polygon_pub.publish(polygon_st)
             rospy.loginfo("Published Geofence")
 
+    def funcall(self):  
+        rospy.loginfo("service started :)") 
+        rospy.Service('no_go_geo_fence_coordinates',trigger,self.service_request)
+
+
+
 if __name__ == "__main__":
     rospy.init_node('geo_fence_publisher')
     fs = geoFencePub()
+
     rospy.spin()

@@ -4,6 +4,7 @@
   <param name="diagnostic_period" value="0.1"/> <!-- 10 Hz = 0.1; 100 Hz = 0.01-->
   <remap from="diagnostics" to="/vehicle_safety_diagnostics"/>
   </node>
+  <node name="geofence" pkg="vehicle_safety_cpp" type="kml_geofence.py" output="screen"/>
   <node name="vehicle_safety_analyzer" pkg="vehicle_safety_cpp" type="vehicle_safety_analyzer_cpp" output="screen"/>
   <node name="curve_detector_cpp" pkg="vehicle_safety_cpp" type="curve_detector_cpp" output="screen"/>
   <node name="geofence_publisher" pkg="vehicle_safety_cpp" type="geo_fence_publisher.py" output="screen"/>
