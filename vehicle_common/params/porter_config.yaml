@@ -32,7 +32,7 @@ base_link:   # center of the rear axle.
     roll: 0.0
     pitch: 0.0
     yaw: 0.0
-  zed2i_base_link: # center of the rear axle to zed camera 
+  zed_camera: # center of the rear axle to zed camera 
     x: 2.8
     y: 0.0
     z: 0.5
