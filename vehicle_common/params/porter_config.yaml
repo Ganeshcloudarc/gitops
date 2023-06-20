@@ -12,7 +12,7 @@ dimensions: # for yellow porter ref https://trucks.cardekho.com/en/trucks/piaggi
   tyre_section_width :  0.145
   gear_ratio         : 26.67
 
-speed:
+motion_limits:
   max_forward_speed      : 3  # m/s
   min_forward_speed      : 0.3 # m/s
   max_backward_speed : -3
@@ -22,55 +22,36 @@ speed:
   max_steering_angle : 30 # degrees
   min_steering_angle : -30 # degrees
 
-## center of gravity also a point
-COG_position:
-  - 0.4
-  - 1
-  - 0.5   # [X, Y, Z] distances from rear wheel axle center
-
 robot_origin_frame: "base_link" # name of link at rear wheel
 
-sensors: 
-  # sensor info and locations from front_wheel axle center
-  fcu:
-    model: "pixhawk4"
-    sensor_frame: "fcu_link"
-    position :
-      - 0.2
-      - 0
-      - 0    # [X, Y, Z] distances from front wheel axle center to fcu
-    orientation:
-      - 0
-      - 0
-      - 0 # [row, pitch, yaw] of fcu in radians wrt front wheel axle center
+base_link:   # center of the rear axle.
+  gps_link:  # center of the rear axle to gps position, center point of two gps modules.
+    x: 2.080
+    y: 0.0
+    z: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+  zed_camera: # center of the rear axle to zed camera 
+    x: 2.8
+    y: 0.0
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
 
-  zed_camera:
-    model : "zed2i"
-    sensor_frame : "zed2i_base_link"
-    position:
-        - 0.4
-        - 0
-        - 0.4    # [X, Y, Z] distances from front wheel axle center to camera_center
-    orientation:
-        - 0
-        - 0
-        - 0 # [row, pitch, yaw] of zed camera in radians wrt front wheel axle center
+  rslidar: # center of the rear axle to rslidar(3d lidar)
+    x: 2.8
+    y: 0.0
+    z: 0.2
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
 
-  lidar:
-    model: "rs_lidar"
-    sensor_frame : "rs_lidar"
-    position:
-      - 0.4
-      - 0
-      - 0.2    # [X, Y, Z] distances from front wheel axle center to lidar
-    orientation:
-      - 0
-      - 0
-      - 0 # [row, pitch, yaw] of lidar in radians wrt front wheel axle center
-
-
-
-
-
-
-
+  rplidar: # center of the rear axle to rplidar (2d lidar )
+    x: 2.8
+    y: 0.0
+    z: 0.1
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
