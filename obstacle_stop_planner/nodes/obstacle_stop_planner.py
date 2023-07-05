@@ -104,6 +104,8 @@ class ObstacleStopPlanner:
         self._TIME_OUT_FROM_LASER = 2  # in secs
         self._TIME_OUT_FROM_ODOM = 2
         self._TIME_OUT_FROM_ZED = 2
+        self.vehicle_stop_init_time_for_obs = None
+        self.stop_threshold_time_for_obs = rospy.get_param("/obstacle_stop_planner/stop_threshold_time_for_obs", 5)
         # TODO consider vehicle diagonal to check for collision detection radius
         # distance within below value to laser point would make collision.
         self._radius_to_search = vehicle_data.dimensions.overall_width / 2 + radial_off_set_to_vehicle_width
@@ -128,8 +130,8 @@ class ObstacleStopPlanner:
         if self.use_zed_detections:
             rospy.loginfo("Running zed Obs")
             rospy.Subscriber(self.zed_objects_topic, ObjectsStamped, self.zed_objects_callback, queue_size=1)
+            self.transformed_zed_objects_publisher = rospy.Publisher('/obstacle_stop_planner/transformed_zed_obj', ObjectsStamped, queue_size=1)
         # ros publishers
-        self.transformed_zed_objects_publisher = rospy.Publisher('/obstacle_stop_planner/transformed_zed_obj', ObjectsStamped, queue_size=1)
         local_traj_in_topic = rospy.get_param("obstacle_stop_planner/traj_out", "local_gps_trajectory")
         self.local_traj_publisher = rospy.Publisher(local_traj_in_topic, Trajectory, queue_size=10)
         self.collision_points_publisher = rospy.Publisher('obstacle_stop_planner/collision_points', PointCloud2,
@@ -347,6 +349,7 @@ class ObstacleStopPlanner:
 
                     # TODO apply break directly to pilot
                     rospy.logwarn("obstacle is very close, applying hard breaking")
+                    self.vehicle_stop_init_time_for_obs = time.time()
                     for i in range(self._close_idx, collision_index + 1):
                         traj_point = copy.deepcopy(self._traj_in.points[i])
                         traj_point.longitudinal_velocity_mps = 0.0
@@ -372,15 +375,28 @@ class ObstacleStopPlanner:
                     # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
                     # #
                     # # traj_out = self._smoother.filter(trajectory_msg)
+                    self.vehicle_stop_init_time_for_obs = time.time()
                     for i in range(stop_index, collision_index):
                         traj_point = copy.deepcopy(self._traj_in.points[i])
                         traj_point.longitudinal_velocity_mps = 0.0
                         # traj_out.points.append(traj_point)
                         trajectory_msg.points.append(traj_point)
             else:
-                rospy.loginfo("No obstacle found")
-                for i in range(self._close_idx, collision_index):
-                    trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
+                if self.vehicle_stop_init_time_for_obs is not None:
+                    if time.time() - self.vehicle_stop_init_time_for_obs > self.stop_threshold_time_for_obs:
+                        rospy.loginfo("No obstacle found")
+                        for i in range(self._close_idx, collision_index):
+                            trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
+                    else:
+                        rospy.logwarn(f'Obs Time limit not crossed. Remaining time: {self.stop_threshold_time_for_obs - (time.time() - self.vehicle_stop_init_time_for_obs)}')
+                        for i in range(stop_index, collision_index):
+                            traj_point = copy.deepcopy(self._traj_in.points[i])
+                            traj_point.longitudinal_velocity_mps = 0.0
+                            # traj_out.points.append(traj_point)
+                            trajectory_msg.points.append(traj_point)
+                else:
+                    for i in range(self._close_idx, collision_index):
+                        trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
                 # trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
                 # if self.robot_speed < self.robot_min_speed_th:
                 #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th

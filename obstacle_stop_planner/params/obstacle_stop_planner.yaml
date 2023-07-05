@@ -2,6 +2,7 @@ obstacle_stop_planner:
   stop_line_buffer : 5 # distance to be maintained from obstacle from front tip of vehicle (m).
   radial_off_set_to_vehicle_width : 0.3 # offset search radius to add vehicle width.
   trajectory_resolution : 0.5 # the minimum distance between the points in trajectory
+  stop_threshold_time_for_obs : 5 # time to stop vehicle if obstacle is detected in front of vehicle (s).
 
   lookup_collision_distance : 20 # the distance to look for obstacle from vehicle location on the path.
   robot_min_speed_th : 0.8
