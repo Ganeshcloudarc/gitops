@@ -10,6 +10,7 @@ try:
     import numpy as np
     from sklearn.neighbors import KDTree
     import copy
+    np.float = np.float64
     import ros_numpy
     import rospy
     import tf2_ros
@@ -416,7 +417,7 @@ class ObstacleStopPlanner:
 
     def odom_callback(self, data):
         self.robot_pose = data.pose.pose
-        self.robot_speed = math.hypot(data.twist.twist.linear.x ** 2, data.twist.twist.linear.y ** 2)
+        self.robot_speed = math.sqrt(data.twist.twist.linear.x ** 2, data.twist.twist.linear.y ** 2)
         # print("self.robot_speed", self.robot_speed)
         self.odom_data_in_time = time.time()
         pose_heading = get_yaw(data.pose.pose.orientation)

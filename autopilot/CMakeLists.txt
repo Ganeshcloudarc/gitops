@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   sensor_msgs
-  jsk_rviz_plugins
   mavros
   mavros_extras
   geographic_msgs
