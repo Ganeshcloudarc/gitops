@@ -1,5 +1,5 @@
 <launch>
-    <arg name="hardware_in_loop" default="false" doc="false to software in loop"/>
+    <arg name="hardware_in_loop" default="true" doc="false to software in loop"/>
     <arg name="vehicle_type" default="half_cabin" doc="It can be either half_cabin or porter"/>
 
     <arg name="mission_file" default="default.json"/>
