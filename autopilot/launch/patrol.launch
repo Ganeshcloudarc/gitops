@@ -38,7 +38,7 @@
  
     <group if="$(eval arg('hardware_in_loop'))">
        <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
-           <arg name="vehicle_type" value="$(arg vehicle_type)"/>
+            <arg name="vehicle_type" value="$(arg vehicle_type)"/>
             <arg name="vcu_up" default="false"/>
             <arg name="gps_up" default="false"/>
             <arg name="zed_camera" value="$(arg enable_zed_obs)"/>
@@ -49,12 +49,9 @@
 
      <group unless="$(eval arg('hardware_in_loop'))">
         <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
-        <arg name="record" default="false"/>
-        <arg name="failsafe_enable" default="false"/>
-        <arg name="failsafe_enable_cpp" default="false"/>
-       <include file="$(find vehicle_description)/launch/boson_sim.launch">
+        <include file="$(find vehicle_description)/launch/boson_sim.launch">
             <arg name="vehicle_type" value="$(arg vehicle_type)"/>
-       </include>
+        </include>
     </group>
 
 
@@ -98,35 +95,35 @@
           </group>
     </group> -->
 
-    <group if="$(eval arg('pp_with_pid'))">
-        <node name="patrol_bag_record" pkg="rosbag" type="record"
-            args="record -o $(env HOME)/.bags/boson_pid_kp_$(arg kp)_ki_$(arg ki) -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/> 
-    </group>
+    <!-- Record only when HIL is True -->
+    <group if="$(eval arg('hardware_in_loop'))">
+        <group if="$(eval arg('pp_with_pid'))">
+            <node name="patrol_bag_record" pkg="rosbag" type="record"
+                args="record -o $(env HOME)/.bags/boson_pid_kp_$(arg kp)_ki_$(arg ki) -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/> 
+        </group>
 
-    <group unless="$(eval arg('pp_with_pid'))">
-        <node name="patrol_bag_record" pkg="rosbag" type="record"
-            args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
-    </group>
-    
-    <!-- <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include> -->
-
-
-    <group if="$(eval arg('failsafe_enable'))">
-        <include file="$(find autopilot)/launch/failsafe_manager.launch">
-            <arg name="use_zed_camera"         value="false" />
-            <arg name="use_oak_camera"            value="false" />
-            <arg name="vehicle_safety_diagnostics" default="true"/>
-            <arg name="vehicle_safety_cpp_diagnostics" default="false"/>
-            <arg name="use_emergeny_stop" value ="true"/>
-        </include>
-    </group>
-    <group if="$(eval arg('failsafe_enable_cpp'))">
-        <include file="$(find autopilot)/launch/failsafe_manager.launch">
-            <arg name="use_zed_camera"         value="false" />
-            <arg name="use_oak_camera"            value="false" />
-            <arg name="vehicle_safety_diagnostics" default="false"/>
-            <arg name="vehicle_safety_cpp_diagnostics" default="true"/>
-            <arg name="use_emergeny_stop" value ="true"/>
-        </include>
+        <group unless="$(eval arg('pp_with_pid'))">
+            <node name="patrol_bag_record" pkg="rosbag" type="record"
+                args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
+        </group>
+        <!-- <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include> -->
+        <group if="$(eval arg('failsafe_enable'))">
+            <include file="$(find autopilot)/launch/failsafe_manager.launch">
+                <arg name="use_zed_camera"         value="false" />
+                <arg name="use_oak_camera"            value="false" />
+                <arg name="vehicle_safety_diagnostics" default="true"/>
+                <arg name="vehicle_safety_cpp_diagnostics" default="false"/>
+                <arg name="use_emergeny_stop" value ="true"/>
+            </include>
+        </group>
+        <group if="$(eval arg('failsafe_enable_cpp'))">
+            <include file="$(find autopilot)/launch/failsafe_manager.launch">
+                <arg name="use_zed_camera"         value="false" />
+                <arg name="use_oak_camera"            value="false" />
+                <arg name="vehicle_safety_diagnostics" default="false"/>
+                <arg name="vehicle_safety_cpp_diagnostics" default="true"/>
+                <arg name="use_emergeny_stop" value ="true"/>
+            </include>
+        </group>
     </group>
 </launch>
