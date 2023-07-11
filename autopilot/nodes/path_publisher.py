@@ -31,6 +31,11 @@ except Exception as e:
     rospy.logerr("module named %s", str(e)) 
     exit() 
 
+
+def get_tie(theta):
+    return np.array([np.cos(theta), np.sin(theta)])
+
+
 class GlobalGpsPathPub:
     def __init__(self, mission_file_dir):
         self.interploted_x=[] 
@@ -243,6 +248,8 @@ class GlobalGpsPathPub:
             x, y = ll2xy(long_lat_list[i][1], long_lat_list[i][0], home_lat, home_long)
             xy_list.append([x, y])
         self.polygon_xy_pub.publish(self.to_polygon(xy_list))
+        if self.mission_continue:
+            xy_list.append(xy_list[0])
 
         x_y_filled = [xy_list[0]]
 
@@ -327,7 +334,7 @@ class GlobalGpsPathPub:
         self.global_trajectory_pub.publish(traj_msg)
         self._traj_manager.update(traj_msg)
         self.gps_path_pub.publish(self._traj_manager.to_path())
-        self.trajectory_velocity_marker_pub.publish(trajectory_to_marker(traj_msg, 1.5))
+        self.trajectory_velocity_marker_pub.publish(trajectory_to_marker(traj_msg, self.max_forward_speed))
         rospy.loginfo("PUBLISHED GLOBAL GPS PATH")
 
     def from_odometry(self, data):
@@ -392,42 +399,43 @@ class GlobalGpsPathPub:
         # connecting the first and last way points
         i = i + 1
         if self.mission_continue:
-            distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[1].pose)
+            distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[0].pose)
             rospy.loginfo("distance between first and last way point %s", str(distance))
-            if distance > self.avg_lhd:
-                rospy.logwarn("path's end and start points are %s meters apart , Interpolating them ", str(distance))
-                n_points = distance // self.path_resolution
-                angle = angle_btw_poses(trajectory_msg.points[1].pose, trajectory_msg.points[-1].pose)
-                # print()
-                # print("angle", angle)
-                for j in range(0, int(n_points)):
-                    # odom path
-                    px = trajectory_msg.points[-1].pose.position.x
-                    py = trajectory_msg.points[-1].pose.position.y
-                    px_updated = px + self.path_resolution * math.cos(angle)
-                    py_updated = py + self.path_resolution * math.sin(angle)
-                    odom_pose = Pose()
-                    odom_pose.position.x, odom_pose.position.y, odom_pose.position.z = px_updated, py_updated, \
-                                                                                       self.rear_axle_center_height_from_ground
-                    odom_pose.orientation = yaw_to_quaternion(angle)
-                    # Trajectory
-                    lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long)
+            # if distance > self.avg_lhd:
 
-                    dis = distance_btw_poses(odom_pose, prev_pose)
-                    accumulated_distance = accumulated_distance + dis
-                    prev_pose = odom_pose
-                    # Trajectory msg filling
-                    traj_pt_msg = TrajectoryPoint()
-                    traj_pt_msg.pose = odom_pose
+            rospy.logwarn("path's end and start points are %s meters apart , Interpolating them ", str(distance))
+            n_points = distance // self.path_resolution
+            angle = angle_btw_poses(trajectory_msg.points[0].pose, trajectory_msg.points[-1].pose)
+            # print()
+            # print("angle", angle)
+            for j in range(0, int(n_points)):
+                # odom path
+                px = trajectory_msg.points[-1].pose.position.x
+                py = trajectory_msg.points[-1].pose.position.y
+                px_updated = px + self.path_resolution * math.cos(angle)
+                py_updated = py + self.path_resolution * math.sin(angle)
+                odom_pose = Pose()
+                odom_pose.position.x, odom_pose.position.y, odom_pose.position.z = px_updated, py_updated, \
+                                                                                    self.rear_axle_center_height_from_ground
+                odom_pose.orientation = yaw_to_quaternion(angle)
+                # Trajectory
+                lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long)
 
-                    traj_pt_msg.gps_pose.position.latitude = lat
-                    traj_pt_msg.gps_pose.position.longitude = lng
-                    # traj_pt_msg.longitudinal_velocity_mps =
-                    traj_pt_msg.index = i + j
-                    traj_pt_msg.accumulated_distance_m = accumulated_distance
-                    trajectory_msg.points.append(traj_pt_msg)
-            else:
-                rospy.loginfo("path end and start points are close , no interpolation needed ")
+                dis = distance_btw_poses(odom_pose, prev_pose)
+                accumulated_distance = accumulated_distance + dis
+                prev_pose = odom_pose
+                # Trajectory msg filling
+                traj_pt_msg = TrajectoryPoint()
+                traj_pt_msg.pose = odom_pose
+
+                traj_pt_msg.gps_pose.position.latitude = lat
+                traj_pt_msg.gps_pose.position.longitude = lng
+                # traj_pt_msg.longitudinal_velocity_mps =
+                traj_pt_msg.index = i + j
+                traj_pt_msg.accumulated_distance_m = accumulated_distance
+                trajectory_msg.points.append(traj_pt_msg)
+            # else:
+            #     rospy.loginfo("path end and start points are close , no interpolation needed ")
         else:
             distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[1].pose)
             rospy.logdebug("distance between first and last way point %s", str(distance))
@@ -489,7 +497,7 @@ class GlobalGpsPathPub:
                 return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
         return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
    
-
+    
 if __name__ == "__main__": 
 
     rospy.init_node("global_gps_path_publisher")
