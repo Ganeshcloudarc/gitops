@@ -11,7 +11,9 @@ try:
     import rospy
     import tf2_ros
     import time, sys
-
+    # import dynamic reconfigure related imports
+    from dynamic_reconfigure.server import Server
+    from autopilot.cfg import pid_Config
     # ros messages
     from nav_msgs.msg import Path, Odometry
     from geometry_msgs.msg import Point, PoseArray, PoseStamped
@@ -52,6 +54,7 @@ def getLineNumber():
 
 class PurePursuitController:
     def __init__(self):
+        srv = Server(pid_Config,self.pid_callback)
         self.updated_odom_time = None
         self.trajectory_len = None
         self.gps_robot_state = None
@@ -63,8 +66,13 @@ class PurePursuitController:
         self.cte = 0
         self.sum_cte = 0
         self.is_reverse = False
+        self.kp_pid = 0.01
+        self.ki_pid = 0.01
+        self.e1 = 0
+        self.e2 = 0
+        self.rqt = rospy.get_param("/pure_pursuit/enable_rqt")
 
-        self.is_pp_pid = rospy.get_param("/pp_with_pid",False)
+        self.is_pp_pid = rospy.get_param("/patrol/pp_with_pid",False)
         # ros parameters
         self.max_speed = rospy.get_param("/patrol/max_forward_speed", 1.8) # default value of max speed is max forward speed.
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
@@ -198,6 +206,7 @@ class PurePursuitController:
 
             # close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
             self.index_old, close_dis = self.find_close_point_by_distance(robot_pose, self.index_old)
+            # self.cte = close_dis
 
             #  COMMETING FOR DEBUG
             # if close_dis > self.avg_look_ahead:
@@ -299,6 +308,27 @@ class PurePursuitController:
             target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
             alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
            
+            # robot_position = (3, 3)
+            robot_position = (robot_pose.position.x,robot_pose.position.y) 
+            # nearest_point = (5, 5)
+            nearest_point = (close_pose_msg.pose.position.x,close_pose_msg.pose.position.y)
+            # lookahead_point = (7, 6)
+            lookahead_point = (target_pose_msg.pose.position.x,target_pose_msg.pose.position.y)
+
+            cross_product = self.calculate_cross_product(robot_position, nearest_point, lookahead_point)
+            if cross_product > 0:
+                result = "right"
+                # return "Right"
+            elif cross_product < 0:
+                close_dis = -close_dis
+                result = "Left"
+                # return "Left"  
+            else:
+                result = "on path"
+                # return "On Path" 
+            self.cte = close_dis
+            rospy.logdebug(f'Robot is {result} of the path.')
+            
             dot_vector = self.findLookaheadPos(robot_pose, target_pose_msg)
 
             if dot_vector >= 0:
@@ -319,10 +349,12 @@ class PurePursuitController:
                 pass
 
             if self.is_pp_pid:
+                rospy.logdebug("running with pid")
                 delta_degrees = self.pp_with_pid(lhd=lhd,alpha=alpha)
                 delta_degrees = math.degrees(delta_degrees)
 
             else:
+                rospy.logdebug("running without pid")
                 delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
                 delta_degrees = math.degrees(delta)
 
@@ -387,8 +419,14 @@ class PurePursuitController:
         pid on the pure pursuit controller
         '''
         #0.6,0.1,0.3 //0.65,0.25 //
-        kp = rospy.get_param("kp_pid",0.01)
-        ki = rospy.get_param("ki_pid",0.01)
+        # kp = rospy.get_param("kp_pid",0.01)
+        # ki = rospy.get_param("ki_pid",0.01)
+        if self.rqt:
+            kp = self.kp_pid
+            ki = self.ki_pid
+        else:
+            kp = rospy.get_param("/pure_pursuit/kp_pid",0.01)
+            ki = rospy.get_param("/pure_pursuit/ki_pid",0.01)
         kd = 0.5
         kpp = 1 - kp - ki
         delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), lhd)
@@ -551,6 +589,22 @@ class PurePursuitController:
         #     return 1
         return dot_product
     
+    def calculate_cross_product(self,robot_position, nearest_point, lookahead_point):
+        # Calculate vectors P and Q
+        vector_P = np.array([lookahead_point[0] - robot_position[0], lookahead_point[1] - robot_position[1]])
+        vector_Q = np.array([nearest_point[0] - robot_position[0], nearest_point[1] - robot_position[1]])
+
+        # Calculate the cross product (P x Q)
+        cross_product = np.cross(vector_P, vector_Q)
+        rospy.logdebug(cross_product)
+        
+        return cross_product
+        # if cross_product > 0.3:
+        #     return "Right"  
+        # elif cross_product < 0.3:
+        #     return "Left"  
+        # else:
+        #     return "On Path" 
     def compute_lookahead_distance(self, robot_speed):
         # return 3
         # return self.min_look_ahead_dis
@@ -576,12 +630,16 @@ class PurePursuitController:
         self.ackermann_msg.speed = speed
         self.ackermann_msg.jerk = jerk
         self.ackermann_publisher.publish(self.ackermann_msg)
-
+    
+    def pid_callback(self, config, level):
+        rospy.loginfo("""Reconfigure Request: {kp_pid}, {ki_pid}""".format(**config))
+        self.kp_pid = config['kp_pid']
+        self.ki_pid = config['ki_pid']
+        rospy.loginfo(f'Kp and Ki elements are {self.kp_pid},{self.ki_pid}')
+        return config
 
 if __name__ == "__main__":
     rospy.init_node('Pure_pursuit_controller_node')
-
     pure_pursuit = PurePursuitController()
-
     rospy.spin()
 

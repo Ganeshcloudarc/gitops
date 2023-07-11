@@ -21,6 +21,9 @@ find_package(catkin REQUIRED COMPONENTS
   rosbridge_server
   )
 
+generate_dynamic_reconfigure_options(
+cfg/pid_config.cfg
+)
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES autopilot_boson
@@ -32,5 +35,4 @@ include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
 )
-
 
