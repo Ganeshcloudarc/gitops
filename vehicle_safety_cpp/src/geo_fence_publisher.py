@@ -90,7 +90,7 @@ class geoFencePub:
 
 
 if __name__ == "__main__":
-    rospy.init_node('geo_fence_publisher', log_level=rospy.DEBUG)
+    rospy.init_node('geo_fence_publisher')
     fs = geoFencePub()
 
     rospy.spin()
