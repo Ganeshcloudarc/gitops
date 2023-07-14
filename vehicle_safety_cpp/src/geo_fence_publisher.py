@@ -65,31 +65,32 @@ class geoFencePub:
                 point.x, point.y = ll2xy(lat, lon, home_lat, home_long)
                 polygon_st.polygon.points.append(point)
             self.geofence_polygon_pub.publish(polygon_st)
-            rospy.loginfo("geo fence is published")
+            rospy.logdebug("published Geofence")
             
             polygon_st = gmsg.PolygonStamped() #reset the polygon
             polygon_st.header.frame_id = 'map'
             
             # print(no_go_geo_fence_coordinates[0])
-            for i in self.no_go_geo_fence_coordinates:
-                print(i)
-                for j in i:
-                    lat, lon = j[0], j[1]
-                    # print(lat, lon) 
-                    point = gmsg.Point()
-                    point.x, point.y = ll2xy(lat, lon,home_lat , home_long)
-                    polygon_st.polygon.points.append(point)
-                self.nogozone_polygon_pub.publish(polygon_st)
-            rospy.loginfo("Published Geofence")
+            if self.no_go_geo_fence_coordinates is not None: #None = param is not there. 
+                for i in self.no_go_geo_fence_coordinates:
+                    print(i)
+                    for j in i:
+                        lat, lon = j[0], j[1]
+                        # print(lat, lon) 
+                        point = gmsg.Point()
+                        point.x, point.y = ll2xy(lat, lon,home_lat , home_long)
+                        polygon_st.polygon.points.append(point)
+                    self.nogozone_polygon_pub.publish(polygon_st)
+                rospy.logdebug("Published No Go Zone")
 
     def funcall(self):  
-        rospy.loginfo("service started :)") 
+        rospy.logdebug("service started :)") 
         rospy.Service('no_go_geo_fence_coordinates',trigger,self.service_request)
 
 
 
 if __name__ == "__main__":
-    rospy.init_node('geo_fence_publisher')
+    rospy.init_node('geo_fence_publisher', log_level=rospy.DEBUG)
     fs = geoFencePub()
 
     rospy.spin()

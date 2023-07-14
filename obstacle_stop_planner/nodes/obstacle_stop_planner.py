@@ -390,7 +390,7 @@ class ObstacleStopPlanner:
                             trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
                     else:
                         rospy.logwarn(f'Obs Time limit not crossed. Remaining time: {self.stop_threshold_time_for_obs - (time.time() - self.vehicle_stop_init_time_for_obs)}')
-                        for i in range(stop_index, collision_index):
+                        for i in range(self._close_idx, collision_index):
                             traj_point = copy.deepcopy(self._traj_in.points[i])
                             traj_point.longitudinal_velocity_mps = 0.0
                             # traj_out.points.append(traj_point)
