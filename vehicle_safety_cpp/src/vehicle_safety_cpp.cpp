@@ -88,7 +88,7 @@ class VehicleSafety {
       nh.param("/vehicle_safety/CTE_THR_AT_CURVE", CTE_THR_AT_CURVE);
   bool emergency_stop = false;
   int TRACKING_CONTROLLER_TIMEOUT = 5;
-  int GPS_FIX_CB_TIMEOUT = 1; //timout in sec to check gps callback
+  int GPS_FIX_CB_TIMEOUT = 5; //timout in sec to check gps callback
   float prev_coordinates_lat, prev_coordinates_long;
   float curr_coordinates_lat = 0, curr_coordinates_long = 0;
   double gps_accuracy = -1, sensor_accuracy_value, GPS_ACC_IDEAL, GPS_ACC_THR;
