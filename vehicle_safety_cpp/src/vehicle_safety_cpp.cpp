@@ -87,8 +87,8 @@ class VehicleSafety {
   int CTE_THR_AT_CURVE =
       nh.param("/vehicle_safety/CTE_THR_AT_CURVE", CTE_THR_AT_CURVE);
   bool emergency_stop = false;
-  int TRACKING_CONTROLLER_TIMEOUT = 5;
-  int GPS_FIX_CB_TIMEOUT = 5; //timout in sec to check gps callback
+  int TRACKING_CONTROLLER_TIMEOUT = 1;
+  int GPS_FIX_CB_TIMEOUT = 1; //timout in sec to check gps callback
   float prev_coordinates_lat, prev_coordinates_long;
   float curr_coordinates_lat = 0, curr_coordinates_long = 0;
   double gps_accuracy = -1, sensor_accuracy_value, GPS_ACC_IDEAL, GPS_ACC_THR;
@@ -112,8 +112,8 @@ class VehicleSafety {
   bool is_inside_geo_fence;
   bool is_with_in_no_go_zone;
   double time_to_launch;
-  time_t time_on_tracking_cb = 0;
-  time_t time_on_gps_fix_cb = 0;
+  ros::Time time_on_tracking_cb;
+  ros::Time time_on_gps_fix_cb;
 
   int mavros_head;
   vector<int> ignore_heading = {0, 45, 90, 135, 180, 225, 270, 315, 360};
@@ -253,7 +253,9 @@ class VehicleSafety {
   void heading_failsafe(const mavros_msgs::GPSRAW &data) {
     reset_head = 1;
     gps1_fix = data.fix_type;
-    time_on_gps_fix_cb = time(0);
+    time_on_gps_fix_cb = ros::Time::now();
+    // start_time_ros = ros::Time::now();
+    // ROS_ERROR_STREAM("callbakck ros time : " << start_time_ros);
     // Calculating the heading using the new and previous coordinates
     double delta_lat = data.lat - curr_coordinates_lat;
     double delta_long = data.lon - curr_coordinates_long;
@@ -286,7 +288,7 @@ class VehicleSafety {
   void path_track_diagnose_callback(
       const autopilot_msgs::ControllerDiagnose &msg) {
     auto start = std::chrono ::system_clock ::now();
-    time_on_tracking_cb = time(0);
+    time_on_tracking_cb = ros::Time::now();
     pp_diagnose_data = msg;
     flag1 = 1;
   }
@@ -333,7 +335,7 @@ class VehicleSafety {
 
     gps_accuracy = sensor_accuracy(cov_value);
 
-    if (time_on_gps_fix_cb != 0) {
+    if (time_on_gps_fix_cb != ros::Time(0)) {
       if (gps_accuracy != -1) {
         if (gps_accuracy < 0 || gps_accuracy > 100) {
           stat.add("GPS ACCURACY LOW", gps_accuracy);
@@ -347,50 +349,51 @@ class VehicleSafety {
       } else {
         stat.add("GPS ACCURACY NONE", gps_accuracy);
       }
+       
+      ros::Duration elapsed  = ros::Time::now() - time_on_gps_fix_cb;
+      double elapsed_sec = elapsed.toSec(); //local variable
 
-      if ((time(0) - time_on_gps_fix_cb) < GPS_FIX_CB_TIMEOUT) {
-
-      // if (gps1_fix == 6 && gps2_fix == 6)
-
-      if (std::find(gps1_fix_list.begin(), gps1_fix_list.end(), gps1_fix) !=
-              gps1_fix_list.end() &&
-          std::find(gps2_fix_list.begin(), gps2_fix_list.end(), gps2_fix) !=
-              gps2_fix_list.end()) {
-        stat.summary(OK, "GPS FIX OK");
-        // stat.add("BOTH GPS Fix Type", 6);
-        stat.add("GPS1 Fix Type", gps1_fix);
-        stat.add("GPS2 Fix Type", gps2_fix);
-        stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
-        stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
-        start_time = 0;
-      } else if (gps1_fix == 5 && gps2_fix == 6) {
-        if (start_time == 0) {
-          start_time = time(0);
-        }
-        if ((time(0) - start_time) > GPS_FIX_THR) {
-          stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT");
+      // ROS_WARN_STREAM("ROS TIME : " << time_on_gps_fix_cb << " ELAPSED : " << elapsed_sec << " Elapsed " << elapsed);
+      
+      if (elapsed_sec < GPS_FIX_CB_TIMEOUT) {
+        if (std::find(gps1_fix_list.begin(), gps1_fix_list.end(), gps1_fix) !=
+                gps1_fix_list.end() &&
+            std::find(gps2_fix_list.begin(), gps2_fix_list.end(), gps2_fix) !=
+                gps2_fix_list.end()) {
+          stat.summary(OK, "GPS FIX OK");
+          // stat.add("BOTH GPS Fix Type", 6);
           stat.add("GPS1 Fix Type", gps1_fix);
           stat.add("GPS2 Fix Type", gps2_fix);
           stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
           stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
+          start_time = 0;
+        } else if (gps1_fix == 5 && gps2_fix == 6) {
+          if (start_time == 0) {
+            start_time = time(0);
+          }
+          if ((time(0) - start_time) > GPS_FIX_THR) {
+            stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT");
+            stat.add("GPS1 Fix Type", gps1_fix);
+            stat.add("GPS2 Fix Type", gps2_fix);
+            stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
+            stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
+          } else {
+            stat.summary(WARN, "WARN: GPS FIX LOST");
+            stat.add("GPS1 Fix Type", gps1_fix);
+            stat.add("GPS2 Fix Type", gps2_fix);
+            stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
+            stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
+          }
         } else {
-          stat.summary(WARN, "WARN: GPS FIX LOST");
+          stat.summary(ERROR, "ERROR: GPS FIX LOST");
           stat.add("GPS1 Fix Type", gps1_fix);
           stat.add("GPS2 Fix Type", gps2_fix);
           stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
           stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
         }
       } else {
-        stat.summary(ERROR, "ERROR: GPS FIX LOST");
-        stat.add("GPS1 Fix Type", gps1_fix);
-        stat.add("GPS2 Fix Type", gps2_fix);
-        stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
-        stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
-      }
-    } else {
-      int data = (time(0) - time_on_gps_fix_cb);
-      stat.summaryf(ERROR, "No update on GPS Tracking from last: %d secs",
-                    data);
+      stat.summaryf(ERROR, "No update on GPS Tracking from last: %f secs",
+                    elapsed_sec);
     }
   } else {
       stat.summary(ERROR, "Waiting for GPS Callback Data");
@@ -398,10 +401,11 @@ class VehicleSafety {
   }
 
   void cte_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat) {
-    auto start = std::chrono::system_clock::now();
-
-    if (time_on_tracking_cb != 0) {
-      if ((time(0) - time_on_tracking_cb) < TRACKING_CONTROLLER_TIMEOUT) {
+    // auto start = std::chrono::system_clock::now();
+    ros::Duration elapsed = ros::Time::now() - time_on_tracking_cb;
+    double elapsed_sec = elapsed.toSec();
+    if (time_on_tracking_cb != ros::Time(0)) {
+      if (elapsed_sec < TRACKING_CONTROLLER_TIMEOUT) {
         // if (flag1 == 1) {
           if (pp_diagnose_data.level == ERROR) {
             stat.summary(ERROR, pp_diagnose_data.message);
@@ -439,9 +443,8 @@ class VehicleSafety {
       }
 
       else {
-        int data = (time(0) - time_on_tracking_cb);
         stat.summaryf(
-            ERROR, "No update on Tracking Controller from last :%d secs", data);
+            ERROR, "No update on Tracking Controller from last : %f secs", elapsed_sec);
       }
     } else {
       stat.summary(ERROR, "Waiting for Tracking Controller diagnose");
