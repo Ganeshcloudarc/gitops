@@ -1,7 +1,7 @@
 <launch>
     <!--    Here we will have concept -->
     <arg name="hardware_in_loop" default="true" doc="false to software in loop"/>
-    <arg name="vehicle_type" default="porter" doc="It can be either half_cabin or porter"/>
+    <arg name="vehicle_type" default="half_cabin" doc="It can be either half_cabin or porter"/>
     <arg name="mission_file" default="default.json"/>
     <arg name='min_dis' default='0.1'/>
     <arg name="failsafe_enable" default="true"/>
@@ -13,20 +13,23 @@
     <param name='/patrol/odom_topic' value = '/vehicle/odom'/>
 
     <group if="$(eval arg('hardware_in_loop'))">
-       <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
-           <arg name="vehicle_type" value="$(arg vehicle_type)"/>
-            <arg name="vcu_up" default="false"/>
-            <arg name="gps_up" default="false"/>
-            <arg name="zed_camera" value="false"/>
-            <arg name="2d_lidar" value="false"/>
-            <arg name="3d_lidar" value="false"/>
-       </include>
-    </group>
+        <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
+            <arg name="vehicle_type" value="$(arg vehicle_type)"/>
+             <arg name="vcu_up" default="false"/>
+             <arg name="gps_up" default="false"/>
+             <arg name="zed_camera" value="false"/>
+             <arg name="2d_lidar" value="false"/>
+             <!-- <arg name="3d_lidar" value="$(eval arg('enable_obs_v1') or arg('use_pcl_boxes'))"/> -->
+             <arg name="rslidar" value="false"/>
+             <arg name="lslidar" value="false"/>
+        </include>
+     </group>
 
      <group unless="$(eval arg('hardware_in_loop'))">
-       <include file="$(find vehicle_description)/launch/boson_sim.launch">
+        <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
+        <include file="$(find vehicle_description)/launch/boson_sim.launch">
             <arg name="vehicle_type" value="$(arg vehicle_type)"/>
-       </include>
+        </include>
     </group>
 
     <param name="/save_path/mission_file" value="$(arg mission_file)"/>

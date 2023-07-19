@@ -7,9 +7,10 @@
     <arg name="zed_camera" default="true"/>
     <arg name="2d_lidar" default="true"/>
     <arg name="2d_lidar_ip" default="192.168.6.66"/>
-    <arg name="3d_lidar" default="true"/>
-    <arg name="3d_lidar_ip" default="true" doc="todo"/>
-
+    <arg name="rslidar" default="true"/>
+    <arg name="rslidar_ip" default="true" doc="todo"/>
+    <arg name="lslidar" default="true"/>
+    <arg name="lslidar_ip" default="192.168.1.200"/>
 
     <include file="$(find pilot)/launch/all_pilot.launch" if ="$(eval arg('vcu_up'))"/>
     <include file="$(find mavros)/launch/px4.launch" if = "$(eval arg('gps_up'))">
@@ -22,6 +23,9 @@
     <include file="$(find slamware_ros_sdk)/launch/scan_pub_no_tf.launch" if = "$(eval arg('2d_lidar'))" >
            <arg name="ip_address" value="$arg  2d_lidar_ip)"/>
     </include>
-    <include file="$(find rslidar_sdk)/launch/start.launch" if = "$(eval arg('3d_lidar'))"/>
+    <include file="$(find rslidar_sdk)/launch/start.launch" if = "$(eval arg('rslidar'))"/>
+    <include file="$(find lslidar_driver)/launch/lslidar_c32.launch" if = "$(eval arg('lslidar'))">
+        <arg name="device_ip" value="$(arg lslidar_ip)" />
+    </include>
 
 </launch>

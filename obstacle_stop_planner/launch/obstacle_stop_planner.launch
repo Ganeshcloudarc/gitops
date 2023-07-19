@@ -4,13 +4,26 @@
     <arg name="sensor_source" default="1" doc="0: zed_camera, 1: rslidar, 2: rplidar "/>
     <arg name="use_pcl_boxes" default="true"/>
     <arg name="enable_zed_obs" default="true"/>
+    <arg name="rslidar" default="true"/>
+    <arg name="lslidar" default="false"/>
+
     <param name = "/obstacle_stop_planner/mission_continue" value = "$(arg mission_continue)"/>
     <param name="use_pcl_boxes" value="$(arg use_pcl_boxes)"/>
     <param name="enable_zed_obs" value="$(arg enable_zed_obs)"/>
     
-    <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
-        <arg name="rviz" value="false"/>
-    </include>
+    <group if="$(eval arg('rslidar'))">
+        <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+            <arg name="rviz" value="false"/>
+        </include>
+    </group>
+
+    <group if="$(eval arg('lslidar'))">
+        <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+            <arg name="rviz" value="false"/>
+            <arg name="points_in" value="lslidar_point_cloud"/>
+            <arg name="bbox_target_frame" value="map"/>
+        </include>
+    </group>
 
     <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
         <arg name="cloud_in" value="/obstacle_detector/cloud_clusters"/>

@@ -55,6 +55,22 @@
     <child link="rslidar" />
   </joint>
 
+  <link name="lslidar"/>
+  <joint name="ls_lidar_link" type="fixed">
+    <!-- <origin xyz="2.8 0 0.2" rpy="0 0 0" /> -->
+    <origin
+        xyz="${vehicle_info['base_link']['lslidar']['x']}
+             ${vehicle_info['base_link']['lslidar']['y']}
+             ${vehicle_info['base_link']['lslidar']['z']}"
+
+        rpy="${vehicle_info['base_link']['lslidar']['roll']}
+             ${vehicle_info['base_link']['lslidar']['pitch']}
+             ${vehicle_info['base_link']['lslidar']['yaw']}"
+    />
+    <parent link="base_link" />
+    <child link="lslidar" />
+  </joint>
+
   <link name="rplidar"/>
   <joint name="2d_lidar_link" type="fixed">
     <!-- <origin xyz="2.8 0 0.1" rpy="0 0 0" /> -->
