@@ -86,20 +86,12 @@ class TrajectoryManager:
         for i in range(0, self._traj_len):
             traj_point = self._traj_in.points[i]
             dis = distance_btw_poses(curr_pose, traj_point.pose)
-            if dis > dist_thr:
-                continue
             yaw_diff = normalize_angle(curr_yaw - get_yaw(traj_point.pose.orientation))
-            # print(yaw_diff)
-            if abs(math.degrees(yaw_diff)) > angle_thr:
-                continue
-            if dis < dist_min:
-                dist_min = dis
-                idx_min = i
-        if idx_min >= 0:
-            var = True, idx_min
+            # rospy.logdebug(f"dis : {dis}, yaw_diff : {math.degrees(yaw_diff)}")
+            if dis < dist_thr and abs(math.degrees(yaw_diff)) < angle_thr:
+                return True, i
         else:
-            var = False, idx_min
-        return var
+            return False, idx_min
 
     def find_close_pose_after_index(self, curr_pose, prev_idx, search_distance=10):
         """
