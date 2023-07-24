@@ -101,13 +101,13 @@
     </group>
 
     <group if="$(eval arg('pp_with_pid'))">
-        <node name="patrol_bag_record" pkg="rosbag" type="record"
-            args="record -o $(env HOME)/.bags/boson_pid_kp_$(arg kp)_ki_$(arg ki) -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points|/lslidar_point_cloud " if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+        <node name="patrol_pid_bag_record" pkg="rosbag" type="record"
+            args="record -o $(env HOME)/.bags/boson_pid_kp_$(arg kp)_ki_$(arg ki)_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud " if="$(eval arg('record') and arg('hardware_in_loop'))"/>
     </group>
 
     <group unless="$(eval arg('pp_with_pid'))">
         <node name="patrol_bag_record" pkg="rosbag" type="record"
-            args="record -o $(env HOME)/.bags/boson -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+            args="record -o $(env HOME)/.bags/boson_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
     </group>
     <!-- <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include> -->
     <group if="$(eval arg('failsafe_enable'))">
