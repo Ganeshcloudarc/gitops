@@ -376,7 +376,6 @@ class ObstacleStopPlanner:
                     # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
                     # #
                     # # traj_out = self._smoother.filter(trajectory_msg)
-                    self.vehicle_stop_init_time_for_obs = time.time()
                     for i in range(stop_index, collision_index):
                         traj_point = copy.deepcopy(self._traj_in.points[i])
                         traj_point.longitudinal_velocity_mps = 0.0
