@@ -16,6 +16,11 @@ obstacle_stop_planner:
   vis_collision_points : true
   vis_trajectory_rviz  : true
 
+  robot_level_collision_check_enable : true # To enable vehicle level collision irrespective of save path.
+  footprint:
+    offset_to_width : 0.3 # offset to add to vehicle width for vehicle level collision checking (meters)
+    offset_to_forward_length : 1 # offset to add to vehicle length in forward direction(meters)
+
 gaussian_velocity_filter:
   sigma : 3
   kernal_size : 11 # should be odd number
