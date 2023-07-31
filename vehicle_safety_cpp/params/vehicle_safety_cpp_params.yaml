@@ -4,8 +4,10 @@ vehicle_safety:
   HEAD_THR : 10 # Heading Threshold in degrees(+/-)
   GPS_FIX_THR : 10.0 #GPS FIX Threshold time in seconds
   BATT_TH : 15 # Battery Threshold in %. Below this value vehicle won't move
+  STEER_DIFF_TH : 10 # Allowable Angle diff(degrees) from demand and current angle to detect steering stuck. Beware while changing this.
+  STEER_STUCK_TIME_TH : 2 # Allowable time threshold(seconds) to detect steering stuck. Beware while changing this.
   WHITE_LIST : ["vehicle_safety_cpp_diagnostics: GPS","vehicle_safety_cpp_diagnostics: TrackingController","vehicle_safety_cpp_diagnostics: Emergency","vehicle_safety_cpp_diagnostics: GeoFence","vehicle_safety_cpp_diagnostics: CAN_Batt_Diagnostics"] # vehicle will stop, if these errors came up
-  BLACK_LIST : ["vehicle_safety_cpp_diagnostics: Heading"] # vehicle will ignore and continue running, if the errors coming from these list.
+  BLACK_LIST : ["vehicle_safety_cpp_diagnostics: Heading", "vehicle_safety_cpp_diagnostics: CAN_Steering_Diagnostics"] # vehicle will ignore and continue running, if the errors coming from these list.
   use_geo_fence : true
   use_inner_geo_fence : false
   geo_fence_coordinates: [

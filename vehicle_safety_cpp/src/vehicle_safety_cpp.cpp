@@ -81,6 +81,9 @@ class VehicleSafety {
   int battery_soc{-1};
   int store_batt_level{-1};
   int motor_rpm{0};  // motor rpm will be zero when no can data
+  int demand_steering_angle{0};
+  int current_steering_angle{0};
+  bool is_steering_stuck;
   int BATT_SOC_TH = nh.param("/vehicle_safety/BATT_TH", BATT_SOC_TH);
   int CTE_THR_AT_STRAIGHT =
       nh.param("/vehicle_safety/CTE_THR", CTE_THR_AT_STRAIGHT);
@@ -97,6 +100,7 @@ class VehicleSafety {
   float position_covariance;
   long start_time_gps, start_time;
   long gps_lost_time, gps_start_time;
+  std::time_t steering_error_start_time{0};
   int gps_lost_count = 0;
 
   int OK = diagnostic_msgs::DiagnosticStatus::OK;
@@ -109,6 +113,8 @@ class VehicleSafety {
   bool use_geo_fence = nh.param("/vehicle_safety/use_geo_fence", use_geo_fence);
   bool use_inner_geo_fence =
       nh.param("/vehicle_safety/use_inner_geo_fence", use_inner_geo_fence);
+  float steering_diff_th = nh.param("/vehicle_safety/STEER_DIFF_TH", steering_diff_th);
+  float steering_stuck_time_th = nh.param("/vehicle_safety/STEER_STUCK_TIME_TH", steering_stuck_time_th);
   bool is_inside_geo_fence;
   bool is_with_in_no_go_zone;
   double time_to_launch;
@@ -297,6 +303,8 @@ class VehicleSafety {
     can_data = msg;
     battery_soc = can_data.battery_soc.data;
     motor_rpm = can_data.motor_rpm.data;
+    demand_steering_angle = can_data.demand_steering_angle.data;
+    current_steering_angle = can_data.steering_angle.data;
     // ROS_INFO_STREAM(can_data.battery_soc.data);
   }
 
@@ -416,12 +424,12 @@ class VehicleSafety {
           }
 
           else {
-            if (pp_diagnose_data.cte > CTE_THR) {
+            if (abs(pp_diagnose_data.cte) > CTE_THR) {
               stat.summary(ERROR, "HIGH CTE");
             } else {
               stat.summary(OK, "CTE OK");
             }
-            stat.add("CTE Value", pp_diagnose_data.cte);
+            stat.add("CTE Value", abs(pp_diagnose_data.cte));
             stat.add("CTE_THR", CTE_THR);
           }
         //   error_counter_for_tracking_controller = 0;
@@ -641,6 +649,41 @@ class VehicleSafety {
     }
   }
 
+  void can_steering_diagnostics(
+        diagnostic_updater::DiagnosticStatusWrapper &stat) {
+      
+      if (current_steering_angle == 0) {
+        stat.summary(STALE, "No Steering Data");
+      }
+      // In below logic, If demanded angle is zero, there is something from tracking algorithm but not the steering issue.
+      if (abs(demand_steering_angle - current_steering_angle) >
+              steering_diff_th &&
+          demand_steering_angle != 0) {
+        if (steering_error_start_time == 0) {
+          steering_error_start_time = std::time(nullptr);
+        }
+        if (std::time(nullptr) - steering_error_start_time >
+            steering_stuck_time_th) {
+          
+          is_steering_stuck = true;
+        } else {
+          is_steering_stuck = false;
+        }
+      } else {
+        steering_error_start_time = 0;
+        is_steering_stuck = false;
+      }
+      if (is_steering_stuck) {
+        stat.summary(ERROR, "Steering Stuck");
+      } else {
+        stat.summary(OK, "Steering OK");
+      }
+      stat.add("Demand Steering Angle", demand_steering_angle);
+      stat.add("Current Steering Angle", current_steering_angle);
+
+      //TODO @iam-vishnu: Continuosly monitor for timeout of steering data.
+    }
+    
   void can_batt_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat) {
     std::string log_msg, stat_summ_msg;
     int stat_summ_stat;
@@ -692,6 +735,8 @@ int main(int argc, char **argv) {
   updater.add("GeoFence", &vs, &VehicleSafety::geo_fence_diagnostics);
   updater.add("CAN_Batt_Diagnostics", &vs,
               &VehicleSafety::can_batt_diagnostics);
+  updater.add("CAN_Steering_Diagnostics", &vs,
+              &VehicleSafety::can_steering_diagnostics);
   ros::Rate r(10);  // 10 hz
   while (nh.ok()) {
     ros::spinOnce();
