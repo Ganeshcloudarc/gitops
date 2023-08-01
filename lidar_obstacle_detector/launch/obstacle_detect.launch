@@ -6,7 +6,7 @@
  <!-- <arg name="config_file" default="zed_config.yaml"/> -->
  <arg name="rqt_reconfigure" default="false"/>
 
- <arg name="bbox_target_frame" default="rslidar"/>
+ <arg name="bbox_target_frame" default="map"/>
  <arg name="rviz" default="true"/>
 
   <node name="obstacle_detector_node" pkg="lidar_obstacle_detector" type="obstacle_detector_node" output="screen">

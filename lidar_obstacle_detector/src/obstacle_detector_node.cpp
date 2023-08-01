@@ -33,6 +33,7 @@ bool USE_PCA_BOX;
 bool USE_TRACKING;
 float VOXEL_GRID_SIZE;
 Eigen::Vector4f ROI_MAX_POINT, ROI_MIN_POINT;
+Eigen::Vector4f CROP_BOX_MAX_POINT, CROP_BOX_MIN_POINT;
 float GROUND_THRESH;
 float CLUSTER_THRESH;
 int CLUSTER_MAX_SIZE, CLUSTER_MIN_SIZE;
@@ -81,13 +82,14 @@ void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& con
   VOXEL_GRID_SIZE = config.voxel_grid_size;
   ROI_MAX_POINT = Eigen::Vector4f(config.roi_max_x, config.roi_max_y, config.roi_max_z, 1);
   ROI_MIN_POINT = Eigen::Vector4f(config.roi_min_x, config.roi_min_y, config.roi_min_z, 1);
+  CROP_BOX_MAX_POINT = Eigen::Vector4f(config.crop_box_max_x, config.crop_box_max_y, config.crop_box_max_z, 1);
+  CROP_BOX_MIN_POINT = Eigen::Vector4f(config.crop_box_min_x, config.crop_box_min_y, config.crop_box_min_z, 1);
   GROUND_THRESH = config.ground_threshold;
   CLUSTER_THRESH = config.cluster_threshold;
   CLUSTER_MAX_SIZE = config.cluster_max_size;
   CLUSTER_MIN_SIZE = config.cluster_min_size;
   DISPLACEMENT_THRESH = config.displacement_threshold;
   IOU_THRESH = config.iou_threshold;
-  ROS_DEBUG_STREAM("Cluster Threshold" << CLUSTER_THRESH);
 }
 
 ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
@@ -133,6 +135,8 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
     private_nh.getParam("voxel_grid_size", VOXEL_GRID_SIZE);
     float roi_max_x, roi_max_y, roi_max_z;
     float roi_min_x, roi_min_y, roi_min_z;
+    float crop_box_max_x, crop_box_max_y, crop_box_max_z;
+    float crop_box_min_x, crop_box_min_y, crop_box_min_z;
 
     private_nh.getParam("roi_max_x", roi_max_x);
     private_nh.getParam("roi_max_y", roi_max_y);
@@ -142,8 +146,19 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
     private_nh.getParam("roi_min_y", roi_min_y);
     private_nh.getParam("roi_min_z", roi_min_z);
 
+    private_nh.getParam("crop_box_max_x", crop_box_max_x);
+    private_nh.getParam("crop_box_max_y", crop_box_max_y);
+    private_nh.getParam("crop_box_max_z", crop_box_max_z);
+
+    private_nh.getParam("crop_box_min_x", crop_box_min_x);
+    private_nh.getParam("crop_box_min_y", crop_box_min_y);
+    private_nh.getParam("crop_box_min_z", crop_box_min_z);
+
+
     ROI_MAX_POINT = Eigen::Vector4f(roi_max_x, roi_max_y, roi_max_z, 1);
     ROI_MIN_POINT = Eigen::Vector4f(roi_min_x, roi_min_y, roi_min_z, 1);
+    CROP_BOX_MAX_POINT = Eigen::Vector4f(crop_box_max_x, crop_box_max_y, crop_box_max_z, 1);
+    CROP_BOX_MIN_POINT = Eigen::Vector4f(crop_box_min_x, crop_box_min_y, crop_box_min_z, 1);
 
 
     private_nh.getParam("ground_threshold", GROUND_THRESH);
@@ -164,7 +179,6 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
   obstacle_detector = std::make_shared<ObstacleDetector<pcl::PointXYZ>>();
   obstacle_id_ = 0;
 }
-
 void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points)
 {
   ROS_DEBUG("lidar points recieved");
@@ -177,7 +191,7 @@ void ObstacleDetectorNode::lidarPointsCallback(const sensor_msgs::PointCloud2::C
   pcl::fromROSMsg(*lidar_points, *raw_cloud);
 
   // Downsampleing, ROI, and removing the car roof
-  auto filtered_cloud = obstacle_detector->filterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT, NEIGHOBORS, STANDARD_DEVIATION);
+  auto filtered_cloud = obstacle_detector->filterCloud(raw_cloud, VOXEL_GRID_SIZE, ROI_MIN_POINT, ROI_MAX_POINT, CROP_BOX_MIN_POINT, CROP_BOX_MAX_POINT, NEIGHOBORS, STANDARD_DEVIATION);
 
   // Segment the groud plane and obstacles
   auto segmented_clouds = obstacle_detector->segmentPlane(filtered_cloud, 30, GROUND_THRESH);

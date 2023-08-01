@@ -39,7 +39,7 @@ class ObstacleDetector
 
   // ****************** Detection ***********************
 
-  typename pcl::PointCloud<PointT>::Ptr filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt,  int NEIGHOBORS, float STANDARD_DEVIATION);
+  typename pcl::PointCloud<PointT>::Ptr filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt, const Eigen::Vector4f& crop_box_min_pt, const Eigen::Vector4f& crop_box_max_pt, int NEIGHOBORS, float STANDARD_DEVIATION);
   
   std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> segmentPlane(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const int max_iterations, const float distance_thresh);
 
@@ -84,7 +84,7 @@ template <typename PointT>
 ObstacleDetector<PointT>::~ObstacleDetector() {}
 
 template <typename PointT>
-typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt,  int neighbors, float standard_deviation)
+typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(const typename pcl::PointCloud<PointT>::ConstPtr& cloud, const float filter_res, const Eigen::Vector4f& min_pt, const Eigen::Vector4f& max_pt, const Eigen::Vector4f& crop_box_min_pt, const Eigen::Vector4f& crop_box_max_pt, int neighbors, float standard_deviation)
 {
   // Time segmentation process
   // const auto start_time = std::chrono::steady_clock::now();
@@ -107,10 +107,21 @@ typename pcl::PointCloud<PointT>::Ptr ObstacleDetector<PointT>::filterCloud(cons
   // Removing the car roof region
   std::vector<int> indices;
   pcl::CropBox<PointT> roof(true);
-  roof.setMin(Eigen::Vector4f(-1.5, -1.7, -1, 1));
-  roof.setMax(Eigen::Vector4f(2.6, 1.7, -0.4, 1));
+  //following are the provided by this pacakge.
+
+  // roof.setMin(Eigen::Vector4f(-1.5, -1.7, -1, 1));
+  // roof.setMax(Eigen::Vector4f(2.6, 1.7, -0.4, 1));
+  //changed to suit for our vehicle, when kept on top.
+  //TODO keep these on param file. 
+  // roof.setMin(Eigen::Vector4f(-1.5, -1, -1, 1));
+  // roof.setMax(Eigen::Vector4f(0.3, 1, 1, 1));
+  roof.setMin(crop_box_min_pt);
+  roof.setMax(crop_box_max_pt);
   roof.setInputCloud(cloud_roi);
   roof.filter(indices);
+
+  //changed to suit for our vehicle, when kept on top.
+
 
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
   for (auto& point : indices)

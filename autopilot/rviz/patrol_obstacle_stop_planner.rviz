@@ -390,6 +390,28 @@ Visualization Manager:
       Value: true
     - Alpha: 1
       Class: rviz/Polygon
+      Color: 25; 255; 0
+      Enabled: true
+      Name: CollisionBox
+      Queue Size: 10
+      Topic: /collision_points_polygon
+      Unreliable: false
+      Value: true
+    - Class: jsk_rviz_plugin/BoundingBoxArray
+      Enabled: false
+      Name: BoundingBoxArray
+      Queue Size: 10
+      Topic: /obstacle_detector/jsk_bboxes
+      Unreliable: false
+      Value: false
+      alpha: 0.800000011920929
+      color: 25; 255; 0
+      coloring: Auto
+      line width: 0.004999999888241291
+      only edge: false
+      show coords: false
+    - Alpha: 1
+      Class: rviz/Polygon
       Color: 255; 255; 0
       Enabled: true
       Name: CollisionCircles
@@ -451,7 +473,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 19.13315773010254
+      Distance: 14.912607192993164
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -459,9 +481,9 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -0.4314490556716919
-        Y: -0.6630539894104004
-        Z: -1.9073486328125e-06
+        X: 9.474319458007812
+        Y: -3.3165392875671387
+        Z: -4.5335500544751994e-06
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -469,7 +491,7 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5697963237762451
       Target Frame: base_link
-      Yaw: 3.2953832149505615
+      Yaw: 3.1403989791870117
     Saved: ~
 Window Geometry:
   Displays:

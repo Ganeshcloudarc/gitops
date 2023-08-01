@@ -137,7 +137,8 @@ class ObstacleStopPlanner:
         self.use_pcl_boxes = rospy.get_param("use_pcl_boxes", False)
         self.use_obs_v1 = rospy.get_param("/patrol/enable_obs_v1", True)
         if self.use_pcl_boxes:
-            rospy.Subscriber("/filtered_detector/jsk_bboxes", BoundingBoxArray, self.pcl_bboxes_callback)
+            bbox_topic = rospy.get_param("/pcl_bbox_topic", "/obstacle_detector/jsk_bboxes")
+            rospy.Subscriber(bbox_topic, BoundingBoxArray, self.pcl_bboxes_callback)
             self.bbox_pub = rospy.Publisher("collision_bbox", BoundingBox, queue_size=1)
             # self.box_corner_pub = rospy.Publisher("corner_boxes", PolygonStamped, queue_size=1)
             self.collision_points_polygon = rospy.Publisher("collision_points_polygon", PolygonStamped, queue_size=1)
