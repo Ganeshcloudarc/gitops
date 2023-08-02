@@ -1,6 +1,6 @@
-target_frame : base_link
-min_height  : 0.1 # any object above 0.3 from ground
-max_height  : 1.5 # vehicle width is assumed to be 1.5
+target_frame : rslidar
+min_height  : -0.2 # any object above 0.3 from ground
+max_height  : 0.5 # vehicle width is assumed to be 1.5
 #angle_min   : -3.1415926536
 #angle_max   : 3.1415926536
 angle_min   : -1.5707963267948966
