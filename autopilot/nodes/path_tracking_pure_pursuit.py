@@ -70,6 +70,8 @@ class PurePursuitController:
         self.ki_pid = 0.01
         self.e1 = 0
         self.e2 = 0
+        self.kp_speed = rospy.get_param("/pure_pursuit/kp_speed",0.1)
+        self.allowable_cte_for_adjustable_speed = rospy.get_param("/pure_pursuit/allowable_cte_for_adjustable_speed",0.3)
         self.rqt = rospy.get_param("/pure_pursuit/enable_rqt")
 
         self.is_pp_pid = rospy.get_param("/patrol/pp_with_pid",False)
@@ -94,6 +96,7 @@ class PurePursuitController:
         self.search_point_distance = 5
         failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
         self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
+        self.enable_cte_based_speed_control = rospy.get_param("/patrol/enable_cte_based_speed_control", False)
 
         if failsafe_enable:
             cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
@@ -359,17 +362,27 @@ class PurePursuitController:
                 delta_degrees = math.degrees(delta)
 
             steering_angle = np.clip(delta_degrees, -30, 30)
+            speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
+            if self.enable_cte_based_speed_control:
+                adjusted_speed = self.adjust_speed_based_on_cte(speed, abs(self.cte),self.kp_speed)
+            else:
+                adjusted_speed = speed
             if stop_on_command:
                 speed = 0
                 log_tracking_message = "allow_reversing flag not set. Stopping the Robot"
                 rospy.logerr_throttle(10, "allow_reversing flag not set. Stopping the Robot")
                 self.send_ack_msg(steering_angle, speed, 1)
             elif self.is_reverse:
-                speed = -min(self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps, self.max_backward_speed) # To avoid max speed from path_publisher.
+                if adjusted_speed < self.min_backward_speed and adjusted_speed > 0:
+                    adjusted_speed = self.min_backward_speed
+                speed = -min(adjusted_speed, self.max_backward_speed) # To avoid max speed from path_publisher.
                 log_tracking_message = f'Tracking path in Reverse with speed {speed}'
                 self.send_ack_msg(steering_angle, speed, 0)
             else:
-                speed = self.trajectory_data.points[close_point_ind].longitudinal_velocity_mps
+                if adjusted_speed < self.min_forward_speed and adjusted_speed > 0:
+                    speed = self.min_forward_speed
+                else:
+                    speed = adjusted_speed
                 log_tracking_message = f'Tracking path in Forward with speed {speed}'
                 # stop vehicle is speed is negative when is_reverse is false.(just a safety check)
                 if speed <= 0:
@@ -637,6 +650,18 @@ class PurePursuitController:
         self.ki_pid = config['ki_pid']
         rospy.loginfo(f'Kp and Ki elements are {self.kp_pid},{self.ki_pid}')
         return config
+    
+    def adjust_speed_based_on_cte(self, speed, cte, kp_speed):
+
+        # speed : pure pursuit calculated speed
+        # CTE : cross track error (positive)
+        # kp_speed : speed adjustment factor or speed gain.
+        
+        if speed == 0 or abs(cte) < self.allowable_cte_for_adjustable_speed:
+            return speed
+        adjusted_speed = speed - kp_speed * cte
+        
+        return adjusted_speed
 
 if __name__ == "__main__":
     rospy.init_node('Pure_pursuit_controller_node')

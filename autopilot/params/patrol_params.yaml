@@ -18,12 +18,15 @@ patrol:
   min_forward_speed : 0.8
   max_backward_speed : -1.0 # you can give positive/negative value. Both have same effect.
   min_backward_speed : -0.3
+  enable_cte_based_speed_control : True
 
 pure_pursuit:
   min_look_ahead_dis : 3 # meters
   max_look_ahead_dis : 6 # meters
   speed_to_lookahead_ratio : 1
   speed_curvature_ratio : 2
+  kp_speed : 0.5 # The speed control gain to adjust speed based on cte.
+  allowable_cte_for_adjustable_speed : 0.3 # This is the min cte to adjust speed. If cte is less than this value, speed will be directly passed from controller.
 
 stanley:
   control_gain : 0.1 # meters
