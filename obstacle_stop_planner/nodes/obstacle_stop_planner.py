@@ -108,12 +108,14 @@ class ObstacleStopPlanner:
         self.laser_geo_obj = LaserProjection()
         # self._a_max, self._slow_speed, self._stop_line_buffer = 1, 0.5, 3.5
         sigma = rospy.get_param("gaussian_velocity_filter/sigma", 1)
-        kernal_size = rospy.get_param("gaussian_velocity_filter/kernal_size", 11)
-        self.robot_min_speed_th = rospy.get_param("obstacle_stop_planner/robot_min_speed_th", 0.8)
+        kernal_size = rospy.get_param("gaussian_velocity_filter/kernal_size", 11) 
+        self.robot_max_speed_th = rospy.get_param("patrol/max_forward_speed", 1.0)
+        self.robot_min_speed_th = rospy.get_param("patrol/min_forward_speed", 0.8)
         self._smoother = TrajectorySmoother(sigma, kernal_size, self.robot_min_speed_th)
         self._traj_manager = TrajectoryManager()
         self._stop_line_buffer = rospy.get_param("obstacle_stop_planner/stop_line_buffer", 3.0)
-
+        self.slow_line_buffer = rospy.get_param("obstacle_stop_planner/slow_line_buffer",2.0)
+        self.velocity_speed_profile_enable = rospy.get_param("obstacle_stop_planner/velocity_speed_profile_enable",True)
         # ros parameters for Obstacle stop planner
         # TODO accept form patrol application if available else take from patrol params.
         radial_off_set_to_vehicle_width = rospy.get_param("obstacle_stop_planner/radial_off_set_to_vehicle_width", 0.5)
@@ -167,6 +169,8 @@ class ObstacleStopPlanner:
                                                           queue_size=10)
         self.velocity_marker_publisher = rospy.Publisher('obstacle_stop_planner/collision_velocity_marker', MarkerArray,
                                                          queue_size=10)
+        self.slow_start_pub = rospy.Publisher("obstacle_stop_planner/slow_start",PoseStamped, queue_size=1)
+        self.slow_pose_pub = rospy.Publisher("obstacle_stop_planner/slow_point",PoseStamped, queue_size=1)
         self.close_pose_pub = rospy.Publisher("obstacle_stop_planner/close_point", PoseStamped, queue_size=1)
         self.front_pose_pub = rospy.Publisher("obstacle_stop_planner/front_point", PoseStamped, queue_size=1)
         self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2, latch=True)
@@ -299,8 +303,12 @@ class ObstacleStopPlanner:
                     rate.sleep()
                     continue
             else:
-                self._close_idx = self._traj_manager.find_close_pose_after_index(self.robot_pose, self._close_idx, 10)
+                self._close_idx = self._traj_manager.find_close_pose_after_index(self.robot_pose, self._close_idx, 10) 
+
+            
             # print(self._traj_manager.get_traj_point(self._close_idx))
+            
+           
             self.close_pose_pub.publish(
                 PoseStamped(header=Header(frame_id="map"),
                             pose=self._traj_manager.get_traj_point(self._close_idx).pose))
@@ -308,7 +316,8 @@ class ObstacleStopPlanner:
 
             front_tip_idx = self._traj_manager.next_point_within_dist(self._close_idx, self._base_to_front)
             self.front_pose_pub.publish(
-                PoseStamped(header=Header(frame_id="map"), pose=self._traj_manager.get_traj_point(front_tip_idx).pose))
+                PoseStamped(header=Header(frame_id="map"), 
+                            pose=self._traj_manager.get_traj_point(front_tip_idx).pose))
 
             # filling Kd true
 
@@ -513,33 +522,79 @@ class ObstacleStopPlanner:
                     for i in range(self._close_idx, collision_index + 1):
                         traj_point = copy.deepcopy(self._traj_in.points[i])
                         traj_point.longitudinal_velocity_mps = 0.0
-                        trajectory_msg.points.append(traj_point)
-                    # traj_out = trajectory_msg
-                else:
+                        trajectory_msg.points.append(traj_point) 
+                    # traj_out = trajectory_msg 
+                else: 
                     rospy.loginfo("obstacle dis is more than the stop_distance")
                     # find the stop index
                     stop_index = collision_index
                     temp_dist = 0.0
                     # Compute the index at which we should stop.
-                    while temp_dist < self._stop_line_buffer and stop_index > self._close_idx:
+
+                    while temp_dist < self._stop_line_buffer + self._base_to_front and stop_index > self._close_idx:
                         temp_dist = abs(self._traj_in.points[collision_index].accumulated_distance_m -
                                         self._traj_in.points[stop_index].accumulated_distance_m)
                         stop_index -= 1
-                    # Our trajectory starts from close_index to stop index
-                    for i in range(self._close_idx, stop_index + 1):
-                        trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
-                    # trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
-                    # # if self.robot_speed < self.robot_min_speed_th:
-                    # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
-                    # # else:
-                    # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
-                    # #
-                    # # traj_out = self._smoother.filter(trajectory_msg)
-                    for i in range(stop_index, collision_index):
-                        traj_point = copy.deepcopy(self._traj_in.points[i])
-                        traj_point.longitudinal_velocity_mps = 0.0
-                        # traj_out.points.append(traj_point)
-                        trajectory_msg.points.append(traj_point)
+                    # Compute the index at which we should slow_Down. 
+
+                    if self.velocity_speed_profile_enable: # speed profile enabled
+                        slow_stop_index = stop_index 
+                        tmp_dist = 0.0  
+                        while tmp_dist < self.slow_line_buffer and slow_stop_index > self._close_idx: 
+                            tmp_dist = abs(self._traj_in.points[stop_index].accumulated_distance_m -
+                                            self._traj_in.points[slow_stop_index].accumulated_distance_m)
+                            slow_stop_index -= 1 
+                        # collison to stop - speed is 0
+                        for i in range(collision_index,stop_index,-1):
+                            traj_point = copy.deepcopy(self._traj_in.points[i])
+                            traj_point.longitudinal_velocity_mps = 0.0
+                            # traj_out.points.append(traj_point)
+                            trajectory_msg.points.append(traj_point)
+                        # stp to slow - speed is gradual slow
+                        for i in range(stop_index, slow_stop_index,-1): 
+                            tmp_dist = abs(self._traj_in.points[stop_index].accumulated_distance_m -
+                                            self._traj_in.points[i].accumulated_distance_m)
+                            updt_spd = np.interp(tmp_dist,[0,self.slow_line_buffer],[self.robot_min_speed_th,self.robot_max_speed_th]) 
+                            traj_point = copy.deepcopy(self._traj_in.points[i])   
+                            traj_point.longitudinal_velocity_mps = min(updt_spd, self._traj_in.points[i].longitudinal_velocity_mps )
+                            trajectory_msg.points.append(traj_point)
+                        
+                            rospy.logwarn(" found an obstacle, vehicle will slow down ")
+                        # slow to clo - speed is max spd
+                        for i in range(slow_stop_index, self._close_idx,-1): 
+                            traj_point = copy.deepcopy(self._traj_in.points[i])   
+                            trajectory_msg.points.append(traj_point) 
+                            
+                        self.slow_pose_pub.publish(PoseStamped(header=Header(frame_id="map"),
+                                pose=self._traj_manager.get_traj_point(slow_stop_index).pose))
+                        trajectory_msg.points.reverse()
+                        self.diagnostics_publisher.summary(WARN,"VEHICLE WILL SLOW DOWN")
+                        self.diagnostics_publisher.add("OBSTACLE FOUND AT ",dis_to_obstacle)  
+                        self.publish(self.diagnostics_publisher)
+
+
+                    else: 
+                         #speed profile disabled
+                        for i in range(self._close_idx, stop_index + 1):
+                            trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
+
+                            # --------------------------------------------------------------------------                
+                        # trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
+                        # # if self.robot_speed < self.robot_min_speed_th:
+                        # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
+                        # # else:
+                        # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
+                        # #
+                        # # traj_out = self._smoother.filter(trajectory_msg)
+                        for i in range(stop_index, collision_index):
+                            traj_point = copy.deepcopy(self._traj_in.points[i])
+                            traj_point.longitudinal_velocity_mps = 0.0
+                            # traj_out.points.append(traj_point)
+                            trajectory_msg.points.append(traj_point)
+                        
+
+
+
             else:
                 if self.vehicle_stop_init_time_for_obs is not None:
                     if time.time() - self.vehicle_stop_init_time_for_obs > self.stop_threshold_time_for_obs:
@@ -579,9 +634,9 @@ class ObstacleStopPlanner:
             # print("len of local traj", len(traj_out.points))
             print("collision_index", collision_index)
 
-            self.publish_velocity_marker(trajectory_msg)
-            rate.sleep()
-
+            self.publish_velocity_marker(trajectory_msg) 
+            rate.sleep() 
+  
     def odom_callback(self, data):
         self.robot_pose = data.pose.pose
         self.robot_speed = math.sqrt(data.twist.twist.linear.x ** 2 + data.twist.twist.linear.y ** 2)
@@ -653,9 +708,9 @@ class ObstacleStopPlanner:
             self.laser_np_2d = np.delete(self.laser_np_3d, -1, axis=1)
             if len(self.laser_np_2d.tolist()) == 0:
                 self.laser_np_2d = np.array([100, 100])
-            self.scan_data_received = True
+            self.scan_data_received = True 
         else:
-            self.scan_data_received = False
+            self.scan_data_received = False 
 
         rospy.logdebug(f"time taken for laser scan callback: {time.time() - start} ")
 
@@ -811,6 +866,14 @@ class ObstacleStopPlanner:
                 marker.color.r = 1.0
                 marker.color.g = 0.0
                 marker.color.b = 0.0
+            elif traj_point.longitudinal_velocity_mps < self.robot_max_speed_th : 
+                marker.scale.x = 0.2
+                marker.scale.y = 0.2
+                marker.scale.z = 0.2
+                marker.color.a = 1.0
+                marker.color.r = 0.0
+                marker.color.g = 0.0
+                marker.color.b = 1.0
             else:
                 marker.scale.x = 0.2
                 marker.scale.y = 0.2
