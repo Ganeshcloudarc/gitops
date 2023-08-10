@@ -661,7 +661,7 @@ class PurePursuitController:
             return speed
         adjusted_speed = speed - kp_speed * cte
         
-        return adjusted_speed
+        return abs(adjusted_speed)
 
 if __name__ == "__main__":
     rospy.init_node('Pure_pursuit_controller_node')

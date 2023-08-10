@@ -439,7 +439,7 @@ class PurePursuitController:
             return speed
         adjusted_speed = speed - kp_speed * cte
 
-        return adjusted_speed
+        return abs(adjusted_speed)
 
     def send_ack_msg(self, steering_angle, speed, jerk):
         self.ackermann_msg.steering_angle = steering_angle
