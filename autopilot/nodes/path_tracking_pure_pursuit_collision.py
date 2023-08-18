@@ -31,7 +31,6 @@ try:
 
 except Exception as e:
     import rospy
-
     rospy.logerr("No module %s", str(e))
     exit(e)
 
@@ -57,7 +56,7 @@ class PurePursuitController:
         self.allowable_cte_for_adjustable_speed = rospy.get_param("/pure_pursuit/allowable_cte_for_adjustable_speed",0.3)
         self.is_reverse = False
 
-        self.is_pp_pid = rospy.get_param("/patrol/pp_with_pid",False)
+        self.is_pp_pid = rospy.get_param("/patrol/pp_with_pid", False)
 
         # ros parameters
         self.max_speed = rospy.get_param("/patrol/max_forward_speed", 1.8) # default value of max speed is max forward speed.

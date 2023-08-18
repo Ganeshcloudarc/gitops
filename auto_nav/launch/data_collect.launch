@@ -1,0 +1,14 @@
+<launch>
+   <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
+       <arg name="vehicle_type" value="half_cabin"/>
+        <arg name="vcu_up" default="false"/>
+        <arg name="gps_up" default="false"/>
+        <arg name="zed_camera" value="false"/>
+        <arg name="2d_lidar" value="false"/>
+        <arg name="3d_lidar" value="true"/>
+   </include>
+
+    <node name="autonav_bag_record" pkg="rosbag" type="record"
+            args="record -o $(env HOME)/.bags/auto_nav_data_collect -a  "/>
+
+</launch>

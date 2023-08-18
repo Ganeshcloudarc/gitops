@@ -1,7 +1,7 @@
 from geometry_msgs.msg import Point, PoseArray, Pose, Quaternion
 import math
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
-
+import numpy as np
 
 def pol2cart(rho, phi):
     """
@@ -84,6 +84,46 @@ def normalize_angle(angle):
     while angle < -math.pi:
         angle += 2.0 * math.pi
     return angle
+
+
+def rectangle_form_pose(robot_pose, x_size, y_size):
+    trans_list = [
+        [-1, -1],
+        [-1, 1],
+        [1, 1],
+        [1, -1]
+    ]
+    corners_list = []
+    yaw_ = get_yaw(robot_pose.pose.orientation)
+    c, s = np.cos(yaw_), np.sin(yaw_)
+    R = np.array(((c, -s), (s, c)))
+    for x_, y_ in trans_list:
+        x = robot_pose.pose.position.x + x_ * x_size/2
+        y = robot_pose.pose.position.y + y_ * y_size/2
+        result = np.dot(R, np.array([x, y]))
+        corners_list.append(result)
+    return corners_list
+
+def rectangle_form_pose(robo_x,robo_y, x_size, y_size):
+    trans_list = [
+        [-1, -1],
+        [-1, 1],
+        [1, 1],
+        [1, -1]
+    ]
+    corners_list = []
+#     yaw_ = get_yaw(robot_pose.pose.orientation)
+    yaw_ = math.radians(145)
+    c, s = np.cos(yaw_), np.sin(yaw_)
+    R = np.array(((c, -s), (s, c)))
+    for x_, y_ in trans_list:
+        x = robo_x + x_ * x_size/2
+        y = robo_y + y_ * y_size/2
+        result = np.dot(R, np.array([x, y]))
+        corners_list.append(result)
+    return corners_list
+
+
 
 
 if __name__ == "__main__":

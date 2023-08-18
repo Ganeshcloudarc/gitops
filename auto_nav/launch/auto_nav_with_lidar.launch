@@ -1,0 +1,45 @@
+<launch>
+    <arg name="bag_file" default="/home/boson/bags/varma_farm/boson_save_path_rslidar_2022-12-14-10-55-39.bag"/>
+    <arg name="rviz" default="true"/>
+    <arg name="mission_file" default="default.json"/>
+
+<!--    <arg namr="rate" default=""-->
+    <param name="auto_nav/ransac/tolerance" value="3"/>
+      <param name=" auto_nav/ransac/max_iterations" value="50"/>
+<!--    auto_nav/ransac/max_iterations-->
+
+      <!-- Lidar obstacle detector node -->
+    <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+        <arg name="config_file" value="autonav_lidar_params.yaml"/>
+        <arg name="rviz" value="false"/>
+        <arg name="rqt_reconfigure" value="true"/>
+    </include>
+
+    <include file="$(find auto_nav)/launch/pointcloud_to_laserscan.launch" >
+        <arg name="cloud_in" value="/obstacle_detector/cloud_clusters"/>
+    </include>
+
+
+    <!-- path publisher -->
+    <include file="$(find autopilot)launch/path_publisher.launch">
+        <arg name="mission_file" value="$(arg mission_file)"/>
+<!--        <arg name="mission_continue" value="$(arg mission_continue)"/>-->
+    </include>
+
+    <rosparam command="load" file="$(find auto_nav)/params/autonav_params.yaml"/>
+
+
+    <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen' />
+
+    <node name="autonav_lidar_bag_play" pkg="rosbag" type="play"
+            args="$(arg bag_file) --topics /tf /tf_static /rslidar_points  /vehicle/odom  /vehicle/foot_print "/>
+
+<!--     <node name="autonav_bag_play" pkg="rosbag" type="play"-->
+<!--            args="$(arg bag_file) &#45;&#45;topics /tf /tf_static /laser_scan  /vehicle/odom /global_gps_trajectory /global_gps_path /vehicle/foot_print"/>-->
+
+
+    <node name="rviz_autonav_lidar" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/lidar_data_view.rviz" if = "$(eval arg('rviz'))"/>
+    <node name="rviz_autonav" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/lsm_on_inliers.rviz" if = "$(eval arg('rviz'))"/>
+
+
+</launch>

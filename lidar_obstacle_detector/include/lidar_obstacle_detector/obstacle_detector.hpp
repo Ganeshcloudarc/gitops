@@ -27,6 +27,7 @@
 #include <pcl/segmentation/extract_clusters.h>
 
 #include "box.hpp"
+//#include "auto_nav_core.hpp"
 
 namespace lidar_obstacle_detector
 {

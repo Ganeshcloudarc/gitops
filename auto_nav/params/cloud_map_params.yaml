@@ -1,0 +1,12 @@
+odom_topic : "vehicle/odom"
+global_frame : "map"
+local_frame : "base_link"
+enable_global_cloud_map : false
+global_cloud_map_topic : "global_cloud_map"
+enable_local_cloud_map : true
+local_cloud_map_topic : "local_cloud_map"
+voxel_size : 0.5
+local_map_size_x : 30
+local_map_size_y : 15
+min_height_local_frame : 1
+max_height_local_frame : 10

@@ -1,0 +1,14 @@
+target_frame : base_link
+min_height  : 0.5 # any object above 0.3 from ground
+max_height  : 10 # vehicle width is assumed to be 1.5
+angle_min   : -3.1415926536
+angle_max   : 3.1415926536
+#angle_min   : -1.5707963267948966
+#angle_max   : 1.5707963267948966
+#angle_increment : 0.0087 #  common incement angle
+angle_increment : 0.001 # working as 2d point cloud.
+scan_time : 0.3333
+range_min : 0.6
+range_max : 30
+concurrency_level : 1
+use_inf : false

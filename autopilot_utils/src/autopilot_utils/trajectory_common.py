@@ -67,6 +67,7 @@ class TrajectoryManager:
         else:
             raise Exception("invalid index or out of bound")
 
+
     def find_closest_idx_with_dist_ang_thr(self, curr_pose, dist_thr, angle_thr):
         """
         Finds the closest point on trajectory within a distance threshold and angle threshold, returns true and
