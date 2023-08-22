@@ -1,0 +1,23 @@
+collision_monitor:
+  base_frame_id: "base_link"
+  source_timeout: 5.0
+  frequency: 15
+  min_points: 5
+  points: [4.0, 1, -1, 1, -1, -1, 4.0, -1]
+
+
+  observation_sources: [ "lidar_scan", "zed_scan"]
+  lidar_scan:
+    type: "scan"
+    topic: "laser_scan"
+
+  zed_scan:
+    type: "scan"
+    topic: "zed_laser_scan"
+
+  pointcloud:
+    type: "pointcloud"
+    topic: "/zed2i/zed_node/point_cloud/cloud_registered1"
+    min_height: 0.1
+    max_height: 0.5
+
