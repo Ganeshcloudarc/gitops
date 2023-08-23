@@ -19,19 +19,30 @@ WARN = DiagnosticStatus.WARN
 STALE = DiagnosticStatus.STALE
 
 
-class CommonCallaback:
+class CommonCallback:
     def __init__(self, topic_name, topic_type, min_z=None, max_z=None):
         self.topic_name = topic_name
         self.topic_type = topic_type
         self.min_z = min_z
         self.max_z = max_z
         self.data = None
+        self.data_received = False
         if isinstance(self.topic_type(), LaserScan):
-            rospy.logerr("inside inistam")
             self.laser_proj = LaserProjection()
 
     def callback(self, data):
         self.data = data
+        if not self.data_received:
+            self.data_received = True
+
+    def last_update_time(self):
+        if self.data_received:
+            return self.data.header.stamp.secs
+        else:
+            return 0
+
+    def check_data_received(self):
+        return self.data_received
 
     def get_data(self, target_frame="base_link"):
         """
@@ -48,13 +59,23 @@ class CommonCallaback:
                 if tf_points:
                     points_numpy = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=False)
                 else:
-                    return None
+                    points_numpy = None
 
             return points_numpy
         if isinstance(self.topic_type(), PointCloud2):
-            points_numpy = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(self.data, remove_nans=False)
-            points_numpy_reshape = np.reshape(points_numpy, (-1, 3), order='C')
-            return points_numpy_reshape
+            if self.data.header.frame_id == target_frame:
+                points_numpy = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(self.data, remove_nans=False)
+                points_numpy_reshape = np.reshape(points_numpy, (-1, 3), order='C')
+
+            else:
+                tf_points = transform_cloud(self.data, self.data.header.frame_id, target_frame)
+                if tf_points:
+                    points_numpy = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=False)
+                    points_numpy_reshape = np.reshape(points_numpy, (-1, 3), order='C')
+                    return points_numpy_reshape
+                else:
+                    points_numpy_reshape = None
+                return points_numpy_reshape
 
 
 class PolygonCheck:
@@ -92,7 +113,6 @@ class CollisionMonitor:
         self.diagnostics_arr.header.frame_id = self.robot_base_frame
         self.diagnose = DiagnosticStatusWrapper()
         self.diagnose.name = rospy.get_name()
-        print(self.observation_details)
         collision_polygon = self.vehicle_foot_print()
         polygon_st = PolygonStamped()
         polygon_st.header.frame_id = self.robot_base_frame
@@ -105,34 +125,62 @@ class CollisionMonitor:
             rospy.Subscriber(source.topic_name, source.topic_type, source.callback)
 
     def run(self):
+        rate = rospy.Rate(5)
+        while not rospy.is_shutdown():
+            self.diagnose.clearSummary()
+            self.diagnose.values = []
+            status_list = []
+            for source in self.observation_details:
+                status = source.check_data_received()
+                self.diagnose.add(source.topic_name, status)
+                status_list.append(status)
+            if all(status_list):
+                self.diagnose.summary(OK, "Data received on all the sensors")
+                rospy.loginfo("Data received on all the sensors")
+                self.diagnostics_arr.status.append(self.diagnose)
+                self.diagnostics_pub.publish(self.diagnostics_arr)
+                break
+            else:
+                self.diagnose.summary(WARN, "No received on all the sensors")
+                rospy.logwarn("No received on all the sensors")
+                self.diagnostics_arr.status.append(self.diagnose)
+                self.diagnostics_pub.publish(self.diagnostics_arr)
+                rate.sleep()
+                continue
         rate = rospy.Rate(self.frequency)
         while not rospy.is_shutdown():
             collision_points_count = 0
             self.diagnose.clearSummary()
             self.diagnose.values = []
+            time_out_status = False
             for source in self.observation_details:
-                print()
+                if rospy.Time.now().secs - source.last_update_time() > self.souce_timeout:
+                    time_out_status = True
+                    rospy.logwarn(f"No update on sensor source : {source.topic_name}")
+                    self.diagnose.add(f"time out from {source.topic_name}", rospy.Time.now().secs - source.last_update_time())
                 points = source.get_data()
+                count = 0
                 if points is not None:
                     for point in points:
                         collision_in = self.polygon_check.is_point_inside(point)
                         if collision_in:
-                            collision_points_count += 1
-            rospy.loginfo(f"collision_points_count : {collision_points_count}")
-            if collision_points_count > self.min_points:
+                            count += 1
+                collision_points_count += count
+                self.diagnose.add(source.topic_name+":  collision_points_count ", count)
+            rospy.loginfo(f"total : collision_points_count : {collision_points_count}")
+            if collision_points_count > self.min_points or time_out_status:
                 self.diagnose.summary(ERROR, "Collision Found near the vehicle")
-                self.diagnose.add("collision_points_count", collision_points_count)
+                self.diagnose.add("total collision_points_count", collision_points_count)
                 rospy.logwarn("Collision Found")
             else:
-                self.diagnose.summary(OK, "No collsion points Found")
-                self.diagnose.add("collision_points_count", collision_points_count)
+                self.diagnose.summary(OK, "No collision points Found")
+                self.diagnose.add("total collision_points_count", collision_points_count)
                 rospy.logwarn("No collision")
 
             self.diagnostics_arr.status = []
             self.diagnostics_arr.status.append(self.diagnose)
             self.diagnostics_pub.publish(self.diagnostics_arr)
             rate.sleep()
-
 
     def load_params(self):
         self.robot_base_frame = rospy.get_param("~collision_monitor/base_frame_id", 1.0)
@@ -147,9 +195,9 @@ class CollisionMonitor:
             type = rospy.get_param("~collision_monitor/" + observation_source + "/type", "scan")
 
             if type == "scan":
-                obj = CommonCallaback(topic_name, LaserScan)
+                obj = CommonCallback(topic_name, LaserScan)
             if type == "pointcloud":
-                obj = CommonCallaback(topic_name, PointCloud2)
+                obj = CommonCallback(topic_name, PointCloud2)
             self.observation_details.append(obj)
 
     def vehicle_foot_print(self):
@@ -157,7 +205,7 @@ class CollisionMonitor:
         for i in range(0, len(self.polygon_points), 2):
             point = Point()
             point.x = self.polygon_points[i]
-            point.y = self.polygon_points[i+1]
+            point.y = self.polygon_points[i + 1]
             pl.points.append(point)
         return pl
 
