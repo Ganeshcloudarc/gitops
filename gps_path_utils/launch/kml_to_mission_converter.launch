@@ -1,0 +1,14 @@
+<launch> 
+    <!-- <arg name="mission_files" default="default.json"/>  -->
+    <arg name="kml_files" default="default.kml"/> 
+    <arg name="linear_sampling_dis" default="10"/>
+    <arg name="rviz" default="false"/>
+
+    <!-- <param name = "/gps_path_utils/mission_files" value = "$(arg mission_files)"/>  -->
+    <param name = "/gps_path_utils/kml_file" value = "$(arg kml_files)"/> 
+    <param name="linear_sampling_dis" value="$(arg linear_sampling_dis)"/>
+    <node pkg="gps_path_utils" type="kml_to_mission_converter.py" name="kml_to_mission_converter_node" output="screen"/>
+
+    <node name="rviz_kml_to_mission_converter" pkg="rviz" type="rviz" args="-d $(find gps_path_utils)/rviz/kml_to_mission.rviz" if = "$(eval arg('rviz'))"/>
+
+</launch> 

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>iuvi.kml</name>
+	<StyleMap id="m_ylw-pushpin">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#s_ylw-pushpin</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#s_ylw-pushpin_hl</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="s_ylw-pushpin">
+		<IconStyle>
+			<scale>1.1</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Style id="s_ylw-pushpin_hl">
+		<IconStyle>
+			<scale>1.3</scale>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>
+			</Icon>
+			<hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/>
+		</IconStyle>
+	</Style>
+	<Placemark>
+		<name>iuvi</name>
+		<styleUrl>#m_ylw-pushpin</styleUrl>
+		<LineString>
+			<tessellate>1</tessellate>
+			<coordinates>
+				79.96177965541595,13.58532751086309,0 79.96175677095998,13.58499375089706,0 79.96193925245058,13.58497902165417,0 79.96195959532852,13.58532049721538,0 79.96212429910935,13.58528604311617,0 79.96210266116465,13.58497523704035,0 79.9622641560224,13.58494774033273,0 79.96229644024736,13.58537354108551,0 79.96246311583297,13.58537419231388,0 79.96242885741907,13.58497309865246,0 79.96259618696189,13.58494589017353,0 79.96263193462987,13.58535440271388,0 79.96282969348304,13.5853415088709,0 79.96276655252954,13.58495236741916,0 79.96275125849171,13.58476209734384,0 79.96171147392538,13.58486037222405,0 79.96168251345615,13.58532299718326,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+</Document>
+</kml>

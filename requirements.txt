@@ -6,3 +6,4 @@ geojson>=2.5.0
 scikit-learn>=1.0.2
 pyproj
 dubins
+shapely
