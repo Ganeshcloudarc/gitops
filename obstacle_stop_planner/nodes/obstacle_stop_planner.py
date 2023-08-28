@@ -43,13 +43,13 @@ try:
     from autopilot_utils.trajectory_smoother import TrajectorySmoother
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_utils.trajectory_common import TrajectoryManager
-    from autopilot_msgs.msg import Trajectory, TrajectoryPoint
+    from autopilot_msgs.msg import Trajectory, TrajectoryPoint, FloatKeyValue
     from velocity_planner import VelocityPlanner
     from autopilot_utils.footprint_transform import transform_footprint_circles
     from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray, KeyValue
     from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper
 
-except Exception as e:
+except Exception as e: 
     import rospy
 
     rospy.logerr("Module error %s", str(e))
@@ -128,7 +128,6 @@ class ObstacleStopPlanner:
         self._time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
         self._min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self._max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
-
         self._TIME_OUT_FROM_LASER = 2  # in secs
         self._TIME_OUT_FROM_ODOM = 2
         self._TIME_OUT_FROM_ZED = 2
@@ -181,6 +180,7 @@ class ObstacleStopPlanner:
 
         self.circles_polygon_pub = rospy.Publisher('/obstacle_stop_planner/collision_checking_circles', PolygonStamped,
                                                    queue_size=2, latch=True)
+        self.path_percent_publisher = rospy.Publisher("/osp_path_percentage",Float32, queue_size=1 ,latch=True)
         self.count_mission_repeat = 0
         self.main_loop()
 
@@ -324,6 +324,8 @@ class ObstacleStopPlanner:
             # check for mission complete
             path_percent = (self._traj_in.points[self._close_idx].accumulated_distance_m /
                             self._traj_in.points[-1].accumulated_distance_m) * 100
+            self.path_percent_publisher.publish(path_percent)
+           
 
             if path_percent > 95.0 and distance_btw_poses(self.robot_pose,
                                                           self._traj_in.points[-1].pose) <= self._min_look_ahead_dis:
@@ -514,7 +516,7 @@ class ObstacleStopPlanner:
                     # TODO apply break directly to pilot
                     rospy.logwarn("obstacle is very close, applying hard breaking")
 
-                    self.diagnostics_publisher.summary(WARN,"OBSTACLE IS VERY CLOSE ")
+                    self.diagnostics_publisher.summary(ERROR,"OBSTACLE IS VERY CLOSE ")
                     self.diagnostics_publisher.add("APPLYING BREAK ",True) 
                     self.diagnostics_publisher.add("OBSTALCE FOUND AT ",dis_to_obstacle)
                     self.publish(self.diagnostics_publisher)
@@ -607,7 +609,7 @@ class ObstacleStopPlanner:
                     else:
                         rospy.logwarn(
                             f'Obs Time limit not crossed. Remaining time: {self.stop_threshold_time_for_obs - (time.time() - self.vehicle_stop_init_time_for_obs)}')
-                        self.diagnostics_publisher.summary(WARN,"OBSTACLE WAIT TIME")
+                        self.diagnostics_publisher.summary(ERROR,"OBSTACLE WAIT TIME")
                         self.diagnostics_publisher.add("VEHICLE WILL MOVE IN ",(self.stop_threshold_time_for_obs - (time.time() - self.vehicle_stop_init_time_for_obs)))
                         self.publish(self.diagnostics_publisher)
                         for i in range(self._close_idx, collision_index):

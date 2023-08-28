@@ -15,7 +15,7 @@ try:
     # ros messages
     from nav_msgs.msg import Path, Odometry
     from geometry_msgs.msg import Point, PoseArray, PoseStamped
-    from std_msgs.msg import Header
+    from std_msgs.msg import Header, Float32
     from geographic_msgs.msg import GeoPointStamped
     from ackermann_msgs.msg import AckermannDrive
     from sensor_msgs.msg import NavSatFix
@@ -27,7 +27,7 @@ try:
     from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
-    from autopilot_msgs.msg import ControllerDiagnose
+    from autopilot_msgs.msg import ControllerDiagnose, FloatKeyValue
 
 except Exception as e:
     import rospy
@@ -40,6 +40,7 @@ def getLineNumber():
 class PurePursuitController:
     def __init__(self):
         self.gps_robot_state = None
+        self.path_percent = None
         self.robot_state = None
         self.trajectory_data = None
         self.updated_traj_time = time.time()
@@ -95,6 +96,7 @@ class PurePursuitController:
         rospy.Subscriber(trajectory_in_topic, Trajectory, self.trajectory_callback)
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
         rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
+        rospy.Subscriber("/osp_path_percentage",Float32, self.path_percent_callback)
         rospy.logdebug(f"Subscriber initiated, {trajectory_in_topic} , {odom_topic}, {gps_topic}")
         time.sleep(1)
         rate = rospy.Rate(1)
@@ -263,8 +265,10 @@ class PurePursuitController:
                 rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
                 rospy.loginfo('lhd: %s, alpha: %s , robot_speed: %s ', str(lhd), str(alpha), str(self.robot_speed))
 
+
+
                 # fill the control diagnose topic
-            
+        
                 diagnostic_msg.level = diagnostic_msg.OK
                 diagnostic_msg.message = log_tracking_message # "Tracking path"
                 diagnostic_msg.stamp = rospy.Time.now()
@@ -277,8 +281,11 @@ class PurePursuitController:
                 diagnostic_msg.target_pose = target_pose.pose
                 diagnostic_msg.target_gps_pose = self.trajectory_data.points[target_point_ind].gps_pose
                 diagnostic_msg.vehicle_pose = robot_pose
-                diagnostic_msg.vehicle_gps_pose = self.gps_robot_state
+                diagnostic_msg.vehicle_gps_pose = self.gps_robot_state 
+                k = FloatKeyValue("path_completed_percentage", round(self.path_percent,3))
+                diagnostic_msg.values.append(k)
                 controller_diagnose_pub.publish(diagnostic_msg)
+                diagnostic_msg.values.pop()
                 prev_steering_angle = steering_angle
                 prev_time = time.time()
                 prev_speed = speed
@@ -290,7 +297,10 @@ class PurePursuitController:
             except Exception as err:
                 rospy.logerr(f"Error occured :{err}")
                 rate.sleep()
-                continue
+                continue 
+    def path_percent_callback(self,data):  
+        self.path_percent = data.data 
+
 
     def target_index(self, robot_pose, close_point_ind):
         """
@@ -375,7 +385,7 @@ class PurePursuitController:
         self.robot_speed = math.sqrt(data.twist.twist.linear.x ** 2 + data.twist.twist.linear.y ** 2)
 
 
-    def gps_callback(self, data):
+    def gps_callback(self, data): 
         self.gps_robot_state = data
 
     def findLookaheadPos(self,robot_pose,lookAheadPose,reverse_threshold=0.1,stop_threshold=0.1):
