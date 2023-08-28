@@ -696,7 +696,7 @@ class VehicleSafety {
     // if (battery_soc != store_batt_level) {
     //   store_batt_level = battery_soc;
 
-    if ((battery_soc > 0) && (battery_soc < BATT_SOC_TH)) {
+    if ((battery_soc > 0) && (battery_soc <= BATT_SOC_TH)) {
       // stop the vehicle
       log_msg = "Low Battery";
       stat_summ_stat = ERROR;
