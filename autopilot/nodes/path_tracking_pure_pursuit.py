@@ -94,14 +94,10 @@ class PurePursuitController:
         self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.search_point_distance = 5
-        failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
         self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
         self.enable_cte_based_speed_control = rospy.get_param("/patrol/enable_cte_based_speed_control", False)
 
-        if failsafe_enable:
-            cmd_topic = rospy.get_param("patrol/cmd_topic", "pure_pursuit/cmd_drive")
-        else:
-            cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
+        cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
 
         # Publishers
         self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10)

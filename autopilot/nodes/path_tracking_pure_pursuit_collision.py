@@ -73,14 +73,10 @@ class PurePursuitController:
         gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/global")
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
 
-        failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)
         self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
         self.enable_cte_based_speed_control = rospy.get_param("/patrol/enable_cte_based_speed_control", False)
 
-        if failsafe_enable:
-            cmd_topic = rospy.get_param("patrol/cmd_topic", "/vehicle/cmd_drive_safe")
-        else:
-            cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
+        cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
 
         # Publishers
         self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10)
