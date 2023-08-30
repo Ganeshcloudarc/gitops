@@ -38,7 +38,10 @@
     <node pkg="autopilot" type="record_waypoints_json.py" name="waypoints_recorder_node" output='screen' />
 
     <group if="$(eval arg('failsafe_enable'))">
-        <include file="$(find vehicle_safety_cpp)/launch/vehicle_safety_cpp.launch"> </include>
+        <include file="$(find vehicle_safety_cpp)/launch/vehicle_safety_cpp.launch"> 
+            <!-- Disable vehicle stop command when in save path -->
+            <arg name="enable_stop_command" value="false"/> 
+        </include>
     </group>
 
     <node name="save_path_bag_record" pkg="rosbag" type="record"
