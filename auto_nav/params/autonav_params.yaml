@@ -1,4 +1,6 @@
 auto_nav:
+  scan_topic : "laser_scan"
+  local_cloud_scan : "local_cloud_laser_scan"
   farm_details:
     row_spacing : 8 # distance between the tree rows in meters
   regulate_speed_enable : True # enable regulated speed
@@ -24,4 +26,6 @@ auto_nav:
   moving_avarage_filter:
     enable : True
     window_size : 10 # How many previous lines to average.
+
+  use_previous_line : True # To use best ransac line which is collision free, Vehicle might not go in exact center after keepin, But maintains to go between the tree.
 

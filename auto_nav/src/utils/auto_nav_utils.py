@@ -1,4 +1,4 @@
-import random
+import random, sys
 import numpy as np
 import sensor_msgs.point_cloud2 as pcd2
 from autopilot_msgs.msg import Trajectory, TrajectoryPoint
@@ -12,23 +12,26 @@ from math import cos, sin
 
 
 class Pose2D:
-    def __init__(self, x, y, yaw=0, curv=np.inf, turn_info=0):
+    def __init__(self, x, y, yaw=0, circum_radius=np.inf, turn_info=0):
         self.x = x
         self.y = y
         self.yaw = yaw
-        self.curv = curv
+        self.circum_radius = circum_radius
         self.turn_info = turn_info
 
     def __str__(self):
-        return f"x: {self.x} y: {self.y} z:{self.yaw} curv:{self.curv} turn_info:{self.turn_info}"
+        return f"x: {self.x} y: {self.y} z:{self.yaw} circum_radius:{self.circum_radius} turn_info:{self.turn_info}"
 
     def __add__(self, other):
         x = self.x + other.x
         y = self.y + other.y
         return Pose2D(x, y)
 
-    def update_curv(self, curv):
-        self.curv = curv
+    def distance(self, other):
+        return math.hypot(self.x - other.x, self.y - other.y)
+
+    def update_circum_radius(self, circum_radius):
+        self.circum_radius = circum_radius
 
     def update_turn_info(self, turn_info):
         # +1 => right turn
@@ -38,6 +41,32 @@ class Pose2D:
 
     def to_numpy(self):
         return np.array([self.x, self.y])
+
+    def dir_check(self, other):
+        """ Return true if both poses lie on same side"""
+        v1 = np.array([np.cos(self.yaw), np.sin(self.yaw)])
+        v2 = np.array([other.x - self.x, other.y - self.y])
+        dot_pro = np.dot(v1, v2)
+        if dot_pro >= 0:
+            return True
+        else:
+            return False
+
+    def heading_check(self, other, th=np.pi/2):
+        """ DOT PRODUCT BETWEEN THE YAW"""
+        v1 = np.array([np.cos(self.yaw), np.sin(self.yaw)])
+        v2 = np.array([np.cos(other.yaw), np.sin(other.yaw)])
+        dot_pro = np.dot(v1, v2)
+        angle = GetAngle(v1, v2)
+        if abs(angle) < np.pi/2:
+            return True
+        return False
+        if dot_pro >= 0:
+            return True
+        else:
+            return False
+
+
 
 
 class Line:
@@ -286,7 +315,7 @@ def circumradius(xvals, yvals):
             ((x1 - x3) ** 2) + ((y1 - y3) ** 2))) ** (0.5)
     if (den == 0):
         print('Failed: points are either collinear or not distinct')
-        return 0
+        return 1000
     R = num / den
     return R
 
@@ -319,5 +348,12 @@ if __name__ == "__main__":
     # print(math.degrees(lane.heading()))
     # (-0.7336240731572223, 16.773232044004445)
     # (1.2663759268427774, 44.453772849218105)]
-    line_points = getLine(0, 16, 0, 44, res=0.2)
-    print("line points", line_points)
+    # line_points = getLine(0, 16, 0, 44, res=0.2)
+    # print("line points", line_points)
+
+    A = Pose2D(0, 0, math.radians(90))
+    # print("math.radians(360)", math.radians(178))
+    B = Pose2D(1,-1, math.radians(1))
+    # print(A.dir_check(B))
+    print(A.heading_check(B))
+

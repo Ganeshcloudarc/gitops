@@ -116,7 +116,7 @@
         <node name="rviz_auto_nav" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/lsm_on_inliers.rviz" if = "$(eval arg('rviz'))"/>
         
         <node name="auto_nav_bag_record" pkg="rosbag" type="record"
-            args="record -o $(env HOME)/.bags/auto_nav -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/local_cloud_map|/global_cloud_map" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+            args="record -o $(env HOME)/.bags/auto_nav -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/local_cloud_map|/global_cloud_map|/rslidar_points|/lslidar_point_cloud" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
     </group>
 
     

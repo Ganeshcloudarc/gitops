@@ -7,6 +7,7 @@ try:
     import numpy as np
 
     import copy
+
     np.float = np.float64
     import ros_numpy
     import rospy
@@ -73,6 +74,7 @@ slope = -(a / b)
 class AutoNav:
     def __init__(self):
         # laser related
+        self.laser_data = None
         self.final_center_line = None
         self.center_line_heading = None
         self.center_line = None
@@ -121,7 +123,7 @@ class AutoNav:
         self.ransac_max_iterations = rospy.get_param("auto_nav/ransac/max_iterations", 200)
         self.moving_avg_filter_enable = rospy.get_param("auto_nav/moving_avarage_filter/enable", True)
         self.window_size = rospy.get_param("auto_nav/moving_avarage_filter/window_size", 10)
-        self.use_prev_center_line = rospy.get_param("auto_nav/use_prev_center_line", False)
+        self.use_previous_line = rospy.get_param("auto_nav/use_previous_line", False)
 
         self.latch_average_filter_enable = rospy.get_param("auto_nav/latch_avarage_filter/enable", False)
         self.latch_average_filter_window_size = rospy.get_param("auto_nav/latch_avarage_filter/window_size", 10)
@@ -152,6 +154,7 @@ class AutoNav:
         self.turn_start_pose_pub = rospy.Publisher("/auto_nav/turn_start_pose", PoseStamped, queue_size=1)
         self.turn_end_pose_pub = rospy.Publisher("/auto_nav/turn_end_pose", PoseStamped, queue_size=1)
         self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2, latch=True)
+        self.path_percent_publisher = rospy.Publisher("/osp_path_percentage",Float32, queue_size=1 ,latch=True)
         self.count_mission_repeat = 0
         self.vibration_path_msg = Path()
 
@@ -186,9 +189,9 @@ class AutoNav:
                                                       queue_size=10, latch=True)
 
             self.before_filter = rospy.Publisher('/auto_nav/before_filter', Path,
-                                                      queue_size=10, latch=True)
+                                                 queue_size=10, latch=True)
             self.after_filter = rospy.Publisher('/auto_nav/after_filter', Path,
-                                                      queue_size=10, latch=True)
+                                                queue_size=10, latch=True)
             self.slope_pub = rospy.Publisher("/auto_nav/slope_pub", Float32, queue_size=10)
             self.left_intercept_pub = rospy.Publisher("/auto_nav/left_intercept_pub", Float32, queue_size=10)
             self.right_intercept_pub = rospy.Publisher("/auto_nav/right_intercept_pub", Float32, queue_size=10)
@@ -198,7 +201,7 @@ class AutoNav:
         self.increment_for_curv = rospy.get_param("auto_nav/turnings/incement_index_for_curvature", 20)
         print("self.increment_for_curv", self.increment_for_curv)
         self.min_turning_radius = rospy.get_param("auto_nav/turnings/min_tunings_radius", 7)
-        self.min_turn_radius_to_check_turn = rospy.get_param("auto_nav/turnings/radius_to_check_turn", 10)
+        self.min_turn_radius_to_check_turn = rospy.get_param("auto_nav/turnings/radius_to_check_turn", 15)
         self.dedug_turn = rospy.get_param("auto_nav/turnings/debug", True)
 
         if self.dedug_turn:
@@ -210,12 +213,15 @@ class AutoNav:
                                                             queue_size=10, latch=True)
             self.automatic_turns_right_pub = rospy.Publisher('/auto_nav/automatic_turns_right', Path,
                                                              queue_size=10, latch=True)
+            self.curv_pub = rospy.Publisher("/auto_nav/global_curv", MarkerArray, queue_size=1, latch=True)
 
         # ros subscribers
         global_traj_topic = rospy.get_param("auto_nav/traj_in", "global_gps_trajectory")
-        scan_topic = rospy.get_param("auto_nav/scan_in", "laser_scan")
+        scan_topic = rospy.get_param("auto_nav/scan_topic", "laser_scan")
+        local_map_scan_topic = rospy.get_param("auto_nav/local_cloud_scan", "local_cloud_laser_scan")
         odom_topic = rospy.get_param("patrol/odom_topic", "vehicle/odom")
         rospy.Subscriber(global_traj_topic, Trajectory, self.global_traj_callback)
+        rospy.Subscriber(local_map_scan_topic, LaserScan, self.local_map_scan_callback, queue_size=1)
         rospy.Subscriber(scan_topic, LaserScan, self.scan_callback, queue_size=1)
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
 
@@ -267,11 +273,11 @@ class AutoNav:
             robot_loc_forward_base_link = Pose2D(30, 0)
             rospy.logdebug(f"robot_loc_forward_base_link:{robot_loc_forward_base_link}")
 
-
             loop_start_time = time.time()
             # checks whether data from sensors are updated.
             if loop_start_time - self.odom_data_in_time > self._TIME_OUT_FROM_ODOM:
-                rospy.logwarn(f"No update on odom (robot position) from last {loop_start_time - self.laser_data_in_time} seconds")
+                rospy.logwarn(
+                    f"No update on odom (robot position) from last {loop_start_time - self.laser_data_in_time} seconds")
                 rate.sleep()
                 continue
             if loop_start_time - self.laser_data_in_time > self._TIME_OUT_FROM_LASER:
@@ -301,7 +307,7 @@ class AutoNav:
             # check for mission complete
             path_percent = (self._traj_in.points[self._close_idx].accumulated_distance_m /
                             self._traj_in.points[-1].accumulated_distance_m) * 100
-
+            self.path_percent_publisher.publish(path_percent)
             if path_percent > 95.0 and distance_btw_poses(self.robot_pose,
                                                           self._traj_in.points[-1].pose) <= self.row_spacing / 2:
                 self.count_mission_repeat += 1
@@ -707,7 +713,7 @@ class AutoNav:
             left_end_point = left_line.intersct_point_to_line(robot_loc_forward_base_link)
             rospy.logdebug(f"robot_loc_backward_base_link: {robot_loc_backward_base_link}")
             rospy.logdebug(f"left_starting_point : {left_starting_point},left_end_point : {left_end_point} ")
-            
+
             right_staring_point = right_line.intersct_point_to_line(robot_loc_backward_base_link)
             right_end_point = right_line.intersct_point_to_line(robot_loc_forward_base_link)
             path = two_points_to_path(left_starting_point, left_end_point, "base_link")
@@ -762,9 +768,10 @@ class AutoNav:
             final_center_inliers_exist = False
             current_line = None
             rospy.logdebug("------------------------")
-            if self.final_center_line is not None:
+            # self.final_center_line = None
+            if self.final_center_line is not None and self.use_previous_line:
                 # finding number of inliers final_center_line
-                final_center_inliers_inds = self.final_center_line.inlier(self.laser_np_2d,
+                final_center_inliers_inds = self.final_center_line.inlier(self.laser_data,
                                                                           vehicle_data.dimensions.track_width / 2 +
                                                                           self.offset_to_add_center_line_width)
                 if len(final_center_inliers_inds) > 0:
@@ -775,7 +782,7 @@ class AutoNav:
                     current_line = self.final_center_line
                     rospy.loginfo("Using final_center_line  as current line")
             else:
-                ransac_center_inliers_idx = filtered_center_line.inlier(self.laser_np_2d,
+                ransac_center_inliers_idx = filtered_center_line.inlier(self.laser_data,
                                                                         vehicle_data.dimensions.track_width / 2 +
                                                                         self.offset_to_add_center_line_width)
                 if len(ransac_center_inliers_idx) == 0 and len(m_list) >= self.window_size:
@@ -788,9 +795,9 @@ class AutoNav:
                     rospy.loginfo("Using ransac_center_line  as current line")
 
             if final_center_inliers_exist:
-                ransac_center_inliers_idx = filtered_center_line.inlier(self.laser_np_2d,
-                                                               vehicle_data.dimensions.track_width / 2 +
-                                                               self.offset_to_add_center_line_width)
+                ransac_center_inliers_idx = filtered_center_line.inlier(self.laser_data,
+                                                                        vehicle_data.dimensions.track_width / 2 +
+                                                                        self.offset_to_add_center_line_width)
                 rospy.loginfo(f"checking for inliers on ransac line and found n: {len(ransac_center_inliers_idx)}")
                 if len(ransac_center_inliers_idx) > 0:
                     rospy.logerr("inliers on the center line, check for collision")
@@ -805,13 +812,13 @@ class AutoNav:
             rospy.loginfo(f"current line equation : {current_line}")
             rospy.logdebug("------------------------")
 
-            current_line_inliers_inds = current_line.inlier(self.laser_np_2d,
+            current_line_inliers_inds = current_line.inlier(self.laser_data,
                                                             vehicle_data.dimensions.track_width / 2 +
                                                             self.offset_to_add_center_line_width)
 
             current_line_inliers = np.array([])
             try:
-                current_line_inliers = np.take(self.laser_np_2d, current_line_inliers_inds, axis=0)
+                current_line_inliers = np.take(self.laser_data, current_line_inliers_inds, axis=0)
                 # comment to check below forward inlier
                 self.center_line_inliers_pub.publish(xy_to_pointcloud2(current_line_inliers, "map"))
             except IndexError:
@@ -950,28 +957,10 @@ class AutoNav:
         self.robot_yaw = get_yaw(data.pose.pose.orientation)
         self.robot_tie = np.array([cos(self.robot_yaw), sin(self.robot_yaw)])
 
-    def scan_callback(self, scan_in):
+    def local_map_scan_callback(self, scan_in):
         self.scan_in_frame_id = scan_in.header.frame_id
         self.laser_data_in_time = time.time()
         self.scan_data_received = True
-        """
-         N = len(scan_in.ranges)
-        if not self.scan_data_received:
-            all_angles = scan_in.angle_min + np.arange(N) * scan_in.angle_increment
-            self._cos_sin_map = np.array([np.cos(all_angles), np.sin(all_angles)])
-            angles = scan_in.angle_min + np.arange(N / 2) * scan_in.angle_increment
-
-            self._cos_sin_map_left = np.array([np.cos(angles), np.sin(angles)])
-
-            angles_1 = scan_in.angle_min + np.arange(N / 2, N) * scan_in.angle_increment
-            self._cos_sin_map_right = np.array([np.cos(angles_1), np.sin(angles_1)])
-            self.scan_data_received = True
-        # print(self._cos_sin_map_right)
-
-        self.all_points = (scan_in.ranges[:self._cos_sin_map.shape[1]] * self._cos_sin_map).T
-        # self.all_points_pub.publish(xy_to_pointcloud2(self.all_points, self.scan_in_frame_id))
-        """
-
         points = self.laser_geo_obj.projectLaser(scan_in)
         # self.all_points_pub.publish(points)
         all_points = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(points, remove_nans=False)
@@ -991,114 +980,14 @@ class AutoNav:
         except Exception as error:
             rospy.logerr(f"Error in transform_cloud, Error : {error}")
 
-        # rospy.logdebug(f"laser scan size : {self.all_points.shape}")
-        # rospy.logdebug(f"map scan size : {self.laser_np_2d.shape}")
-        return 0
-        # self.left_points = (scan_in.ranges[:self._cos_sin_map_left.shape[1]] * self._cos_sin_map_left).T
-        #
-        # self.left_points_pub.publish(xy_to_pointcloud2(self.left_points, self.scan_in_frame_id))
-        #
-        # self.right_points = (scan_in.ranges[-self._cos_sin_map_right.shape[1]:] * self._cos_sin_map_right).T
-        # self.right_points_pub.publish(xy_to_pointcloud2(self.right_points, self.scan_in_frame_id))
-        # # rospy.logwarn("left and right are published")
-        # return 0
-
-        # ransak method start from here
-
-        maximum_inlierscount_l = 0
-        maximum_inlierscount_r = 0
-        tolerance = 2
-        coefficents = []
-        max_iter = 300
-
-        for iterator in range(0, max_iter):
-            # on left side
-            ind1, ind2 = ganerate_random_pairs(left_points.shape[0])
-
-            rospy.loginfo(f"ind1: {left_points[ind1]}, ind2: {left_points[ind2]}")
-            point1 = left_points[ind1]
-            point2 = left_points[ind2]
-
-            # path = two_points_to_path(point1,point2, scan_in.header.frame_id)
-            # self.left_random_path.publish(path)
-
-            """
-            A=y1−y2
-            B=x2−x1
-            C=x1y2−x2y1
-            """
-            A = point1[1] - point2[1]
-            B = point2[0] - point1[0]
-            C = point1[0] * point2[1] - point2[0] * point1[1]
-
-            C2 = C + self.row_spacing * math.sqrt(A * A + B * B)
-
-            yvalues_paralu_line = [(-C2 - A * point1[0]) / B, (-C2 - A * point2[0]) / B]
-
-            parallel_point1 = [point1[0], yvalues_paralu_line[0]]
-            parallel_point2 = [point2[0], yvalues_paralu_line[1]]
-
-            # path = two_points_to_path(parallel_point1, parallel_point2, scan_in.header.frame_id)
-            # self.right_random_path.publish(path)
-
-            inlierscount_left = 0
-            inlierscount_right = 0
-
-            for i in range(0, len(left_points)):
-
-                dis = abs((A * left_points[i][0] + B * left_points[i][1] + C) / (pow(A * A + B * B, 0.5)))
-                if dis <= tolerance:
-                    inlierscount_left += 1
-                #         print(inlierscount)
-            for i in range(0, len(right_points)):
-                dis = abs((A * right_points[i][0] + B * right_points[i][1] + C2) / (pow(A * A + B * B, 0.5)))
-                if dis <= tolerance:
-                    inlierscount_right += 1
-                #         print(inlierscount)
-            if inlierscount_left > maximum_inlierscount_l and inlierscount_right > maximum_inlierscount_r:
-                maximum_inlierscount_l = inlierscount_left
-                maximum_inlierscount_r = inlierscount_right
-                coefficents = [A, B, C, C2]
-
-            # on right side
-
-        A, B, C, C2 = coefficents[0], coefficents[1], coefficents[2], coefficents[3]
-        min_x, max_x = -100, 100
-        yvalues_line1 = [(-C - A * min_x) / B, (-C - A * max_x) / B]
-        yvalues_paralu_line = [(-C2 - A * min_x) / B, (-C2 - A * max_x) / B]
-        final_left1 = [-100, yvalues_line1[0]]
-        final_left2 = [100, yvalues_line1[1]]
-        path = two_points_to_path(final_left1, final_left2, scan_in.header.frame_id)
-        self.left_random_path.publish(path)
-
-        final_right1 = [-100, yvalues_paralu_line[0]]
-        final_right2 = [100, yvalues_paralu_line[1]]
-        path = two_points_to_path(final_right1, final_right2, scan_in.header.frame_id)
-        self.right_random_path.publish(path)
-        rospy.loginfo("both parallel lines are published")
-
-    def scan_callback1(self, data):
-        start = time.time()
-        self.laser_data_in_time = time.time()
-        points = self.laser_geo_obj.projectLaser(data)
-        tf_points = transform_cloud(points, data.header.frame_id, "map")
+    def scan_callback(self, scan_in):
+        points = self.laser_geo_obj.projectLaser(scan_in)
+        tf_points = transform_cloud(points, scan_in.header.frame_id, "map")
         if tf_points:
-            self.laser_np_3d = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=False)
-            self.laser_np_2d = np.delete(self.laser_np_3d, -1, axis=1)
-            if len(self.laser_np_2d.tolist()) == 0:
-                self.laser_np_2d = np.array([100, 100])
-            self.scan_data_received = True
+            laser_data = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=True)
+            self.laser_data = np.delete(laser_data, -1, axis=1)
         else:
-            self.scan_data_received = False
-
-        rospy.logdebug(f"time taken for laser scan callback: {time.time() - start} ")
-
-        # self.publish_points(self.pc_np)
-        # self.collision_points_publisher.publish(tf_points)
-        # try:
-        #     self.tree = KDTree(self.pc_np, leaf_size=2)
-        # except:
-        #     rospy.logwarn("Could not fill KDtree")
+            rospy.logerr("Error in transform_cloud")
 
     def global_traj_callback(self, data):
         self._traj_in = data
@@ -1110,86 +999,81 @@ class AutoNav:
             self.path.append(Pose2D(point.pose.position.x, point.pose.position.y, yaw))
 
         # finding the curvature
-        incement_i = self.increment_for_curv
-
+        incement_i = self.increment_for_curv  # assuming points are saved at 10 cm resolution.
+        for i in range(0, incement_i):
+            self.path[i].update_circum_radius(1000)
         for i in range(incement_i, self._traj_end_index - incement_i):
-
             x_vals = [self.path[i - incement_i].x, self.path[i].x, self.path[i + incement_i].x]
             y_vals = [self.path[i - incement_i].y, self.path[i].y, self.path[i + incement_i].y]
 
-            R = circumradius(x_vals, y_vals)
-            print("R", R)
-            # curvature.append(1 / R)
-            if R == 0.0:
-                self.path[i].update_curv(np.inf)
-                continue
-            c = 1 / R
-            curv_th = 1 / self.min_turn_radius_to_check_turn
-            self.path[i].update_curv(c)
-            if abs(c) >= curv_th and c > 0:
-                self.path[i].update_turn_info(1)
-            elif abs(c) >= curv_th and c < 0:
-                self.path[i].update_turn_info(-1)
-            else:
-                self.path[i].update_turn_info(0)
+            circum_radius = circumradius(x_vals, y_vals)
+            self.path[i].update_circum_radius(circum_radius)
+
+        for i in range(self._traj_end_index - incement_i, self._traj_end_index):
+            self.path[i].update_circum_radius(1000)
+
+        rospy.logdebug("applied circun radius")
 
         if self.dedug_turn:
-            path_msg_right = Path()
-            path_msg_right.header.frame_id = "map"
-            path_msg_left = Path()
-            path_msg_left.header.frame_id = "map"
+            marker_arr_msg = MarkerArray()
+            marker = Marker()
+            marker.header.frame_id = self._traj_in.header.frame_id
+            marker.action = marker.DELETEALL
+            marker_arr_msg.markers.append(marker)
+
+            i = 0
+            once = True
+            while i < len(self.path)-1:
+                # run this loop untill turn end point
+                # Turn end point condition, turn end point should be heading oppisite direction of turn start point.and circumradius should be less than th.
+
+                if abs(self.path[i].circum_radius) < self.min_turn_radius_to_check_turn:
+                    check = [abs(self.path[k].circum_radius) < self.min_turn_radius_to_check_turn for k in range(i, i+20)]
+                    if all(check):
+                        print("valid turn start point")
+                    else:
+                        print("not valid turn start point")
+                        i = i + 1
+                        continue
+                    turn_start_point = self.path[i]
+                    turn_start_point_actual = self.path[i]
+                    # turn_start_point.update_turn_info(1)
+                    self.path[i].update_turn_info(1)
+                    i = i+1
+                    rospy.logerr(f"start index : {i}")
+                    while i < len(self.path)-1:
+                        if turn_start_point.dir_check(self.path[i+1]) or turn_start_point.heading_check(self.path[i]) or abs(int(self.path[i].circum_radius)) <= self.min_turn_radius_to_check_turn:
+                            self.path[i].update_turn_info(1) # or
+                            i = i + 1
+                        else:
+                            break
+                    rospy.logerr(f"end index : {i}")
+                else:
+                    i = i + 1
+            i = 0
             for i in range(len(self.path)):
-                if self.path[i].turn_info == 1:
-                    pose_st = PoseStamped()
-                    pose_st.header.frame_id = "map"
-                    pose_st.pose.position.x = self.path[i].x
-                    pose_st.pose.position.y = self.path[i].y
-                    pose_st.pose.orientation.z = 1
-                    path_msg_left.poses.append(pose_st)
-                elif self.path[i].turn_info == -1:
-                    pose_st = PoseStamped()
-                    pose_st.header.frame_id = "map"
-                    pose_st.pose.position.x = self.path[i].x
-                    pose_st.pose.position.y = self.path[i].y
-                    pose_st.pose.orientation.z = 1
-                    path_msg_right.poses.append(pose_st)
+                # Filling of marker msg
+                marker = Marker()
+                marker.header.frame_id = self._traj_in.header.frame_id
+                marker.type = marker.TEXT_VIEW_FACING
+                marker.text = str(int(self.path[i].circum_radius))
+                marker.id = i
+                marker.action = marker.ADD
+                marker.scale.x = 0.2
+                marker.scale.y = 0.2
+                marker.scale.z = 0.2
+                marker.color.a = 1.0
+                if self.path[i].turn_info != 0:
+                    marker.color.r = 1.0
+                else:
+                    marker.color.g = 1.0
+                marker.color.b = 0.0
 
-            self.turn_path_left_pub.publish(path_msg_left)
-            self.turn_path_right_pub.publish(path_msg_right)
-            rospy.loginfo("turn points publised")
-            print("self.path", self.path)
-
-        # Publish linear regression of the path points untill the turning point
-        x = []
-        y = []
-        for i in range(incement_i + 1, len(self.path)):
-            print(
-                self.path[i].turn_info)
-            if self.path[i].turn_info == 0:
-                x.append(self.path[i].x)
-                y.append(self.path[i].y)
-            else:
-                break
-        print("len x", len(x))
-        x = np.array(x)
-        y = np.array(y)
-        print(x)
-
-        model = LinearRegression()
-        model.fit(x[:, np.newaxis], y[:, np.newaxis])
-
-        # Predict data of estimated models
-        m = model.coef_[0][0]
-        c = model.intercept_[0]
-        print(f" m: {m},c:{c}")
-        # print(line_X, line_y)
-        x1, x2 = x[0], x[-1]
-
-        ry1 = m * x1 + c
-        ry2 = m * x2 + c
-        path = two_points_to_path([x1, ry1], [x2, ry2], "map")
-        self.global_path_linear.publish(path)
-        rospy.loginfo("global path is published")
+                marker.pose = self._traj_in.points[i].pose
+                marker_arr_msg.markers.append(marker)
+            self.curv_pub.publish(marker_arr_msg)
+            rospy.logdebug("global curvature marker are published")
+            # print("self.path", self.path)
 
     def find_close_point(self, robot_pose, old_close_index):
         close_dis = distance_btw_poses(robot_pose, self.traj_in.points[old_close_index].pose)
