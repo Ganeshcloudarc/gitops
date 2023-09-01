@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>tada_path_4.kml</name>
+	<Style id="default">
+	</Style>
+	<StyleMap id="default0">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#default</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#hl</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Style id="hl">
+		<IconStyle>
+			<scale>1.2</scale>
+		</IconStyle>
+	</Style>
+	<Placemark>
+		<name>tada_path_4</name>
+		<styleUrl>#default0</styleUrl>
+		<LineString>
+			<tessellate>1</tessellate>
+			<coordinates>
+				79.96135169456123,13.5855389538639,0 79.96305826391261,13.58543012794997,0 79.96304208461108,13.58519154272969,0 79.96136410924069,13.58532225768141,0 79.96142669542242,13.58514484324522,0 79.96303889368771,13.58497392947273,0 79.96307090203072,13.58475002710513,0 79.96159547236675,13.58490953948076,0 79.96306534696531,13.58442017683524,0 79.96132706177252,13.58433792055846,0 79.96099029381918,13.58550459207688,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+</Document>
+</kml>

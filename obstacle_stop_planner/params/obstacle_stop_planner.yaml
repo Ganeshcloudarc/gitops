@@ -14,7 +14,7 @@ obstacle_stop_planner:
   speed_min_threshold : 0.5 # speed less than this would not move vehicle.
   vis_collision_points : true
   vis_trajectory_rviz  : true
-
+  by_pass_dist : 0 # 0-while will not bypass for obstacle stop; other than 0(ie. 1,2...)- will bypass in mtr dist 
   robot_level_collision_check_enable : true # To enable vehicle level collision irrespective of save path.
   footprint:
     offset_to_width : 0.3 # offset to add to vehicle width for vehicle level collision checking (meters)

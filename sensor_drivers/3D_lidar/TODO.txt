@@ -1,2 +1,0 @@
-rslidar package is already souce compiled so we can use it.
-and we can have just config_yaml and launch file here.

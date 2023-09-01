@@ -7,9 +7,11 @@
     <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
     <arg name="record" default="true"/>
-    <arg name="failsafe_enable" default="false"/>
     <arg name="failsafe_enable_cpp" default="true"/>
+    <!-- DO NOT KEEP BOTH obs_stop_planner and enable_centering TO TRUE AT A TIME -->
     <arg name="obs_stop_planner" default="true"/>
+    <arg name="enable_centering" default="false"/>
+
     <arg name="enable_zed_obs" default="true"/>
     <arg name="enable_obs_v1" default="true"/>
     <arg name="use_pcl_boxes" default="true"/>
@@ -20,8 +22,11 @@
     <!-- OBS CONFIG END -->
     <arg name="pp_with_pid" default="true"/>
     <arg name="enable_rqt" default="false"/>
-
+    
     <arg name="allow_reversing" default="true"/>
+
+
+
 
     <arg name="sensor_source" default='1' doc="1: Zed camera, 1: Rslidar, 2: carla"/>
     <arg name="kp" default="0.12" doc="kp:0.03,ki:0.02 for us vehicle and kp:0.12 ,ki:0.1 for india vehicles"/>
@@ -36,7 +41,6 @@
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
     <param name="/patrol/mission_continue" value ="$(arg mission_continue)"/>
     <param name="/patrol/mission_trips" value ="$(arg mission_trips)"/>
-    <param name="/patrol/failsafe_enable" value = "$(arg failsafe_enable)"/>
     <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
     <param name='/patrol/gps_topic' value = '/vehicle/gps'/>
     <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
@@ -91,8 +95,33 @@
         </include>
         <node name="rviz_obstacle_stop_planner" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol_obstacle_stop_planner.rviz" if = "$(eval arg('rviz'))"/>
     </group>
+    
+    <!-- Auto nav  -->
+    <arg name="cloud_in" default="/rslidar_points" if = "$(eval arg('enable_rslidar'))"/>
+    <arg name="cloud_in" default="/lslidar_point_cloud" if = "$(eval arg('enable_lslidar'))"/>
+    <group if="$(eval arg('enable_centering'))">
+        <param name="/patrol/allow_reversing" value="false"/>
+        <param name="patrol/enable_cte_based_speed_control" value="false"/>
+         <param name="/patrol/pp_with_pid" value="false"/>
 
-    <group unless="$(eval arg('obs_stop_planner'))">
+
+        <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
+        
+        <include file="$(find auto_nav)/launch/auto_nav.launch">
+            <arg name="cloud_in_for_local_map" value="$(arg cloud_in)"/>
+            <arg name="cloud_in_for_auto_nav" value="local_cloud_map"/>
+            <arg name="mission_continue" value="$(arg mission_continue)"/>
+
+        </include>
+        <node name="rviz_auto_nav" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/lsm_on_inliers.rviz" if = "$(eval arg('rviz'))"/>
+        
+        <node name="auto_nav_bag_record" pkg="rosbag" type="record"
+            args="record -o $(env HOME)/.bags/auto_nav -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/local_cloud_map|/global_cloud_map|/rslidar_points|/lslidar_point_cloud" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+    </group>
+
+    
+
+    <group unless="$(eval arg('enable_centering') or arg('obs_stop_planner'))">
         <!-- <group if="$(eval arg('pp_with_pid'))"> -->
           <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
           <group if="$(eval arg('rviz'))">
@@ -100,30 +129,22 @@
           </group>
     </group>
 
-    <group if="$(eval arg('pp_with_pid'))">
-        <node name="patrol_pid_bag_record" pkg="rosbag" type="record"
-            args="record -o $(env HOME)/.bags/boson_pid_kp_$(arg kp)_ki_$(arg ki)_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud " if="$(eval arg('record') and arg('hardware_in_loop'))"/>
-    </group>
+    <group unless="$(eval arg('enable_centering'))">
+        <group if="$(eval arg('pp_with_pid'))">
+            <node name="patrol_pid_bag_record" pkg="rosbag" type="record"
+                args="record -o $(env HOME)/.bags/boson_pid_kp_$(arg kp)_ki_$(arg ki)_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud " if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+        </group>
 
-    <group unless="$(eval arg('pp_with_pid'))">
-        <node name="patrol_bag_record" pkg="rosbag" type="record"
-            args="record -o $(env HOME)/.bags/boson_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+        <group unless="$(eval arg('pp_with_pid'))">
+            <node name="patrol_bag_record" pkg="rosbag" type="record"
+                args="record -o $(env HOME)/.bags/boson_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+        </group>
     </group>
     <!-- <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include> -->
-    <group if="$(eval arg('failsafe_enable'))">
-        <include file="$(find autopilot)/launch/failsafe_manager.launch">
-            <arg name="use_zed_camera"         value="false" />
-            <arg name="use_oak_camera"            value="false" />
-            <arg name="vehicle_safety_diagnostics" default="true"/>
-            <arg name="vehicle_safety_cpp_diagnostics" default="false"/>
-            <arg name="use_emergeny_stop" value ="true"/>
-        </include>
-    </group>
     <group if="$(eval arg('failsafe_enable_cpp'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">
             <arg name="use_zed_camera"         value="false" />
             <arg name="use_oak_camera"            value="false" />
-            <arg name="vehicle_safety_diagnostics" default="false"/>
             <arg name="vehicle_safety_cpp_diagnostics" default="true"/>
             <arg name="use_emergeny_stop" value ="true"/>
         </include>

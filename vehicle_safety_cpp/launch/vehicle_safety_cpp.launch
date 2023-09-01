@@ -1,11 +1,14 @@
 <launch>
+  <arg name="enable_stop_command" default="true"/>
   <rosparam file="$(find vehicle_safety_cpp)/params/vehicle_safety_cpp_params.yaml" command="load"/>
   <node name="vehicle_safety_cpp_diagnostics" pkg="vehicle_safety_cpp" type="vehicle_safety_cpp" output="screen">
   <param name="diagnostic_period" value="0.2"/> <!-- 10 Hz = 0.1; 100 Hz = 0.01-->
   <remap from="diagnostics" to="/vehicle_safety_diagnostics"/>
   </node>
   <node name="geofence" pkg="vehicle_safety_cpp" type="kml_geofence.py" output="screen"/>
-  <node name="vehicle_safety_analyzer" pkg="vehicle_safety_cpp" type="vehicle_safety_analyzer_cpp" output="screen"/>
+  <group if="$(eval arg('enable_stop_command'))">
+    <node name="vehicle_safety_analyzer" pkg="vehicle_safety_cpp" type="vehicle_safety_analyzer_cpp" output="screen"/>
+  </group>
   <node name="curve_detector_cpp" pkg="vehicle_safety_cpp" type="curve_detector_cpp" output="screen"/>
   <node name="geofence_publisher" pkg="vehicle_safety_cpp" type="geo_fence_publisher.py" output="screen"/>
 </launch>

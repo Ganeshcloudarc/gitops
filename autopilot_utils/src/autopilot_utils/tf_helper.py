@@ -50,7 +50,7 @@ def convert_pose(pose, from_frame, to_frame):
         _init_tf()
 
     try:
-        trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time.now(), rospy.Duration(1.0))
+        trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time(0))
         # trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time(0))
 
 
@@ -334,7 +334,29 @@ def bbox_to_corners(bbox):
         corners_list.append(result)
     return corners_list
 
+def convert_path(path, to_frame):
+    """
+    :param path: list or geometry_msgs/poses returns the same format
+    :param to_frame:
+    :return: transformed path in to_frame
+    """
+    if path.header.frame_id == to_frame:
+        return path
 
+    global tfBuffer, listener
+
+    if tfBuffer is None or listener is None:
+        _init_tf()
+    try:
+        trans = tfBuffer.lookup_transform(to_frame, path.header.frame_id, rospy.Time(0))
+
+    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+        rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, path.header.frame_id))
+        return None
+    for i in range(len(path.poses)):
+        path.poses[i] = tf2_geometry_msgs.do_transform_pose(path.poses[i], trans)
+    path.header.frame_id = to_frame
+    return path
 # def add_poses(pose1, pose2):
 #
 #     tf =gmsg.TransformStamped()

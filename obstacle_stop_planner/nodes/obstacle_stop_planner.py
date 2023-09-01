@@ -26,6 +26,8 @@ try:
     from std_msgs.msg import Float32MultiArray, Header
     from sensor_msgs.msg import PointCloud2, LaserScan
     from std_msgs.msg import Float32
+    from std_msgs.msg import Bool
+
     from geometry_msgs.msg import Point, PoseArray, Pose, TransformStamped, PoseStamped, Polygon, PolygonStamped
     import logging
 
@@ -43,13 +45,13 @@ try:
     from autopilot_utils.trajectory_smoother import TrajectorySmoother
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_utils.trajectory_common import TrajectoryManager
-    from autopilot_msgs.msg import Trajectory, TrajectoryPoint
+    from autopilot_msgs.msg import Trajectory, TrajectoryPoint, FloatKeyValue
     from velocity_planner import VelocityPlanner
     from autopilot_utils.footprint_transform import transform_footprint_circles
     from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray, KeyValue
     from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper
 
-except Exception as e:
+except Exception as e: 
     import rospy
 
     rospy.logerr("Module error %s", str(e))
@@ -105,6 +107,7 @@ class ObstacleStopPlanner:
         self.robot_pose = None
         self.robot_head_pose = Pose()
         self.odom_data_in_time = None
+        self.prev_by_pass_dist = None
         self.laser_geo_obj = LaserProjection()
         # self._a_max, self._slow_speed, self._stop_line_buffer = 1, 0.5, 3.5
         sigma = rospy.get_param("gaussian_velocity_filter/sigma", 1)
@@ -128,7 +131,6 @@ class ObstacleStopPlanner:
         self._time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
         self._min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self._max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
-
         self._TIME_OUT_FROM_LASER = 2  # in secs
         self._TIME_OUT_FROM_ODOM = 2
         self._TIME_OUT_FROM_ZED = 2
@@ -181,6 +183,7 @@ class ObstacleStopPlanner:
 
         self.circles_polygon_pub = rospy.Publisher('/obstacle_stop_planner/collision_checking_circles', PolygonStamped,
                                                    queue_size=2, latch=True)
+        self.path_percent_publisher = rospy.Publisher("/osp_path_percentage",Float32, queue_size=1 ,latch=True)
         self.count_mission_repeat = 0
         self.main_loop()
 
@@ -255,6 +258,9 @@ class ObstacleStopPlanner:
             rate.sleep()
 
         rate = rospy.Rate(100)
+        start_by_pass_index = None
+        end_by_pass_index = None
+        prev_by_pass_dist = None
         while not rospy.is_shutdown(): 
             self.diagnostics_publisher.clearSummary() 
             self.diagnostics_publisher.values = [] 
@@ -324,6 +330,8 @@ class ObstacleStopPlanner:
             # check for mission complete
             path_percent = (self._traj_in.points[self._close_idx].accumulated_distance_m /
                             self._traj_in.points[-1].accumulated_distance_m) * 100
+            self.path_percent_publisher.publish(path_percent)
+           
 
             if path_percent > 95.0 and distance_btw_poses(self.robot_pose,
                                                           self._traj_in.points[-1].pose) <= self._min_look_ahead_dis:
@@ -341,21 +349,76 @@ class ObstacleStopPlanner:
                     # self.send_ack_msg(0, 0, 0)
                     rate.sleep()
                     break
-            if self.use_obs_v1:
-                try:
-                    kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
-                except:
-                    rospy.logerr("Could not fill KDtree")
-                    rate.sleep()
-                    continue
-                # rate.sleep()
-                # continue
+            # bypass_mode
             prev_processed_ind = self._close_idx
             obstacle_found = False
             trajectory_msg = Trajectory()
             trajectory_msg.header.frame_id = "map"
             trajectory_msg.home_position = self._traj_in.home_position
 
+            self.by_pass_dist = rospy.get_param("/obstacle_stop_planner/by_pass_dist", 0)
+            rospy.logwarn(f"self.by_pass_dist: {self.by_pass_dist}")
+            # bypass mode is true
+            if self.by_pass_dist != 0: 
+                
+                if not prev_by_pass_dist:
+                     prev_by_pass_dist = self.by_pass_dist 
+                if (end_by_pass_index is None or prev_by_pass_dist != self.by_pass_dist):
+                    rospy.logwarn("vehicle is bypassing") 
+                    start_by_pass_index = self._close_idx
+                    for ind in range(self._close_idx, self._traj_end_index):
+                        path_acc_distance = self._traj_in.points[ind].accumulated_distance_m - \
+                                            self._traj_in.points[self._close_idx].accumulated_distance_m
+
+                        if path_acc_distance > self.by_pass_dist+self._base_to_front:
+                            break
+                        trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[ind]))
+                    end_by_pass_index = ind
+                    # fixes the end bypass index and publishes till the bypass dist 
+                else:
+                    # fill traj msg till end_bypass_index
+                    for ind in range(start_by_pass_index, end_by_pass_index):
+                        # trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[ind]))
+                        traj_point = copy.deepcopy(self._traj_in.points[ind]) 
+                        traj_point.longitudinal_velocity_mps = self.robot_min_speed_th
+                        trajectory_msg.points.append(traj_point)
+                    for ind in range(end_by_pass_index,self._traj_end_index-1): 
+                        path_acc_distance = self._traj_in.points[ind].accumulated_distance_m - \
+                                            self._traj_in.points[self._close_idx].accumulated_distance_m
+
+                        if path_acc_distance > self._lookup_collision_distance:
+                            break
+                        # trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[ind]))
+                        traj_point = copy.deepcopy(self._traj_in.points[ind]) 
+                        traj_point.longitudinal_velocity_mps = self.robot_min_speed_th
+                        trajectory_msg.points.append(traj_point)
+                        # as caution vehicle will bypass with minimum speed 
+                rospy.loginfo(f"start_by_pass_index : {start_by_pass_index},end_by_pass_index : {end_by_pass_index} ")
+                self.local_traj_publisher.publish(trajectory_msg)
+                self.publish_velocity_marker(trajectory_msg) 
+                self.diagnostics_publisher.summary(ERROR,"BYPASS_MODE") 
+                self.diagnostics_publisher.add(f"BYPASSING THE OBSTACLE {self.by_pass_dist} m",self.by_pass_dist) 
+                self.publish(self.diagnostics_publisher)
+            
+                # reseting the bypass parameters 
+                if self._close_idx > end_by_pass_index:
+                    rospy.set_param("/obstacle_stop_planner/by_pass_dist", 0)
+                    end_by_pass_index = None
+                    start_by_pass_index = None
+                    prev_by_pass_dist = None 
+                prev_by_pass_dist = self.by_pass_dist
+                rate.sleep()
+                continue
+
+
+            if self.use_obs_v1: 
+                try: 
+                    kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
+                except: 
+                    rospy.logerr("Could not fill KDtree")
+                    rate.sleep()
+                    continue 
+            
             # TODO
             """
             1. Ganerate few circles along the foot print of the vehicle.
@@ -427,11 +490,14 @@ class ObstacleStopPlanner:
                     self.publish_velocity_marker(trajectory_msg)
                     rospy.logwarn("Obstacle found near Vehicle, Stopping the vehicle")
                     rospy.loginfo("Collision points are published")
-                    rate.sleep()
+                    self.diagnostics_publisher.summary(ERROR,"ROBOT LEVEL COLLISION CHECK") 
+                    self.diagnostics_publisher.add(f"OBSTACLE FOUND WITHIN {self.length_offset} m",self.length_offset) 
+                    self.publish(self.diagnostics_publisher)
+                    rate.sleep() 
                     continue
                 else:
                     rospy.loginfo("No Obstacle found near Vehicle")
-
+                    
             for ind in range(self._close_idx, self._traj_end_index):
                 path_acc_distance = self._traj_in.points[ind].accumulated_distance_m - \
                                     self._traj_in.points[self._close_idx].accumulated_distance_m
@@ -495,26 +561,29 @@ class ObstacleStopPlanner:
                                     self.bbox_pub.publish(self.bboxes.boxes[close_bbx_id])
                                     break
                                 else:
-                                    pass
+                                    pass 
                             except Exception as e:
                                 rospy.logerr(f"Error in find_close_object: {e}")
 
             collision_index = ind
             collision_points = list(collision_points[0])
+            # print("collision index",collision_index)
             print("self.index_old after loop", self._close_idx)
             if obstacle_found:
                 dis_to_obstacle = abs(self._traj_in.points[collision_index].accumulated_distance_m -
                                       self._traj_in.points[self._close_idx].accumulated_distance_m)
+                # print(dis_to_obstacle)
                 dis_from_front_to_obs = abs(self._traj_in.points[collision_index].accumulated_distance_m -
                                             self._traj_in.points[front_tip_idx].accumulated_distance_m)
                 rospy.logwarn(f"obstacle found at {dis_to_obstacle} meters ") 
                 
                 # if obstacle distance is less than _stop_line_buffer -> hard stop
                 if dis_to_obstacle < self._stop_line_buffer + self._base_to_front:
+                    
                     # TODO apply break directly to pilot
                     rospy.logwarn("obstacle is very close, applying hard breaking")
 
-                    self.diagnostics_publisher.summary(WARN,"OBSTACLE IS VERY CLOSE ")
+                    self.diagnostics_publisher.summary(ERROR,"OBSTACLE IS VERY CLOSE ")
                     self.diagnostics_publisher.add("APPLYING BREAK ",True) 
                     self.diagnostics_publisher.add("OBSTALCE FOUND AT ",dis_to_obstacle)
                     self.publish(self.diagnostics_publisher)
@@ -524,11 +593,14 @@ class ObstacleStopPlanner:
                         traj_point.longitudinal_velocity_mps = 0.0
                         trajectory_msg.points.append(traj_point) 
                     # traj_out = trajectory_msg 
-                else: 
+                     
+
+                else:
                     rospy.loginfo("obstacle dis is more than the stop_distance")
                     # find the stop index
                     stop_index = collision_index
                     temp_dist = 0.0
+
                     # Compute the index at which we should stop.
 
                     while temp_dist < self._stop_line_buffer + self._base_to_front and stop_index > self._close_idx:
@@ -549,7 +621,7 @@ class ObstacleStopPlanner:
                             traj_point = copy.deepcopy(self._traj_in.points[i])
                             traj_point.longitudinal_velocity_mps = 0.0
                             # traj_out.points.append(traj_point)
-                            trajectory_msg.points.append(traj_point)
+                            trajectory_msg.points.append(traj_point) 
                         # stp to slow - speed is gradual slow
                         for i in range(stop_index, slow_stop_index,-1): 
                             tmp_dist = abs(self._traj_in.points[stop_index].accumulated_distance_m -
@@ -564,21 +636,20 @@ class ObstacleStopPlanner:
                         for i in range(slow_stop_index, self._close_idx,-1): 
                             traj_point = copy.deepcopy(self._traj_in.points[i])   
                             trajectory_msg.points.append(traj_point) 
-                            
+                    
                         self.slow_pose_pub.publish(PoseStamped(header=Header(frame_id="map"),
                                 pose=self._traj_manager.get_traj_point(slow_stop_index).pose))
                         trajectory_msg.points.reverse()
+                            
                         self.diagnostics_publisher.summary(WARN,"VEHICLE WILL SLOW DOWN")
                         self.diagnostics_publisher.add("OBSTACLE FOUND AT ",dis_to_obstacle)  
                         self.publish(self.diagnostics_publisher)
-
-
+                      
                     else: 
                          #speed profile disabled
                         for i in range(self._close_idx, stop_index + 1):
                             trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
 
-                            # --------------------------------------------------------------------------                
                         # trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
                         # # if self.robot_speed < self.robot_min_speed_th:
                         # #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
@@ -590,11 +661,8 @@ class ObstacleStopPlanner:
                             traj_point = copy.deepcopy(self._traj_in.points[i])
                             traj_point.longitudinal_velocity_mps = 0.0
                             # traj_out.points.append(traj_point)
-                            trajectory_msg.points.append(traj_point)
+                            trajectory_msg.points.append(traj_point) 
                         
-
-
-
             else:
                 if self.vehicle_stop_init_time_for_obs is not None:
                     if time.time() - self.vehicle_stop_init_time_for_obs > self.stop_threshold_time_for_obs:
@@ -607,7 +675,7 @@ class ObstacleStopPlanner:
                     else:
                         rospy.logwarn(
                             f'Obs Time limit not crossed. Remaining time: {self.stop_threshold_time_for_obs - (time.time() - self.vehicle_stop_init_time_for_obs)}')
-                        self.diagnostics_publisher.summary(WARN,"OBSTACLE WAIT TIME")
+                        self.diagnostics_publisher.summary(ERROR,"OBSTACLE WAIT TIME")
                         self.diagnostics_publisher.add("VEHICLE WILL MOVE IN ",(self.stop_threshold_time_for_obs - (time.time() - self.vehicle_stop_init_time_for_obs)))
                         self.publish(self.diagnostics_publisher)
                         for i in range(self._close_idx, collision_index):
@@ -621,12 +689,7 @@ class ObstacleStopPlanner:
                     self.publish(self.diagnostics_publisher) 
                     for i in range(self._close_idx, collision_index):
                         trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
-                # trajectory_msg.points[-1].longitudinal_velocity_mps = 0.0
-                # if self.robot_speed < self.robot_min_speed_th:
-                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_min_speed_th
-                # else:
-                #     trajectory_msg.points[0].longitudinal_velocity_mps = self.robot_speed
-                # traj_out = self._smoother.filter(trajectory_msg)
+               
             self.local_traj_publisher.publish(trajectory_msg)
             self.publish_points(collision_points)
             print("robot_speed", self.robot_speed)

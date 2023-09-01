@@ -56,14 +56,14 @@ class ObstacleDetectorNode
   ros::NodeHandle nh;
   tf2_ros::Buffer tf2_buffer;
   tf2_ros::TransformListener tf2_listener;
-  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
-  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config>::CallbackType f;
 
   ros::Subscriber sub_lidar_points;
   ros::Publisher pub_cloud_ground;
   ros::Publisher pub_cloud_clusters;
   ros::Publisher pub_jsk_bboxes;
   ros::Publisher pub_autoware_objects;
+  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
+  dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config>::CallbackType f;
 
   void lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points);
   void publishClouds(const std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr>&& segmented_clouds, const std_msgs::Header& header);
@@ -108,6 +108,8 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
   ROS_ASSERT(private_nh.getParam("jsk_bboxes_topic", jsk_bboxes_topic));
   ROS_ASSERT(private_nh.getParam("autoware_objects_topic", autoware_objects_topic));
   ROS_ASSERT(private_nh.getParam("bbox_target_frame", bbox_target_frame_));
+
+
 
   sub_lidar_points = nh.subscribe(lidar_points_topic, 1, &ObstacleDetectorNode::lidarPointsCallback, this);
   pub_cloud_ground = nh.advertise<sensor_msgs::PointCloud2>(cloud_ground_topic, 1);

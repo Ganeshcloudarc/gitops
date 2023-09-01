@@ -1,1 +1,0 @@
-# slamware_ros_sdk

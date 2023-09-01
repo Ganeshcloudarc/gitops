@@ -1,0 +1,30 @@
+use_pca_box: False
+use_tracking: False
+
+voxel_grid_size: 0.2
+roi_max_x: 30
+roi_max_y : 30
+roi_max_z : 0.1 # considered on top.
+
+roi_min_x: -30
+roi_min_y: -30
+roi_min_z: -1.0
+crop_box_max_x: 1
+crop_box_max_y: 1
+crop_box_max_z: 1
+
+crop_box_min_x: -1.5
+crop_box_min_y: -1
+crop_box_min_z: -1
+neighbors : 50
+standard_deviation : 1
+
+ground_threshold: 0.4
+
+cluster_threshold: 1.0
+cluster_max_size: 5000
+cluster_min_size: 30
+
+displacement_threshold: 1.0
+iou_threshold: 1.0
+

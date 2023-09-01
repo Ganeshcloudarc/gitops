@@ -1,0 +1,25 @@
+<launch>
+   <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
+       <arg name="vehicle_type" value="half_cabin"/>
+        <arg name="vcu_up" default="false"/>
+        <arg name="gps_up" default="false"/>
+        <arg name="zed_camera" value="false"/>
+        <arg name="2d_lidar" value="false"/>
+        <arg name="3d_lidar" value="true"/>
+   </include>
+
+        <!-- Lidar obstacle detector node -->
+    <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+        <arg name="config_file" value="autonav_params.yaml"/>
+        <arg name="rviz" value="false"/>
+    </include>
+
+    <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch" output = 'log'>
+        <arg name="cloud_in" value="/obstacle_detector/cloud_clusters"/>
+    </include>
+
+
+    <node name="autonav_bag_record" pkg="rosbag" type="record"
+            args="record -o $(env HOME)/.bags/auto_nav_data_collect /tf /tf_static /laser_scan /vehicle/odom  "/>
+
+</launch>

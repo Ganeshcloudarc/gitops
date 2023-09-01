@@ -1,0 +1,3 @@
+[submodule "sensor_drivers"]
+	path = sensor_drivers_new
+	url = https://github.com/bosonrobotics/sensor_drivers.git

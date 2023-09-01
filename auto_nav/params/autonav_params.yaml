@@ -1,0 +1,31 @@
+auto_nav:
+  scan_topic : "laser_scan"
+  local_cloud_scan : "local_cloud_laser_scan"
+  farm_details:
+    row_spacing : 8 # distance between the tree rows in meters
+  regulate_speed_enable : True # enable regulated speed
+  center_line_robot_offset_th : 0.5 # lateral error more than this would bring the speed down.
+  heading_diff_th : 5 # heading error more than this would bring the speed down.
+  collision_detection_enable: false # Enable to stop for obstacles on the center line.
+  obstacle_dist_th : 7 # distance between the vehicle to obstacle for stop condition.
+  forward_collision_dis : 15 # forward collision distance
+  offset_to_add_center_line_width : 0.1 # when checking for collisions off set to add to vehicle width.
+  mission_continue : True
+
+
+  turnings:
+    debug : True
+    min_tunings_radius : 7
+    radius_to_check_turn : 15
+    incement_index_for_curvature : 20
+
+  ransac:
+    tolerance : 3 # half of tree size in meters. 3 means 6 meters is the width of tree.
+    max_iterations : 50 # number of iterations to find the best line fit using the ransac linear regression method.
+
+  moving_avarage_filter:
+    enable : True
+    window_size : 10 # How many previous lines to average.
+
+  use_previous_line : True # To use best ransac line which is collision free, Vehicle might not go in exact center after keepin, But maintains to go between the tree.
+

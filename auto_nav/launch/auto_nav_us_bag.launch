@@ -1,0 +1,30 @@
+<launch>
+    <arg name="bag_file" default="/home/boson/bags/varma_farm/boson_save_path_rslidar_2022-12-14-10-55-39.bag"/>
+    <arg name="mission_file" default="us_auto_nav.json"/>
+    <arg name="rviz" default="true"/>
+<!--    <arg namr="rate" default=""-->
+    <param name="auto_nav/ransac/tolerance" value="3"/>
+      <param name=" auto_nav/ransac/max_iterations" value="50"/>
+<!--    auto_nav/ransac/max_iterations-->
+
+    <!-- path publisher -->
+    <include file="$(find autopilot)launch/path_publisher.launch">
+        <arg name="mission_file" value="$(arg mission_file)"/>
+    </include>
+
+
+
+    <node name="autonav_bag_play" pkg="rosbag" type="play"
+            args="$(arg bag_file) -s 20"/>
+
+<!--     <node name="autonav_bag_play" pkg="rosbag" type="play"-->
+<!--            args="$(arg bag_file) &#45;&#45;topics /tf /tf_static /laser_scan  /vehicle/odom /global_gps_trajectory /global_gps_path /vehicle/foot_print"/>-->
+
+
+    <node name="rviz_autonav" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/lsm_on_inliers.rviz" if = "$(eval arg('rviz'))"/>
+<!--    <include file="$(find auto_nav)/launch/pointcloud_map.launch" if = "$(eval arg('rviz'))"/>-->
+
+    <include file="$(find auto_nav)/launch/auto_nav.launch" />
+
+
+</launch>

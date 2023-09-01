@@ -1,0 +1,28 @@
+<launch>
+    <arg name="bag_file" default="/home/boson/bags/april-2023/auto_nav_2023-04-26-10-17-23.bag"/>
+    <arg name="rviz" default="true"/>
+<!--    <arg namr="rate" default=""-->
+    <param name="auto_nav/ransac/tolerance" value="3"/>
+      <param name=" auto_nav/ransac/max_iterations" value="50"/>
+<!--    auto_nav/ransac/max_iterations-->
+
+<!--    <node name="autonav_bag_record" pkg="rosbag" type="record"-->
+<!--            args="record -o $(env HOME)/.bags/auto_nav -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points" if="$(eval record)"/>-->
+
+    <rosparam command="load" file="$(find auto_nav)/params/autonav_params.yaml"/>
+
+    <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen' />
+<!--    <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />-->
+
+
+    <node name="autonav_bag_play" pkg="rosbag" type="play"
+            args="$(arg bag_file) --topics /tf /tf_static /laser_scan  /vehicle/odom /global_gps_trajectory /global_gps_path /vehicle/foot_print /mavros/global_position/global"/>
+
+<!--     <node name="autonav_bag_play" pkg="rosbag" type="play"-->
+<!--            args="$(arg bag_file) &#45;&#45;topics /tf /tf_static /laser_scan  /vehicle/odom /global_gps_trajectory /global_gps_path /vehicle/foot_print"/>-->
+
+
+    <node name="rviz_autonav" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/lsm_on_inliers.rviz" if = "$(eval arg('rviz'))"/>
+
+
+</launch>
