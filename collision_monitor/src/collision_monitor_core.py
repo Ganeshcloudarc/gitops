@@ -8,8 +8,9 @@ import tf2_geometry_msgs
 import sensor_msgs.point_cloud2 as pcd2
 from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 from autopilot_utils.tf_helper import transform_cloud
-import ros_numpy
 import numpy as np
+np.float = np.float64
+import ros_numpy
 from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper
 from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray, KeyValue
 from pilot.msg import vehicle_stop_command

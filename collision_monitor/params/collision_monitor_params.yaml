@@ -6,10 +6,10 @@ collision_monitor:
   points: [4.0, 1, -1, 1, -1, -1, 4.0, -1] # should be even in number, order is x1,y1,x2,y2 and so on.
 
 
-  observation_sources: [ "lidar_scan"] # ["zed_scan"]
-  lidar_scan:
+  observation_sources: [ "rslidar_scan"] # ["zed_scan"]
+  rslidar_scan:
     type: "scan"
-    topic: "laser_scan"
+    topic: "lidar_laser_scan"
 
   zed_scan:
     type: "scan"

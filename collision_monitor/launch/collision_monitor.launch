@@ -1,6 +1,7 @@
 <launch>
     <arg name="rviz" default="false"/>
     
+    
     <node pkg="collision_monitor" type="collision_monitor_core.py" name="collision_monitor_core" output="screen">
         <rosparam command="load" file="$(find collision_monitor)/params/collision_monitor_params.yaml"/>
     </node>

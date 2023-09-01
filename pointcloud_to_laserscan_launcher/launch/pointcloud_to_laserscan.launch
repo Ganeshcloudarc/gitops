@@ -1,0 +1,11 @@
+<launch>
+   <arg name="cloud_in" default="rslidar_points"/>
+   <arg name="scan_out" default="lidar_laser_scan"/>
+   <arg name="config_file" default="lidar_collision_monitor_p2c.yaml"/>
+
+   <node name='$(anon pointcloud_to_laserscan_node)' pkg='pointcloud_to_laserscan' type='pointcloud_to_laserscan_node'>
+      <remap from="cloud_in" to="$(arg cloud_in)"/>
+      <remap from="scan" to="$(arg scan_out)"/>
+      <rosparam command="load" file="$(find pointcloud_to_laserscan_launcher)/params/$(arg config_file)"/>
+   </node>
+</launch>
