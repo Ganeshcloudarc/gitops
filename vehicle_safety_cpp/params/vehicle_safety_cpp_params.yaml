@@ -3,6 +3,8 @@ vehicle_safety:
   CTE_THR_AT_CURVE : 8 # CTE Threshold at curve
   HEAD_THR : 10 # Heading Threshold in degrees(+/-)
   GPS_FIX_THR : 10.0 #GPS FIX Threshold time in seconds
+  GPS1_FIX_TH: [6] # GPS1 fix type threshold. TYPE : RTK FIXTYPE, GPSRAW.msg
+  GPS2_FIX_TH: [6] # GPS2 fix type threshold. TYPE : RTK FIXTYPE, GPSRAW.msg
   BATT_TH : 15 # Battery Threshold in %. Below this value vehicle won't move
   STEER_DIFF_TH : 10 # Allowable Angle diff(degrees) from demand and current angle to detect steering stuck. Beware while changing this.
   STEER_STUCK_TIME_TH : 2 # Allowable time threshold(seconds) to detect steering stuck. Beware while changing this.

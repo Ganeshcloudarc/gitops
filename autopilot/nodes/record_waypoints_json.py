@@ -52,9 +52,10 @@ def get_distance(lat1, lon1, lat2, lon2):
 
 
 class SaveWayPoints:
-    def __init__(self, mission_file_dir):
+    def __init__(self, mission_file_dir,mission_file):
 
         self.mission_file_dir = mission_file_dir
+        self.mission_file_name=mission_file
         self.prev_lat = 0
         self.prev_long = 0
         self.is_first_point = True
@@ -62,6 +63,7 @@ class SaveWayPoints:
         self.imu_list = []
         self.odometry_list = []
         self.gps_list = []
+        self.RTK_Status=True
         self.heading = 0
         self.odom_data = None
         self.odom_data_msg = None
@@ -72,6 +74,8 @@ class SaveWayPoints:
         self.time_at_gps = None
         self.wait_time_limit = 1
         self.RTK_fail_status  = None
+
+        
 
         # IMP PARAMS
         self.min_dis_between_waypoints = rospy.get_param('/save_path/min_dis_between_waypoints', 0.1)
@@ -103,6 +107,7 @@ class SaveWayPoints:
                 break
         # time.sleep(1)
         self.main_loop()
+
         if len(self.final_waypoints_list) == 0:
             rospy.logwarn('No points to save, Exiting without saving')
             exit()
@@ -111,10 +116,20 @@ class SaveWayPoints:
         line_string['imu'] = self.imu_list
         line_string['odometry'] = self.odometry_list
         line_string['gps_coordinates'] = self.gps_list
-        with open(mission_file_dir, 'w') as f:
-            dump(line_string, f)
-        print(" ")
-        rospy.loginfo("saved %s points to %s", str(len(self.final_waypoints_list)), self.mission_file_dir)
+        line_string['Is_RTK_Good']=self.RTK_Status
+
+        # Rename the mission file if the RTK status is False
+        if not self.RTK_Status:
+            self.mission_file_dir = self.mission_file_dir+ "Invalid_" + str(mission_file)
+        else:
+            self.mission_file_dir = self.mission_file_dir + str(mission_file)
+        try:
+            with open(self.mission_file_dir, 'w') as f:
+                dump(line_string, f)
+            print(" ")
+            rospy.loginfo("saved %s points to %s", str(len(self.final_waypoints_list)), self.mission_file_dir)
+        except Exception as e:
+            rospy.loginfo("Error while opening the file %s ",str(e))
 
     def odom_callback(self, data):
         self.odom_data_msg = data
@@ -206,6 +221,9 @@ class SaveWayPoints:
                 else:
                     rospy.logwarn("NO RTK, not saving PATH")
                     rospy.logwarn("Stop the vehicle, untill RTK comes")
+                    
+                    self.RTK_Status=False
+                        
                 r.sleep()
         except Exception as e:
             print('exception', e)
@@ -222,9 +240,11 @@ if __name__ == "__main__":
         rospy.set_param('/save_path/mission_file', mission_file)
     try:
         ros_pack = rospkg.RosPack()
-        mission_file_dir = ros_pack.get_path('autopilot') + "/mission_files/" + str(mission_file)
+        mission_file_dir = ros_pack.get_path('autopilot') + "/mission_files/"
     except Exception as e:
         rospy.logwarn("Please source autopilot package" + str(e))
         sys.exit()
-    save_points = SaveWayPoints(mission_file_dir)
+    save_points = SaveWayPoints(mission_file_dir, mission_file)
     rospy.spin()
+
+
