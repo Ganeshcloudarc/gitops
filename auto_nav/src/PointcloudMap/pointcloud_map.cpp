@@ -7,6 +7,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 #include <pcl_ros/point_cloud.h>
+#include <pcl/io/pcd_io.h>
 #include <pcl_conversions/pcl_conversions.h>
 // #include<pcl_ros/transforms.hpp>
 #include <pcl_ros/transforms.h>
@@ -16,13 +17,16 @@
 #include<cmath>
 #include<jsk_recognition_msgs/BoundingBoxArray.h>
 #include<jsk_recognition_msgs/BoundingBox.h>
+#include<mavros_msgs/HomePosition.h>
+#include <ros/package.h>
 
 // #include<lidar_obstacle_detector/obstacle_detector.h>
 using namespace lidar_obstacle_detector;
 using namespace std;
+
+
 namespace LocalPointCloudMap
 {
-  
 class LocalPointCloudMapNode
 {   public:
         LocalPointCloudMapNode();
@@ -31,13 +35,18 @@ class LocalPointCloudMapNode
         ros::NodeHandle nh;
         tf2_ros::Buffer tf2_buffer;
         tf2_ros::TransformListener tf2_listener;
-        ros::Subscriber sub_lidar_points, sub_odom;
+        ros::Subscriber sub_lidar_points, sub_odom, sub_gps_home_position;
         ros::Publisher pub_local_cloud_map,pub_global_cloud_map,local_bboxes_pub, tree_cloud_pub;
         void lidarPointsCallback(const sensor_msgs::PointCloud2::ConstPtr& lidar_points);
         void odomCallback(const nav_msgs::Odometry::ConstPtr & odom);
+        void gpsHomepositionCallback(const mavros_msgs::HomePosition::ConstPtr& home_position);
         void loadParams();
+        bool savePclfile(string path, pcl::PointCloud<pcl::PointXYZ> tree_cloud);
+
         nav_msgs::Odometry curr_odom;
-        bool odom_recrived = false; 
+        mavros_msgs::HomePosition gps_home_position_data;
+        bool odom_received = false; 
+        bool gps_home_position_received = false; 
         sensor_msgs::PointCloud2 raw_cloud, cloud_in_base_frame;
         pcl::PointCloud<pcl::PointXYZ> final_cloud;
         // pcl::PointCloud<pcl::PointXYZ> tree_cloud;
@@ -48,7 +57,7 @@ class LocalPointCloudMapNode
 
 
         bool enable_global_cloud_map,enable_local_cloud_map,enable_tree_mapping;
-        std::string local_cloud_map_topic, global_cloud_map_topic,odometry_topic, tree_mapping_topic;
+        std::string input_cloud_topic,local_cloud_map_topic, global_cloud_map_topic,odometry_topic, tree_mapping_topic, gps_home_position_topic;
         std::string local_frame, global_frame;
 
         float voxel_size;
@@ -65,7 +74,7 @@ class LocalPointCloudMapNode
         float STANDARD_DEVIATION;
         float cluster_threshold, cluster_max_size, cluster_min_size;
         float row_width, row_lenght,tree_height;
-       
+        string tree_mapping_file_name;
 
 
 };
@@ -73,15 +82,19 @@ class LocalPointCloudMapNode
 void LocalPointCloudMapNode::loadParams()
     {
     ros::NodeHandle private_nh("~");
+    private_nh.param<std::string>("input_cloud", input_cloud_topic, "rslidar_points");///zed2i/zed_node/point_cloud/cloud_registered
+
     private_nh.param<std::string>("odom_topic", odometry_topic, "vehicle/odom");
     private_nh.param<std::string>("global_frame", global_frame, "map");
     private_nh.param<std::string>("local_frame", local_frame, "base_link");
+    private_nh.param<std::string>("gps_home_position_topic", gps_home_position_topic, "/mavros/global_position/home");
     private_nh.param<bool>("enable_global_cloud_map", enable_global_cloud_map, true);///zed2i/zed_node/point_cloud/cloud_registered
     private_nh.param<bool>("enable_local_cloud_map", enable_local_cloud_map, true);///zed2i/zed_node/point_cloud/cloud_registered
     private_nh.param<bool>("enable_tree_mapping", enable_tree_mapping, true);///zed2i/zed_node/point_cloud/cloud_registered
     
     private_nh.param<std::string>("global_cloud_map_topic", global_cloud_map_topic, "global_cloud_map");
     private_nh.param<std::string>("tree_mapping_topic", tree_mapping_topic, "tree_cloud_map");
+    private_nh.param<std::string>("tree_mapping_file_name", tree_mapping_file_name, "");
 
 
 
@@ -121,14 +134,6 @@ void LocalPointCloudMapNode::loadParams()
      private_nh.param<float>("row_lenght", row_lenght, 4.5);
      private_nh.param<float>("tree_height", tree_height, 3);
 
-     
-
-
-
-
-row_width, row_lenght,tree_height;
-
-
     }
 
 
@@ -136,11 +141,11 @@ LocalPointCloudMapNode::LocalPointCloudMapNode() : tf2_listener(tf2_buffer)
 {
   ros::NodeHandle private_nh("~");
   loadParams();
-  std::string input_cloud;
-  private_nh.param<std::string>("input_cloud", input_cloud, "rslidar_points");///zed2i/zed_node/point_cloud/cloud_registered
-
-  sub_lidar_points = nh.subscribe(input_cloud, 1, &LocalPointCloudMapNode::lidarPointsCallback, this);
+ 
+  sub_lidar_points = nh.subscribe(input_cloud_topic, 1, &LocalPointCloudMapNode::lidarPointsCallback, this);
   sub_odom = nh.subscribe(odometry_topic, 1, &LocalPointCloudMapNode::odomCallback, this);
+  sub_gps_home_position = nh.subscribe(gps_home_position_topic, 1, &LocalPointCloudMapNode::gpsHomepositionCallback, this);
+
 
   pub_local_cloud_map = nh.advertise<sensor_msgs::PointCloud2>(local_cloud_map_topic, 1); 
   if (enable_global_cloud_map)
@@ -170,7 +175,7 @@ void LocalPointCloudMapNode::lidarPointsCallback(const sensor_msgs::PointCloud2:
     pcl::fromROSMsg(*lidar_points, *points_raw);
 
     // pub_local_cloud_map.publish(lidar_points);
-    if (odom_recrived==false)
+    if (odom_received==false)
     {
       ROS_WARN("WAITING FOR ODOM DATA");
       return ;
@@ -379,15 +384,71 @@ void LocalPointCloudMapNode::lidarPointsCallback(const sensor_msgs::PointCloud2:
   pcl::toROSMsg(tree_cloud, tree_cloud_ros);
   tree_cloud_ros.header.frame_id = global_frame;
   tree_cloud_pub.publish(tree_cloud_ros);
+
+  if (ros::param::has("save_tree_mapping"))
+  { bool save_tree_mapping;
+    ros::param::get("/save_tree_mapping", save_tree_mapping);
+    if(save_tree_mapping)
+    {
+      LocalPointCloudMapNode::savePclfile("",tree_cloud );
+      
+    }
+  }
  
+}
+
+bool LocalPointCloudMapNode::savePclfile(string path, pcl::PointCloud<pcl::PointXYZ> tree_cloud)
+{
+string package_path = ros::package::getPath("auto_nav");
+string output_json_file_dir = package_path+"/maps/"+ tree_mapping_file_name +"_map_config.yaml";
+
+string pcd_file_name = package_path+"/maps/"+ tree_mapping_file_name +"_tree_map.pcd";
+fstream FileName;
+
+FileName.open(output_json_file_dir, ios::out);
+if (!FileName)
+ {
+    ROS_ERROR("Error while creating config file");
+    return false;
+ }
+ else
+ {
+  stringstream json_string;
+  json_string << "map_origin: \n";
+  json_string << "    latitude: "<<fixed<<setprecision(8)<<gps_home_position_data.geo.latitude<<"\n";
+  json_string << "    longitude: "<<fixed<<setprecision(8)<<gps_home_position_data.geo.longitude<<"\n";
+  json_string << "    altitude: "<<fixed<<setprecision(8)<<gps_home_position_data.geo.altitude<<"\n";
+  json_string << "    roll: "<<0.0<<"\n";
+  json_string << "    pitch: "<<0.0<<"\n";
+  json_string << "    yaw: "<<0.0<<"\n";
+  json_string << "pcd_file_name: "<<tree_mapping_file_name +"_tree_map.pcd";
+
+
+  FileName<<json_string.str();
+  FileName.close();
+  pcl::io::savePCDFileASCII (pcd_file_name, tree_cloud);
+  ROS_INFO_STREAM("Saved "<< tree_cloud.size()<< " data points to " <<  tree_mapping_file_name +"_tree_map.pcd" );
+  ros::param::set("/save_tree_mapping", false);
+  return true;
+
+ }
+
 }
 
 void LocalPointCloudMapNode::odomCallback(const nav_msgs::Odometry::ConstPtr& odom_msg)
 {
     ROS_DEBUG_ONCE("odom callback called");
-    odom_recrived = true;
+    odom_received = true;
     curr_odom = *odom_msg;
   
+}
+
+void LocalPointCloudMapNode::gpsHomepositionCallback(const mavros_msgs::HomePosition::ConstPtr& home_position)
+{
+   ROS_DEBUG_ONCE("GPS home position callback");
+   gps_home_position_received = true;
+   gps_home_position_data = *home_position;
+
 }
 }
 
