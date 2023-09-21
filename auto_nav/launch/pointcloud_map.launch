@@ -1,10 +1,12 @@
 <?xml version="1.0"?>
 <launch>
      <arg name="input_cloud" default="rslidar_points"/>
+     <arg name="tree_mapping_file_name" default=""/>
     
 
     <node name="pointcloud_map" pkg="auto_nav" type="pointcloud_map_node" output="screen">
         <param name="input_cloud" value="$(arg input_cloud)"/>
+         <param name="tree_mapping_file_name" value="$(arg tree_mapping_file_name)"/>
         <rosparam command="load" file="$(find auto_nav)/params/cloud_map_params.yaml"/>
 
     </node>

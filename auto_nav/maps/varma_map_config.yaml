@@ -1,0 +1,8 @@
+map_origin: 
+    latitude: 37.95054860
+    longitude: -121.65230070
+    altitude: 134.09975629
+    roll: 0.00000000
+    pitch: 0.00000000
+    yaw: 0.00000000
+pcd_file_name: varma_tree_map.pcd
