@@ -7,6 +7,7 @@ enable_local_cloud_map : true
 local_cloud_map_topic : "local_cloud_map"
 enable_tree_mapping : true
 tree_mapping_topic : "tree_cloud_map"
+gps_home_position_topic : "/mavros/global_position/home"
 voxel_size : 0.5 # voxel size of 
 local_map_size_x : 10 # left and right side
 local_map_size_y : 10 # forward and backward
