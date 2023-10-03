@@ -27,6 +27,7 @@
 
     <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
             <arg name="rviz" value="false"/>
+            <arg name="points_in" value="$(arg cloud_in_for_local_map)"/>
     </include>
 
     <!-- local cloud map node -->
