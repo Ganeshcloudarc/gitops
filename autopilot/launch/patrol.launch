@@ -1,8 +1,8 @@
 <launch>
-    <arg name="hardware_in_loop" default="false" doc="false to software in loop"/>
+    <arg name="hardware_in_loop" default="true" doc="false to software in loop"/>
     <arg name="vehicle_type" default="half_cabin" doc="It can be either half_cabin or porter"/>
 
-    <arg name="mission_file" default="almond56m.json"/>
+    <arg name="mission_file" default="default.json"/>
     <arg name="mission_continue" default="true"/>
     <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
