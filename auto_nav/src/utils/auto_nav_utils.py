@@ -277,11 +277,15 @@ def two_points_to_path(point1, point2, frame_id):
     return path_msg
 
 
-def getLine(x1, y1, x2, y2, res=0.2):
+def getLine(x1, y1, x2, y2):
     rev = False
     if x1 == x2:  # Perfectly horizontal line, can be solved easily
         # return [(x1, i) for i in np.arange(y1, y2, abs(y2 - y1) / (y2 - y1))]
-        return [(x1, i) for i in np.arange(y1, y2, res)]
+        if y1> y2:
+            t = y1
+            y1 = y2
+            y2 = t
+        return [(x1, i) for i in range(y1, y2)]
 
     else:  # More of a problem, ratios can be used instead
         if x1 > x2:  # If the line goes "backwards", flip the positions, to go "forwards" down it.
@@ -296,12 +300,36 @@ def getLine(x1, y1, x2, y2, res=0.2):
         line = []
         i = 0
         while x1 + i < x2:  # Keep iterating until the end of the line is reached
-            i += res
-            line.append((x1 + i, y1 + slope * i))  # Add the next point on the line
+            i += 1
+            line.append((x1 + i, int(y1 + slope * i)))  # Add the next point on the line
         if rev:
             line.reverse()
 
         return line  # Finally, return the line!
+
+
+def bresenham(x1, y1, x2, y2):
+    m_new = 2 * (y2 - y1)
+    slope_error_new = m_new - (x2 - x1)
+
+    y = y1
+    xy_list = []
+    for x in range(x1, x2+1):
+
+        # print("(", x, ",", y, ")\n")
+
+        # Add slope to increment angle formed
+        slope_error_new = slope_error_new + m_new
+
+        # Slope error reached limit, time to
+        # increment y and update slope error.
+        if (slope_error_new >= 0):
+            y = y+1
+            slope_error_new = slope_error_new - 2 * (x2 - x1)
+        xy_list.append([x, y])
+    return xy_list
+
+
 
 
 def path_to_traj(path, speed, resolution=0.2):
@@ -419,7 +447,10 @@ if __name__ == "__main__":
     # line = Line(1, 0)
     # shifted_line = line.shift_line(-1.5)
     # print(shifted_line)
+    import matplotlib.pyplot as plt
     print(two_points_to_line([1, 0], [1, 1]))
+    print(getLine(0,0,10,0))
+    print(bresenham(0,0,0,10))
 
 
 
