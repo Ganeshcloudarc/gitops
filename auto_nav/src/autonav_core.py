@@ -1116,10 +1116,10 @@ class AutoNav:
                     dis = self.center_line.distance_to_point(path[-1].tolist())
                     dis_list.append(abs(dis))
                     # print("dis_list", dis_list)
-                # if len(dis_list) == 0:
-                #     rospy.logwarn("could not found collision free path")
-                #     rate.sleep()
-                #     continue
+                if len(dis_list) == 0:
+                    rospy.logwarn("could not found collision free path")
+                    rate.sleep()
+                    continue
                 min_dis_idx = np.argmin(dis_list)
                 print("min_dis_idx", min_dis_idx)
                 close_path_to_first_row = collision_free_paths[min_dis_idx]
