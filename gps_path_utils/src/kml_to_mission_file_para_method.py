@@ -155,6 +155,8 @@ class KmlToMissionFile:
             rospy.logerr(f"Error in reading: {kml_file_dir}, err : {err}")
 
         rospy.logdebug(f"lenght of kml way points: {len(kml_coords)}")
+
+        
         
         self.home_lat = kml_coords[0][0]
         self.home_lon = kml_coords[0][1]

@@ -18,9 +18,16 @@
         <arg name="scan_out" value="laser_scan"/>
     </include>
 
+    <include file="$(find collision_check)/launch/costmap2.launch"/>
+
     <!-- autonav node -->
     <rosparam command="load" file="$(find auto_nav)/params/autonav_params.yaml"/>
-    <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen' required="true"/>
+<!--    <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen' required="true"/>-->
+    <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen'/>
+
+    <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+            <arg name="rviz" value="false"/>
+    </include>
 
     <!-- local cloud map node -->
     <include file="$(find auto_nav)/launch/pointcloud_map.launch">

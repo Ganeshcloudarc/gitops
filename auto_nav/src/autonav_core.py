@@ -18,9 +18,9 @@ try:
 
     # ros messages
     from nav_msgs.msg import Path, Odometry
-    from jsk_recognition_msgs.msg import BoundingBoxArray
+    from jsk_recognition_msgs.msg import BoundingBoxArray, PolygonArray
     from zed_interfaces.msg import ObjectsStamped, Object
-    from geometry_msgs.msg import Point, PoseArray, Pose, TransformStamped, PoseStamped
+    from geometry_msgs.msg import Point, PoseArray, Pose, TransformStamped, PoseStamped, PolygonStamped
     from visualization_msgs.msg import Marker, MarkerArray
     from std_msgs.msg import Float32MultiArray, Header, Float32
     from sensor_msgs.msg import PointCloud2, LaserScan
@@ -35,7 +35,7 @@ try:
 
     # autopilot related imports
     from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud, convert_path, \
-        convert_pose, yaw_to_quaternion, convert_path
+        convert_pose, yaw_to_quaternion, convert_path, transform_lidar_objects, bbox_to_corners
     from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, normalize_angle
     from autopilot_utils.trajectory_smoother import TrajectorySmoother
     from vehicle_common.vehicle_config import vehicle_data
@@ -45,10 +45,15 @@ try:
     from utils.auto_nav_utils import Pose2D, ganerate_random_pairs, xy_to_pointcloud2, two_points_to_path, path_to_traj, \
         GetAngle, min_distance_to_object, circumradius, Line, get_tie, pose_array_to_pose_stamped, \
         dubins_path_to_ros_path
-
+    from autopilot_utils.occ_grid_helper import OccupancyGridManager
     # python packages
     from sklearn.linear_model import LinearRegression
     import dubins
+    from utils.dwa_path_candidate_generator import DwaPathGenerator
+    from utils.bboxes_utils import inside_radius
+    from utils.polygon_collision_check import PolygonCheck
+
+
 
 except Exception as e:
     import rospy
@@ -69,11 +74,23 @@ C2 = C - self.row_spacing * math.sqrt(A * A + B * B) # to compute left line.
 y-intercept = (c / b) 
 slope = -(a / b)             
 """
+def points_to_path(points, frame_id="map"):
+    path_msg = Path()
+    path_msg.header.frame_id = frame_id
+    for point in points:
+        pose_st = PoseStamped()
+        pose_st.header.frame_id = frame_id
+        pose_st.pose.position.x = point[0]
+        pose_st.pose.position.y = point[1]
+        pose_st.pose.orientation = yaw_to_quaternion(point[2])
+        path_msg.poses.append(pose_st)
+    return path_msg
 
 
 class AutoNav:
     def __init__(self):
         # laser related
+        self.bboxes = None
         self.laser_data = None
         self.final_center_line = None
         self.center_line_heading = None
@@ -195,6 +212,11 @@ class AutoNav:
             self.slope_pub = rospy.Publisher("/auto_nav/slope_pub", Float32, queue_size=10)
             self.left_intercept_pub = rospy.Publisher("/auto_nav/left_intercept_pub", Float32, queue_size=10)
             self.right_intercept_pub = rospy.Publisher("/auto_nav/right_intercept_pub", Float32, queue_size=10)
+            self.dwa_marker_pub = rospy.Publisher("/auto_nav/dwa_all_paths", MarkerArray, queue_size=10)
+            self.dwa_collision_free_paths_pub = rospy.Publisher("/auto_nav/dwa_collision_free", MarkerArray, queue_size=10)
+            self.dwa_collision_free_and_close_to_line_pub = rospy.Publisher("/auto_nav/dwa_collision_free_and_close_to_line", Path, queue_size=10)
+            self.collision_point_center_line_pub = rospy.Publisher("auto_nav/collision_point_center_line", PoseStamped, queue_size=1)
+            self.enlarged_bboxes_pub = rospy.Publisher("enlarged_bboxes", PolygonArray, queue_size=1, latch=True)
 
         # Turnings related
 
@@ -224,9 +246,17 @@ class AutoNav:
         rospy.Subscriber(local_map_scan_topic, LaserScan, self.local_map_scan_callback, queue_size=1)
         rospy.Subscriber(scan_topic, LaserScan, self.scan_callback, queue_size=1)
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
+        rospy.Subscriber("/obstacle_detector/jsk_bboxes", BoundingBoxArray, self.bboxes_callback)
 
         self.offset_to_add_center_line_width = rospy.get_param("offset_to_add_center_line_width", 0.1)
-
+        # initialise Dwa planner
+        wheel_base = vehicle_data.dimensions.wheel_base
+        steering_angle_max = vehicle_data.motion_limits.max_steering_angle
+        steering_inc = 1
+        max_path_length = 6
+        path_resolution = 0.1
+        self.dwa_path_gen = DwaPathGenerator(wheel_base, steering_angle_max, steering_inc, max_path_length, path_resolution)
+        self.cost_map = OccupancyGridManager("/costmap_node/costmap/costmap", True)
         self.main_loop()
         rospy.signal_shutdown("auto_nav node killed")
         # self.main_loop_ransac()
@@ -253,10 +283,12 @@ class AutoNav:
         while not rospy.is_shutdown():
             count += 1
 
+
             # new method to publish line
             # new method to publish line
-            robot_loc = Pose2D(self.robot_pose.position.x, self.robot_pose.position.y)
+            robot_loc = Pose2D(self.robot_pose.position.x, self.robot_pose.position.y, self.robot_yaw)
             robot_loc_np = robot_loc.to_numpy()
+
             rospy.logdebug(f"yaw : {self.robot_yaw} , degress :{math.degrees(self.robot_yaw)} ")
             rospy.logdebug(f"robot_loc_np:{robot_loc}")
             robot_loc_backward = Pose2D(self.robot_pose.position.x - np.cos(self.robot_yaw) * 30,
@@ -272,6 +304,96 @@ class AutoNav:
             robot_loc_forward_base_link = Pose2D(np.cos(self.robot_yaw) * 30, np.sin(self.robot_yaw) * 30)
             robot_loc_forward_base_link = Pose2D(30, 0)
             rospy.logdebug(f"robot_loc_forward_base_link:{robot_loc_forward_base_link}")
+
+            # start
+            """
+            dwa_paths = self.dwa_path_gen.generate_paths(robot_loc.to_list())
+            self.dwa_marker_pub.publish(self.dwa_path_gen.get_dwa_paths_marker_array(dwa_paths, "map"))
+            bboxes = transform_lidar_objects(self.bboxes, "base_link")
+            radius_filtered_bboxes = inside_radius(bboxes, 2 * self.row_spacing)
+            print("radius_filtered_bboxes len ", len(radius_filtered_bboxes))
+            polygon_arr_msg = PolygonArray()
+            polygon_arr_msg.header.frame_id = "base_link"
+            for bbox in radius_filtered_bboxes:
+                polygon = PolygonStamped()
+
+                polygon.header.frame_id = "base_link"
+                box_list = bbox_to_corners(bbox, scale=0.7)
+                for x, y in box_list:
+                    pt = Point()
+                    pt.x = x
+                    pt.y = y
+                    polygon.polygon.points.append(pt)
+                pt = Point()
+                pt.x = box_list[0][0]
+                pt.y = box_list[0][1]
+                polygon.polygon.points.append(pt)
+                polygon_arr_msg.polygons.append(polygon)
+            self.enlarged_bboxes_pub.publish(polygon_arr_msg)
+
+            print("COSTMAP ORIFIN",self.cost_map.origin)
+            print("cost val at robot pose ", self.cost_map.get_cost_from_world_x_y(robot_loc.x-3.3, robot_loc.y+4))
+            collision_free_paths = []
+            for path in dwa_paths:
+                in_collision_flag = False
+                print("===")
+                for point in path:
+                    cost = self.cost_map.get_cost_from_world_x_y(point[0], point[1])
+                    print("cost", cost)
+                    if cost != 0:
+                        in_collision_flag = True
+                        break
+                    else:
+                        pass
+                if in_collision_flag:
+                    continue
+                else:
+                    collision_free_paths.append(path)
+            print("len of collision free paths ", len(collision_free_paths))
+
+            self.dwa_collision_free_paths_pub.publish(self.dwa_path_gen.get_dwa_paths_marker_array(collision_free_paths, "map"))
+            dis_list = []
+            if self.center_line:
+                for i in range(len(collision_free_paths)):
+                    path = collision_free_paths[i]
+                    # print("path[-1]", path[-1])
+                    # print(type(path[-1].tolist()))
+                    dis = self.center_line.distance_to_point(path[-1].tolist())
+                    dis_list.append(abs(dis))
+                    # print("dis_list", dis_list)
+                # if len(dis_list) == 0:
+                #     rospy.logwarn("could not found collision free path")
+                #     rate.sleep()
+                #     continue
+                min_dis_idx = np.argmin(dis_list)
+                print("min_dis_idx", min_dis_idx)
+                close_path_to_first_row = collision_free_paths[min_dis_idx]
+                dwa_output = points_to_path(close_path_to_first_row, "map")
+                # self.pub_handler.dwa_collision_free_and_close_to_line_pub.publish(dwa_output)
+                # dwa_output_map = convert_path(dwa_output, "map")
+                self.dwa_collision_free_and_close_to_line_pub.publish(dwa_output)
+                traj_msg = Trajectory()
+                traj_msg.header.frame_id = "map"
+                speed = 1
+                for i in range(len(dwa_output.poses)):
+                    traj_point = TrajectoryPoint()
+                    traj_point.pose = dwa_output.poses[i].pose
+                    traj_point.index = i
+                    traj_point.longitudinal_velocity_mps = speed
+
+                    if i == 0:
+                        traj_point.accumulated_distance_m = 0
+                    else:
+                        acc_dis = math.hypot(traj_msg.points[-1].pose.position.x - dwa_output.poses[i].pose.position.x,
+                                             traj_msg.points[-1].pose.position.y - dwa_output.poses[i].pose.position.y)
+                        traj_point.accumulated_distance_m = traj_msg.points[-1].accumulated_distance_m + acc_dis
+                    traj_msg.points.append(traj_point)
+                self.center_traj_pub.publish(traj_msg)
+
+                # rate.sleep()
+
+            # end
+            """
 
             loop_start_time = time.time()
             # checks whether data from sensors are updated.
@@ -386,7 +508,7 @@ class AutoNav:
             # decide on minimum turning radius
             # use the dubins curves to connect start and point.
             # convert into traj and path and publish
-
+            """ Uncomment after full completion
             min_turn_radius = 3.5
             if self.center_line:
                 rospy.logdebug("At tunings testing part")
@@ -436,6 +558,7 @@ class AutoNav:
                 path_msg = dubins_path_to_ros_path(dubins_path)
                 self.automatic_turns_right_pub.publish(path_msg)
                 rospy.logdebug("automartic turn is published")
+            """
 
             # decide on left and right points
             close_pose = self._traj_manager.get_traj_point(self._close_idx).pose
@@ -923,7 +1046,7 @@ class AutoNav:
             self._input_traj_manager.update(traj_msg)
             path = self._input_traj_manager.to_path()
             self.center_traj_path_pub.publish(path)
-            self.center_traj_pub.publish(traj_msg)
+            # self.center_traj_pub.publish(traj_msg)
             rospy.loginfo("Center traj and path are published")
             # Publising vibration path.
             posest = PoseStamped()
@@ -937,6 +1060,103 @@ class AutoNav:
             rospy.loginfo("Vibration path published")
             loop_end_time = time.time()
             rospy.loginfo(f"time taken {loop_end_time - loop_start_time}")
+            # start
+            dwa_paths = self.dwa_path_gen.generate_paths(robot_loc.to_list())
+            self.dwa_marker_pub.publish(self.dwa_path_gen.get_dwa_paths_marker_array(dwa_paths, "map"))
+            bboxes = transform_lidar_objects(self.bboxes, "base_link")
+            radius_filtered_bboxes = inside_radius(bboxes, 2 * self.row_spacing)
+            print("radius_filtered_bboxes len ", len(radius_filtered_bboxes))
+            polygon_arr_msg = PolygonArray()
+            polygon_arr_msg.header.frame_id = "base_link"
+            for bbox in radius_filtered_bboxes:
+                polygon = PolygonStamped()
+
+                polygon.header.frame_id = "base_link"
+                box_list = bbox_to_corners(bbox, scale=0.7)
+                for x, y in box_list:
+                    pt = Point()
+                    pt.x = x
+                    pt.y = y
+                    polygon.polygon.points.append(pt)
+                pt = Point()
+                pt.x = box_list[0][0]
+                pt.y = box_list[0][1]
+                polygon.polygon.points.append(pt)
+                polygon_arr_msg.polygons.append(polygon)
+            self.enlarged_bboxes_pub.publish(polygon_arr_msg)
+
+            print("COSTMAP ORIFIN", self.cost_map.origin)
+            print("cost val at robot pose ", self.cost_map.get_cost_from_world_x_y(robot_loc.x - 3.3, robot_loc.y + 4))
+            collision_free_paths = []
+            for path in dwa_paths:
+                in_collision_flag = False
+                print("===")
+                for point in path:
+                    cost = self.cost_map.get_cost_from_world_x_y(point[0], point[1])
+                    print("cost", cost)
+                    if cost != 0:
+                        in_collision_flag = True
+                        break
+                    else:
+                        pass
+                if in_collision_flag:
+                    continue
+                else:
+                    collision_free_paths.append(path)
+            print("len of collision free paths ", len(collision_free_paths))
+
+            self.dwa_collision_free_paths_pub.publish(
+                self.dwa_path_gen.get_dwa_paths_marker_array(collision_free_paths, "map"))
+            dis_list = []
+            if self.center_line:
+                for i in range(len(collision_free_paths)):
+                    path = collision_free_paths[i]
+                    # print("path[-1]", path[-1])
+                    # print(type(path[-1].tolist()))
+                    dis = self.center_line.distance_to_point(path[-1].tolist())
+                    dis_list.append(abs(dis))
+                    # print("dis_list", dis_list)
+                # if len(dis_list) == 0:
+                #     rospy.logwarn("could not found collision free path")
+                #     rate.sleep()
+                #     continue
+                min_dis_idx = np.argmin(dis_list)
+                print("min_dis_idx", min_dis_idx)
+                close_path_to_first_row = collision_free_paths[min_dis_idx]
+                dwa_output = points_to_path(close_path_to_first_row, "map")
+                # self.pub_handler.dwa_collision_free_and_close_to_line_pub.publish(dwa_output)
+                # dwa_output_map = convert_path(dwa_output, "map")
+                self.dwa_collision_free_and_close_to_line_pub.publish(dwa_output)
+                traj_msg = Trajectory()
+                traj_msg.header.frame_id = "map"
+                speed = 1
+                for i in range(len(dwa_output.poses)):
+                    traj_point = TrajectoryPoint()
+                    traj_point.pose = dwa_output.poses[i].pose
+                    traj_point.index = i
+                    traj_point.longitudinal_velocity_mps = speed
+
+                    if i == 0:
+                        traj_point.accumulated_distance_m = 0
+                    else:
+                        acc_dis = math.hypot(traj_msg.points[-1].pose.position.x - dwa_output.poses[i].pose.position.x,
+                                             traj_msg.points[-1].pose.position.y - dwa_output.poses[i].pose.position.y)
+                        traj_point.accumulated_distance_m = traj_msg.points[-1].accumulated_distance_m + acc_dis
+                    traj_msg.points.append(traj_point)
+                self.center_traj_pub.publish(traj_msg)
+
+                # Finding the center line inliers on costmap
+
+                line_cost, xy = self.cost_map.get_line_cost_world(center_starting_point[0], center_starting_point[1],
+                                                              center_end_point[0], center_end_point[1])
+                rospy.logerr(f"Center line cost :{line_cost}")
+                pst = PoseStamped()
+                pst.header.frame_id = "map"
+                pst.pose.position.x = xy[0]
+                pst.pose.position.y = xy[1]
+                pst.pose.orientation.w = 1
+                if line_cost != 0:
+                    self.collision_point_center_line_pub.publish(pst)
             rate.sleep()
 
     def find_number_inlier_on_center_line(self, A, B, C):
@@ -949,6 +1169,9 @@ class AutoNav:
                 inliers_count += 1
                 inliers_points.append(self.all_points[i])
         return inliers_count, inliers_points
+
+    def bboxes_callback(self, data):
+        self.bboxes = data
 
     def odom_callback(self, data):
         self.robot_pose = data.pose.pose

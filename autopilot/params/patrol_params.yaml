@@ -14,15 +14,15 @@ patrol:
   pilot_cmd_in         : "/vehicle/cmd_drive_safe"
   wait_time_on_mission_complete  : 2  # secs
   google_map_center_always : true
-  max_forward_speed : 1.0
+  max_forward_speed : 1.5
   min_forward_speed : 0.8
   max_backward_speed : -1.0 # you can give positive/negative value. Both have same effect.
   min_backward_speed : -0.3
   enable_cte_based_speed_control : True
 
 pure_pursuit:
-  min_look_ahead_dis : 3 # meters
-  max_look_ahead_dis : 6 # meters
+  min_look_ahead_dis : 2 # meters
+  max_look_ahead_dis : 4 # meters
   speed_to_lookahead_ratio : 1
   speed_curvature_ratio : 2
   kp_speed : 0.5 # The speed control gain to adjust speed based on cte.

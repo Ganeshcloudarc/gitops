@@ -1,18 +1,18 @@
 <launch>
-    <arg name="hardware_in_loop" default="true" doc="false to software in loop"/>
+    <arg name="hardware_in_loop" default="false" doc="false to software in loop"/>
     <arg name="vehicle_type" default="half_cabin" doc="It can be either half_cabin or porter"/>
 
-    <arg name="mission_file" default="default.json"/>
+    <arg name="mission_file" default="almond56m.json"/>
     <arg name="mission_continue" default="true"/>
     <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
     <arg name="record" default="true"/>
     <arg name="failsafe_enable_cpp" default="true"/>
     <!-- DO NOT KEEP BOTH obs_stop_planner and enable_centering TO TRUE AT A TIME -->
-    <arg name="obs_stop_planner" default="true"/>
-    <arg name="enable_centering" default="false"/>
+    <arg name="obs_stop_planner" default="false"/>
+    <arg name="enable_centering" default="true"/>
 
-    <arg name="enable_zed_obs" default="true"/>
+    <arg name="enable_zed_obs" default="false"/>
     <arg name="enable_obs_v1" default="true"/>
     <arg name="use_pcl_boxes" default="true"/>
 
@@ -56,7 +56,7 @@
             <arg name="zed_camera" value="$(arg enable_zed_obs)"/>
             <arg name="2d_lidar" value="false"/>
             <!-- <arg name="3d_lidar" value="$(eval arg('enable_obs_v1') or arg('use_pcl_boxes'))"/> -->
-            <arg name="rslidar" value="$(arg enable_rslidar)"/>
+            <arg name="rslidar" value="$(earg enable_rslidar)"/>
             <arg name="lslidar" value="$(arg enable_lslidar)"/>
        </include>
     </group>

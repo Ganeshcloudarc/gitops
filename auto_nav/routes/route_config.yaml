@@ -1,0 +1,16 @@
+route_planning:
+  route_file_name : almond_100_mtr.geojson
+  row_spacing : 6
+  tree_width : 2.5
+  calculate_row_heading_from_coord : True
+  row_heading : 90
+  Headland_width : 8
+  skip_rows : 2
+  minimin_turing_radius_of_vehicle : 5
+  max_number_of_rows_to_cover : 5
+  reversing_enabled : False
+  ransac_max_iterations : 50
+
+
+
+

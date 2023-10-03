@@ -1,0 +1,21 @@
+<launch> 
+    <arg name="kml_file" default="default.kml"/> 
+    <arg name="minimum_turning_radius" default="5"/>
+    <arg name="maximum_breadth_of_farm" default="9"/>
+    <arg name="no_of_parallel_line" default="3"/>
+    <arg name="path_resolution" default="0.1"/>
+    <arg name="direction_parallel_line" default = "1"/>
+    <arg name = "len_of_path" default = "100"/>
+    
+
+    <!-- <param name = "/gps_path_utils/mission_files" value = "$(arg mission_files)"/>  -->
+    <param name = "/gps_path_utils/kml_file" value = "$(arg kml_file)"/> 
+    <param name = "/len_of_path" value = "$(arg len_of_path)"/> 
+
+    <param name="minimum_turning_radius" value="$(arg minimum_turning_radius)"/>
+    <param name="maximum_breath_of_farm" value="$(arg maximum_breadth_of_farm)"/>
+    <param name="no_of_parallel_line" value="$(arg no_of_parallel_line)"/>
+    <param name="path_resolution" value="$(arg path_resolution)"/> 
+    <param name="direction_parallel_line" value="$(arg direction_parallel_line)"/>
+    <node pkg="gps_path_utils" type="parallel_method_for_centering.py" name="kml_to_mission_file_para_method_node" output="screen" required="true"/>
+</launch> 

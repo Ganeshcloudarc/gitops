@@ -20,12 +20,20 @@ class Pose2D:
         self.turn_info = turn_info
 
     def __str__(self):
-        return f"x: {self.x} y: {self.y} z:{self.yaw} circum_radius:{self.circum_radius} turn_info:{self.turn_info}"
+        return f"x: {self.x} y: {self.y} yaw :{math.degrees(self.yaw)} circum_radius:{self.circum_radius} turn_info:{self.turn_info}"
 
     def __add__(self, other):
         x = self.x + other.x
         y = self.y + other.y
         return Pose2D(x, y)
+
+    def to_posestamped(self, target_frame):
+        pose = PoseStamped()
+        pose.header.frame_id = target_frame
+        pose.pose.position.x = self.x
+        pose.pose.position.y = self.y
+        pose.pose.orientation = yaw_to_quaternion(self.yaw)
+        return pose
 
     def distance(self, other):
         return math.hypot(self.x - other.x, self.y - other.y)
@@ -41,6 +49,9 @@ class Pose2D:
 
     def to_numpy(self):
         return np.array([self.x, self.y])
+
+    def to_list(self):
+        return [self.x, self.y, self.yaw]
 
     def dir_check(self, other):
         """ Return true if both poses lie on same side"""
@@ -125,12 +136,60 @@ class Line:
         return math.atan2(y_diff, x_diff)
 
     def inlier(self, points, offset):
-        # Find the number of iliner, find the front pointd
+        # Find the number of iliner, find the front point
         dino = dino = pow(self.m * self.m + (-1 * -1), 0.5)
         numerator = (self.m * (points[:, 0]) - points[:, 1] + self.c)
         dir_perpendicular_dis = numerator / dino
         left_points_ind = np.where((abs(dir_perpendicular_dis) <= offset))[0]
         return left_points_ind
+
+    def inliers_cross_product(self, cloud_points, offset):
+        p1 = np.array([0, self.m * 0 + self.c])
+        p2 = np.array([1, self.m * 1 + self.c])
+        dir_perpendicular_dis = np.cross(p2 - p1, p1 - cloud_points) / np.linalg.norm(
+            p2 - p1)
+        points_ind = np.where((abs(dir_perpendicular_dis) <= offset))[0]
+        return points_ind
+
+
+    def shift_line(self, distance, direction_change=True):
+        """
+        # formulas
+        A = y1−y2
+        B = x2−x1
+        C = x1y2−x2y1
+        C2 = C + self.row_spacing * math.sqrt(A * A + B * B)  # to compute right line.
+        C2 = C - self.row_spacing * math.sqrt(A * A + B * B)  # to compute left line.
+
+        """
+
+        c2 = self.c + distance * math.sqrt(1+self.m * self.m)
+        return Line(self.m, c2)
+
+
+def two_points_to_line(p1, p2):
+    if isinstance(p1, list) or isinstance(p1, tuple) or isinstance(p1, np.ndarray):
+        # two points in a list to y = mx +c
+        try:
+            m = (p2[1] - p1[1]) / (p2[0] - p1[0])
+        except :
+            m = 10000
+        c = p2[1] - m * p2[0]
+        return Line(m, c)
+    elif isinstance(p1, Pose2D):
+        try:
+            m = (p2.y - p1.y) / (p2.x - p1.x)
+        except:
+            m = 10000
+        c = p2.y - m * p2.x
+        return Line(m, c)
+
+    else:
+        raise TypeError("Only lists,tuples and Pose2D are allowed")
+
+
+
+
 
 
 def get_tie(yaw):
@@ -351,9 +410,16 @@ if __name__ == "__main__":
     # line_points = getLine(0, 16, 0, 44, res=0.2)
     # print("line points", line_points)
 
-    A = Pose2D(0, 0, math.radians(90))
-    # print("math.radians(360)", math.radians(178))
-    B = Pose2D(1,-1, math.radians(1))
-    # print(A.dir_check(B))
-    print(A.heading_check(B))
+    # A = Pose2D(0, 0, math.radians(90))
+    # # print("math.radians(360)", math.radians(178))
+    # B = Pose2D(1,-1, math.radians(1))
+    # # print(A.dir_check(B))
+    # print(A.heading_check(B))
+
+    # line = Line(1, 0)
+    # shifted_line = line.shift_line(-1.5)
+    # print(shifted_line)
+    print(two_points_to_line([1, 0], [1, 1]))
+
+
 

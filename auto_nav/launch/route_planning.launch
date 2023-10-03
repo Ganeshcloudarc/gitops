@@ -1,0 +1,33 @@
+<launch>
+
+
+    <param name='/patrol/gps_topic' value = '/mavros/global_position/global'/>
+    <include file="$(find vehicle_description)/launch/boson_sim.launch"/>
+
+    <include file="$(find auto_nav)/launch/pointcloud_map.launch"/>
+
+     <include file="$(find auto_nav)/launch/pointcloud_to_laserscan.launch" >
+        <arg name="cloud_in" value="rslidar_points"/>
+        <arg name="config_file" value="cloud_to_laser_180_params.yaml"/>
+        <arg name="scan_out" value="laser_scan"/>
+    </include>
+
+    <include file="$(find auto_nav)/launch/pointcloud_to_laserscan.launch">
+        <arg name="cloud_in" value="local_cloud_map"/>
+        <arg name="config_file" value="cloud_to_laser_360_params.yaml"/>
+        <arg name="scan_out" value="local_cloud_laser_scan"/>
+    </include>
+
+    <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+            <arg name="rviz" value="false"/>
+    </include>
+
+    <rosparam command="load" file="$(find auto_nav)/routes/route_config.yaml"/>
+
+    <node name="rviz_route_planning" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/route_plan.rviz"/>
+
+    <node pkg="autopilot" type="path_tracking_pure_pursuit_collision.py" name="pure_pursuit_node" />
+
+
+</launch>
+
