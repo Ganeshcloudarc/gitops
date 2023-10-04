@@ -191,6 +191,59 @@ class OccupancyGridManager(object):
         else:
             return False
 
+    def get_line_cost_map(self, x1, y1, x2, y2):
+        cost = 0
+        # Calculate differences and absolute differences between coordinates
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+
+        # Calculate the direction of the line
+        sx = 1 if x1 < x2 else -1
+        sy = 1 if y1 < y2 else -1
+
+        # Initialize error
+        error = dx - dy
+
+        # Initialize coordinates
+        x, y = x1, y1
+
+        try:
+            cost = self.get_cost_from_costmap_x_y(x, y)
+            if cost != 0:
+                return cost, self.get_world_x_y(x, y)
+        except:
+            pass
+
+        # Main loop to iterate through the line
+        while x != x2 or y != y2:
+            # Add the current point to the list
+            # Calculate the next coordinates
+            double_error = 2 * error
+            if double_error > -dy:
+                error -= dy
+                x += sx
+            if double_error < dx:
+                error += dx
+                y += sy
+            try:
+                cost = self.get_cost_from_costmap_x_y(x, y)
+                if cost != 0:
+                    return cost, self.get_world_x_y(x, y)
+            except:
+                pass
+
+        return cost, (None, None)
+
+
+
+    def get_line_cost_world(self, x1, y1, x2, y2):
+        x1, y1 = self.get_costmap_x_y(x1, y1)
+        x2, y2 = self.get_costmap_x_y(x2, y2)
+        print("val", self.get_line_cost_map(x1, y1, x2, y2))
+        cost, obs_xy = self.get_line_cost_map(x1, y1, x2, y2)
+        return cost, obs_xy
+
+    """
     def get_line_cost_world(self, x1, y1, x2, y2):
         cost = 255
         x1, y1 = self.get_costmap_x_y(x1, y1)
@@ -294,6 +347,7 @@ class OccupancyGridManager(object):
             except:
                 pass
         return 0, self.get_world_x_y(x,y)
+        """
 
 
     def get_closest_cell_under_cost(self, x, y, cost_threshold, max_radius):

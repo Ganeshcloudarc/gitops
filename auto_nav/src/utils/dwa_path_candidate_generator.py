@@ -79,8 +79,8 @@ class DwaPathGenerator:
             marker.id = count
             count += 1
             marker.action = marker.ADD
-            marker.scale.x = 0.1
-            marker.color.a = 0.5
+            marker.scale.x = 0.01
+            marker.color.a = 0.3
             marker.color.r = random.random()
             marker.color.g = random.random()
             marker.color.b = random.random()

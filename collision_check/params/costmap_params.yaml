@@ -1,6 +1,6 @@
 global_frame: map
 robot_base_frame: base_link
-update_frequency: 5
+update_frequency: 10
 publish_frequency: 15
 
 #set if you want the voxel map published
@@ -28,9 +28,9 @@ footprint_clearing_enabled : true
 #transform_tolerance: 0.3
 transform_tolerance: 3.0
 
-obstacle_range: 50
-max_obstacle_height: 8
-raytrace_range: 50
+#obstacle_range: 50
+#max_obstacle_height:
+#raytrace_range: 50
 #footprint: [[-1, -0.65], [-1, 3.35], [1, 3.35], [1, -3.35]]
 footprint: [[-0.65, 1], [-0.65, -1],[3.35, -1], [3.35, 1]]
 
@@ -51,10 +51,10 @@ lethal_cost_threshold: 100
 obstacle_layer:
     observation_sources: rslidar lslidar
 #     point_cloud_sensor : {sensor_frame: lslidar,data_type: LaserScan, clearing: true, marking: true, topic: /laser_scan, inf_is_valid: false}
-    rslidar: {sensor_frame: rslidar, data_type: PointCloud2, topic: /rslidar_points, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.3, max_obstacle_height: 3.0,
-     raytrace_range: 50 ,obstacle_range: 50}
-    lslidar: {sensor_frame: lslidar, data_type: PointCloud2, topic: /lslidar_point_cloud, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.3, max_obstacle_height: 3.0,
-     raytrace_range: 50 ,obstacle_range: 50}
+    rslidar: {sensor_frame: rslidar, data_type: PointCloud2, topic: /rslidar_points, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.3, max_obstacle_height: 1.0,
+     raytrace_range: 30 ,obstacle_range: 30}
+    lslidar: {sensor_frame: lslidar, data_type: PointCloud2, topic: /lslidar_point_cloud, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.3, max_obstacle_height: 1.0,
+     raytrace_range: 30 ,obstacle_range: 30}
 # inflation:
 #     inflation_radius: 5.0
 
