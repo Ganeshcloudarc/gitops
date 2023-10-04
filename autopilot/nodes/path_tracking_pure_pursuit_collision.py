@@ -65,8 +65,8 @@ class PurePursuitController:
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
         self.max_backward_speed = abs(rospy.get_param("/patrol/max_backward_speed",1.0)) # doing abs() as reversing uses same logic as forward wrt to speed
         self.min_backward_speed = abs(rospy.get_param("/patrol/min_backward_speed",0.8))
-        self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 2)
-        self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 4)
+        self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
+        self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
         self.time_out_from_input_trajectory = rospy.get_param("/pure_pursuit/time_out", 3)
         trajectory_in_topic = rospy.get_param("/trajectory_in", "/local_gps_trajectory")
         odom_topic = rospy.get_param("/patrol/odom_topic", "/vehicle/odom")
