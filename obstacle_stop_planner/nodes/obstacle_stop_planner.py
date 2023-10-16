@@ -84,7 +84,7 @@ class ObstacleStopPlanner:
         # publisher for obstacle_stop_plannner diagnostics 
         self.publisher = rospy.Publisher("/obstacle_stop_planner_diagnostics", DiagnosticArray, queue_size=1,latch= True) 
         self.diagnostics_publisher = DiagnosticStatusWrapper() 
-        self.diagnostics_publisher.name = " OBSTACLE_STOP_PLANNER_DIAGNOSTICS " 
+        self.diagnostics_publisher.name = rospy.get_name()
         self.diagnostics_publisher.hardware_id = 'zekrom_v1'
         self.objects_number = None
         self.zed_objects = None
@@ -199,6 +199,7 @@ class ObstacleStopPlanner:
         is_lidar_sensor_healthy = False
         is_zed_sensor_healthy = False
         is_global_path_ok = False 
+        sensor_msg = "waiting for"
         if self._traj_manager.get_len() > 0 and self.robot_pose:
             rospy.loginfo("global path and robot_pose are received") 
             is_global_path_ok = True
@@ -213,11 +214,13 @@ class ObstacleStopPlanner:
                         else: 
                             rospy.logwarn("waiting for bounding boxes")
                             is_lidar_sensor_healthy = False
+                            sensor_msg+=" lidar data"
                     else:
                         is_lidar_sensor_healthy = True
                 else:
                     rospy.logwarn( f"waiting for data  scan :{self.scan_data_received}") 
                     is_lidar_sensor_healthy = False
+                    sensor_msg+=" lidar data"
             else:
                 is_lidar_sensor_healthy = True
             if self.use_zed_detections:
@@ -227,15 +230,16 @@ class ObstacleStopPlanner:
                 else:
                     rospy.logwarn("Waiting for zed data")
                     is_zed_sensor_healthy = False
+                    sensor_msg+=" zed data"
             else:
                 is_zed_sensor_healthy = True
         else:
             rospy.logwarn(
                 f" waiting for global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
             is_global_path_ok = False
-
+            sensor_msg+=" global trajectory"
         sensor_status = is_lidar_sensor_healthy and is_zed_sensor_healthy and is_global_path_ok
-        return sensor_status
+        return sensor_status,sensor_msg
 
     def main_loop(self):
         # TODO: publish stop, slow_down margin's circle
@@ -245,16 +249,16 @@ class ObstacleStopPlanner:
             self.diagnostics_publisher.clearSummary() 
             self.diagnostics_publisher.values = [] 
             # robot_pose = current_robot_pose("map", self.robot_base_frame)
-            sensor_status = self.do_initial_sensor_check() 
+            sensor_status,sensor_msg = self.do_initial_sensor_check() 
             if sensor_status: 
-                self.diagnostics_publisher.summary(OK,"Sensor status is healthy :)") 
-                self.diagnostics_publisher.add("SENSOR_STATUS ",sensor_status)
+                self.diagnostics_publisher.summary(OK,"Received data") 
+                self.diagnostics_publisher.add("Sensor_status ",sensor_status)
                 self.publish(self.diagnostics_publisher) 
                 break
             else : 
-                self.diagnostics_publisher.summary(ERROR,"Sensor status is unhealthy :(") 
-                self.diagnostics_publisher.add("SENSOR_STATUS ",sensor_status)
-                self.publish(self.diagnostics_publisher) 
+                self.diagnostics_publisher.summary(ERROR,f"{sensor_msg}") 
+                self.diagnostics_publisher.add("Sensor_status ",sensor_status)
+                self.publish(self.diagnostics_publisher)  
             rate.sleep()
 
         rate = rospy.Rate(100)
@@ -271,7 +275,7 @@ class ObstacleStopPlanner:
             if loop_start_time - self.odom_data_in_time > self._TIME_OUT_FROM_ODOM:
                 rospy.logwarn("No update on odom (robot position)")
                 self.diagnostics_publisher.summary(ERROR,"No update on odom (robot position)") 
-                self.diagnostics_publisher.add("LAST ODOM TIME",loop_start_time - self.odom_data_in_time) 
+                self.diagnostics_publisher.add("Last Odom time",loop_start_time - self.odom_data_in_time) 
                 self.publish(self.diagnostics_publisher)
                 rate.sleep()  
                 continue
@@ -279,7 +283,7 @@ class ObstacleStopPlanner:
                 if loop_start_time - self.laser_data_in_time > self._TIME_OUT_FROM_LASER:
                     rospy.logwarn(f"No update on laser data from last {loop_start_time - self.laser_data_in_time}")
                     self.diagnostics_publisher.summary(ERROR,"No update on laser data") 
-                    self.diagnostics_publisher.add("LAST LASER TIME",loop_start_time - self.laser_data_in_time)  
+                    self.diagnostics_publisher.add("Last laser time",loop_start_time - self.laser_data_in_time)  
                     self.publish(self.diagnostics_publisher) 
                     rate.sleep()  
                     continue
@@ -287,7 +291,7 @@ class ObstacleStopPlanner:
                 if (loop_start_time - self.zed_data_in_time > self._TIME_OUT_FROM_ZED):
                     rospy.logwarn(f"No update on ZED data from last {loop_start_time - self.zed_data_in_time}")
                     self.diagnostics_publisher.summary(ERROR,"No update on ZED data") 
-                    self.diagnostics_publisher.add("LAST ZED TIME",loop_start_time - self.zed_data_in_time)  
+                    self.diagnostics_publisher.add("Last ZED time",loop_start_time - self.zed_data_in_time)  
                     self.publish(self.diagnostics_publisher)
                     rate.sleep()
                     continue
@@ -303,8 +307,8 @@ class ObstacleStopPlanner:
                 else:
                     rospy.logwarn(f"No close point found dist_thr: {self._max_look_ahead_dis}, angle_thr: {angle_th}")
                     self.diagnostics_publisher.summary(ERROR,"No close point found") 
-                    self.diagnostics_publisher.add("DISTANCE THR",self._max_look_ahead_dis) 
-                    self.diagnostics_publisher.add("ANGLE_THR ",angle_th)   
+                    self.diagnostics_publisher.add("Distance Threshold",self._max_look_ahead_dis) 
+                    self.diagnostics_publisher.add("Angle Threshold ",angle_th)   
                     self.publish(self.diagnostics_publisher)
                     rate.sleep()
                     continue
@@ -341,7 +345,7 @@ class ObstacleStopPlanner:
                 if self.mission_continue:
                     self._close_idx = 1
                     self.diagnostics_publisher.summary(OK,"Mission complete ") 
-                    self.diagnostics_publisher.add("MISSION REPEAT ",self.count_mission_repeat) 
+                    self.diagnostics_publisher.add("Mission Repeat ",self.count_mission_repeat) 
                     self.publish(self.diagnostics_publisher)
                     time.sleep(self._time_to_wait_at_ends)
                     continue
@@ -397,7 +401,7 @@ class ObstacleStopPlanner:
                 self.local_traj_publisher.publish(trajectory_msg)
                 self.publish_velocity_marker(trajectory_msg) 
                 self.diagnostics_publisher.summary(ERROR,"BYPASS_MODE") 
-                self.diagnostics_publisher.add(f"BYPASSING THE OBSTACLE {self.by_pass_dist} m",self.by_pass_dist) 
+                self.diagnostics_publisher.add(f"Bypassing the obstacle {self.by_pass_dist} m",self.by_pass_dist) 
                 self.publish(self.diagnostics_publisher)
             
                 # reseting the bypass parameters 
@@ -582,7 +586,6 @@ class ObstacleStopPlanner:
                     
                     # TODO apply break directly to pilot
                     rospy.logwarn("obstacle is very close, applying hard breaking")
-
                     self.diagnostics_publisher.summary(ERROR,"OBSTACLE IS VERY CLOSE ")
                     self.diagnostics_publisher.add("APPLYING BREAK ",True) 
                     self.diagnostics_publisher.add("OBSTALCE FOUND AT ",dis_to_obstacle)
@@ -643,6 +646,7 @@ class ObstacleStopPlanner:
                             
                         self.diagnostics_publisher.summary(WARN,"VEHICLE WILL SLOW DOWN")
                         self.diagnostics_publisher.add("OBSTACLE FOUND AT ",dis_to_obstacle)  
+                        
                         self.publish(self.diagnostics_publisher)
                       
                     else: 
