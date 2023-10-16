@@ -217,10 +217,10 @@ class CollisionMonitor:
 
     def vehicle_foot_print(self):
         pl = Polygon()
-        for i in range(0, len(self.polygon_points), 2):
+        for i in range(0, len(self.polygon_points)):
             point = Point()
-            point.x = self.polygon_points[i]
-            point.y = self.polygon_points[i + 1]
+            point.x = self.polygon_points[i][0]
+            point.y = self.polygon_points[i][1]
             pl.points.append(point)
         return pl
 

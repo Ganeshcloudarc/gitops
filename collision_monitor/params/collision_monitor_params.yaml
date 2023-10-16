@@ -3,7 +3,7 @@ collision_monitor:
   source_timeout: 5.0 # before time out
   frequency: 15 # frequency of the collision monitor node.
   min_points: 5 # Minimum points inside the polygon to not consider as collision.
-  points: [4.0, 1, -1, 1, -1, -1, 4.0, -1] # should be even in number, order is x1,y1,x2,y2 and so on.
+  points : [[-0.65, 1], [-0.65, -1],[3.35, -1], [3.35, 1]] # Foot_print points representing the vehicle wrt base_link
 
 
   observation_sources: [ "rslidar_scan"] # ["zed_scan"]
