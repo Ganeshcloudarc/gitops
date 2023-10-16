@@ -9,7 +9,6 @@ try:
     from geographic_msgs.msg import GeoPointStamped
     from mavros_msgs.msg import HomePosition
     from json import dump
-    from geojson import LineString
     import numpy as np
     import time
     from rospy_message_converter import message_converter
@@ -112,7 +111,10 @@ class SaveWayPoints:
             rospy.logwarn('No points to save, Exiting without saving')
             exit()
 
-        line_string = LineString(self.final_waypoints_list)
+        # line_string = LineString(self.final_waypoints_list)
+        line_string = {}
+        line_string["type"] = "LineString"
+        line_string["coordinates"] = self.final_waypoints_list
         line_string['imu'] = self.imu_list
         line_string['odometry'] = self.odometry_list
         line_string['gps_coordinates'] = self.gps_list
@@ -223,6 +225,7 @@ class SaveWayPoints:
                     rospy.logwarn("Stop the vehicle, untill RTK comes")
                     
                     self.RTK_Status=False
+
                         
                 r.sleep()
         except Exception as e:
