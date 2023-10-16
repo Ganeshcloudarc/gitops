@@ -1,6 +1,6 @@
 # target_frame : rslidar
-min_height  : 0.0 # any object above 0.3 from ground
-max_height  : 1.5 # vehicle width is assumed to be 1.5
+min_height  : -0.2 # any object above 0.3 from ground
+max_height  : 0.3 # vehicle height asssumed to be 0.8 meters
 angle_min   : -1.5707963267948966
 angle_max   : 1.5707963267948966
 angle_increment : 0.0087 #  common incement angle
