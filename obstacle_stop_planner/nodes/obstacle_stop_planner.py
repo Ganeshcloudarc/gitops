@@ -229,7 +229,7 @@ class ObstacleStopPlanner:
                     is_zed_sensor_healthy = True
                 else:
                     rospy.logwarn("Waiting for zed data")
-                    is_zed_sensor_healthy = False
+                    is_zed_sensor_healthy = False 
                     sensor_msg+=" zed data"
             else:
                 is_zed_sensor_healthy = True
@@ -333,7 +333,7 @@ class ObstacleStopPlanner:
 
             # check for mission complete
             path_percent = (self._traj_in.points[self._close_idx].accumulated_distance_m /
-                            self._traj_in.points[-1].accumulated_distance_m) * 100
+                                self._traj_in.points[-1].accumulated_distance_m) * 100
             self.path_percent_publisher.publish(path_percent)
            
 

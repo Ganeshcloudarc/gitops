@@ -53,7 +53,9 @@ class GlobalGpsPathPub:
         self.max_forward_speed = rospy.get_param('/patrol/max_forward_speed', 1.5)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
         distance_to_slowdown_on_ends = rospy.get_param("/path_publisher/distance_to_slowdown_on_ends", 3)
-        self.mission_continue = rospy.get_param("patrol/mission_continue", True)
+        self.mission_continue = rospy.get_param("patrol/mission_continue", True) 
+        self.interpolate_with_rtk = rospy.get_param("path_publisher/interpolate_with_rtk",False)
+        self.interpolate_without_rtk = rospy.get_param("path_publisher/interpolate_without_rtk",False)
         self.max_dis_btw_points = rospy.get_param("path_publisher/max_dis_btw_points", 0.5)
         self.path_resolution = rospy.get_param("path_publisher/path_resolution", 0.1)
         self.steering_limits_to_slow_down = rospy.get_param("path_publisher/steering_limits_to_slow_down", 10)
@@ -138,6 +140,7 @@ class GlobalGpsPathPub:
                                 px_upd = px + self.path_resolution * math.cos(angle_line) 
                                 py_upd = py + self.path_resolution * math.sin(angle_line)
                                 self.interploted.append([px_upd,py_upd])  
+                        
                     else: 
                         rospy.loginfo("setting the same turning points ")
                         element_1 = self.curve_points[i] 
@@ -206,7 +209,7 @@ class GlobalGpsPathPub:
         except Exception as error:
             rospy.logerr('Error In Reading mission file ' + str(error))
             rospy.signal_shutdown('Error In Reading mission file ' + str(error))
-
+        
         k = kml.KML()
         k.from_string(doc)
         long_lat_list = []
@@ -339,6 +342,7 @@ class GlobalGpsPathPub:
 
     def from_odometry(self, data):
         data_keys = data.keys()
+        rtk_status = data['Is_RTK_Good']
         data_len = len(data['coordinates'])
         odom_key_name = "odometry"
         gps_key_name = "coordinates"
@@ -364,14 +368,15 @@ class GlobalGpsPathPub:
 
         # Filling the Trajectory_msg
         accumulated_distance = 0
-        prev_pose = Pose()
+        prev_pose = Pose()            
+        last_index = 0
         for i in range(len(data['coordinates'])):
-
             # Odom based path
             lon, lat = data['coordinates'][i][0], data['coordinates'][i][1]
             odom_position = data['odometry'][i]['pose']['pose']['position']
             # print("odom position",odom_position)
             odom_orientation = data['odometry'][i]['pose']['pose']['orientation']
+            
             odom_pose = Pose()
             odom_pose.position.x, odom_pose.position.y, odom_pose.position.z = odom_position['x'], odom_position['y'], \
                                                                                self.rear_axle_center_height_from_ground
@@ -381,24 +386,66 @@ class GlobalGpsPathPub:
                 prev_pose = odom_pose
 
             dis = distance_btw_poses(odom_pose, prev_pose)
-            accumulated_distance = accumulated_distance + dis
-            prev_pose = odom_pose
-            if dis >= self.max_dis_btw_points:
+            # accumulated_distance = accumulated_distance + dis   
+            # linear interpolating the highest path_resolution with parameter   
+            if dis >= self.max_dis_btw_points: 
                 # TODo interpolate
-                pass
+                # if rtk_Status and interplote param is true internal interpolation would occur  
+                if((rtk_status and self.interpolate_with_rtk)or(not rtk_status and self.interpolate_without_rtk)): 
+                    rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
+                    internal_path_res = distance_btw_poses(odom_pose,prev_pose)
+                    # rospy.loginfo_once("internal path resolution %s", str(internal_path_res))
+                    rospy.logwarn_once("Interpolating the internal path resolution is %s meters", str(internal_path_res))
+                    n_points = internal_path_res // self.path_resolution
+                    angle = angle_btw_poses(odom_pose,prev_pose)
+                    prev_pose_ = prev_pose
+                    for j in range(0, int(n_points)):
+                        # odom path
+                        px = trajectory_msg.points[-1].pose.position.x
+                        py = trajectory_msg.points[-1].pose.position.y
+                        px_updated = px + self.path_resolution * math.cos(angle)
+                        py_updated = py + self.path_resolution * math.sin(angle)
+                        odom_pose_ = Pose()
+                        odom_pose_.position.x, odom_pose_.position.y, odom_pose_.position.z = px_updated, py_updated, \
+                                                                                            self.rear_axle_center_height_from_ground
+                        odom_pose_.orientation = yaw_to_quaternion(angle)
+                        # Trajectory
+                        lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long) 
 
+                        dis = distance_btw_poses(odom_pose_, prev_pose_)
+                        accumulated_distance = accumulated_distance + dis
+                        prev_pose_ = odom_pose_
+
+                        # Trajectory msg filling
+                        traj_pt_msg = TrajectoryPoint()
+                        traj_pt_msg.pose = odom_pose_
+                        traj_pt_msg.gps_pose.position.latitude = lat
+                        traj_pt_msg.gps_pose.position.longitude = lon
+                        # traj_pt_msg.longitudinal_velocity_mps =
+                        traj_pt_msg.index = last_index
+                        last_index = last_index + 1
+                        traj_pt_msg.accumulated_distance_m = accumulated_distance
+                        trajectory_msg.points.append(traj_pt_msg)
+                                                  
+                else:
+                    rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
+                pass 
+            
+            prev_pose = odom_pose 
             # Trajectory msg filling
-            traj_pt_msg = TrajectoryPoint()
-            traj_pt_msg.pose = odom_pose
+            traj_pt_msg = TrajectoryPoint() 
+            traj_pt_msg.pose = odom_pose  
             traj_pt_msg.gps_pose.position.latitude = lat
-            traj_pt_msg.gps_pose.position.longitude = lon
+            traj_pt_msg.gps_pose.position.longitude = lon  
             # traj_pt_msg.longitudinal_velocity_mps =
-            traj_pt_msg.index = i
+            traj_pt_msg.index = last_index 
+            last_index = last_index+1
             traj_pt_msg.accumulated_distance_m = accumulated_distance
-            trajectory_msg.points.append(traj_pt_msg)
+            trajectory_msg.points.append(traj_pt_msg)    
+            
         # connecting the first and last way points
-        i = i + 1
-        if self.mission_continue:
+      
+        if self.mission_continue: 
             distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[0].pose)
             rospy.loginfo("distance between first and last way point %s", str(distance))
             # if distance > self.avg_lhd:
@@ -431,7 +478,8 @@ class GlobalGpsPathPub:
                 traj_pt_msg.gps_pose.position.latitude = lat
                 traj_pt_msg.gps_pose.position.longitude = lng
                 # traj_pt_msg.longitudinal_velocity_mps =
-                traj_pt_msg.index = i + j
+                traj_pt_msg.index = last_index
+                last_index = last_index +1
                 traj_pt_msg.accumulated_distance_m = accumulated_distance
                 trajectory_msg.points.append(traj_pt_msg)
             # else:
@@ -470,14 +518,13 @@ class GlobalGpsPathPub:
                 #                                                     vehicle_data.motion_limits.max_steering_angle],
                 #                                                     [self.max_forward_speed,
                 #                                                     self.min_forward_speed])
-
         marker_arr = trajectory_to_marker(trajectory_msg, self.max_forward_speed)
         self.trajectory_velocity_marker_pub.publish(marker_arr)
-        path = trajectory_to_path(trajectory_msg)
-        self.gps_path_pub.publish(path)
-        self.global_trajectory_pub.publish(trajectory_msg)
-        rospy.loginfo("global_trajectory_published")
-        rospy.loginfo('Details of ' + str(i) + " are published from file " + str(mission_file))
+        path = trajectory_to_path(trajectory_msg)  
+        self.gps_path_pub.publish(path) 
+        self.global_trajectory_pub.publish(trajectory_msg) 
+        rospy.loginfo("global_trajectory_published") 
+        rospy.loginfo('Details of ' + str(i) + " are published from file " + str(mission_file)) 
 
     def target_index(self, robot_pose, close_point_ind): 
         """

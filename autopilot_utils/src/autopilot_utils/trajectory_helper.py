@@ -25,14 +25,13 @@ def trajectory_to_marker(trajectory_msg, max_forward_speed):
         marker = Marker()
         marker.header.frame_id = "map"
         marker.type = marker.TEXT_VIEW_FACING
-        marker.text = str(round(traj_point.longitudinal_velocity_mps, 2))
         marker.id = i
         marker.action = marker.ADD
         marker.scale.x = 0.1
         marker.scale.y = 0.1
         marker.scale.z = 0.1
         marker.color.a = 1.0
-        if traj_point.longitudinal_velocity_mps == max_forward_speed:
+        if traj_point.longitudinal_velocity_mps == max_forward_speed: 
             marker.color.r = 0.0
             marker.color.g = 1.0
             marker.color.b = 0.0
