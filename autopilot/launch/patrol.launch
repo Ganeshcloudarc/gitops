@@ -13,7 +13,7 @@
     <arg name="enable_centering" default="false"/>
 
 
-    <arg name="enable_zed_obs" default="false"/>
+    <arg name="enable_zed_obs" default="true"/>
     <arg name="enable_obs_v1" default="true"/>
     <arg name="use_pcl_boxes" default="true"/>
 
