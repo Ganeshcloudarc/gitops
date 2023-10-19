@@ -393,7 +393,7 @@ class VehicleSafety {
             start_time = time(0);
           }
           if ((time(0) - start_time) > GPS_FIX_THR) {
-            stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT");
+            stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT. GPS 1: " + std::to_string(gps1_fix) + ", GPS 2: " + std::to_string(gps2_fix));
             stat.add("GPS1 Fix Type", gps1_fix);
             stat.add("GPS2 Fix Type", gps2_fix);
             stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
@@ -406,7 +406,7 @@ class VehicleSafety {
             stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
           }
         } else {
-          stat.summary(ERROR, "ERROR: GPS FIX LOST");
+          stat.summary(ERROR, "ERROR: GPS FIX LOST. GPS 1: " + std::to_string(gps1_fix) + ", GPS 2: " + std::to_string(gps2_fix));
           stat.add("GPS1 Fix Type", gps1_fix);
           stat.add("GPS2 Fix Type", gps2_fix);
           stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
