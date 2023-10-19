@@ -65,7 +65,7 @@ class GlobalGpsPathPub:
         # self.path_res = rospy.get_param("path_publisher/path_resolution",0.1)
         self.max_forward_speed = rospy.get_param('/patrol/max_forward_speed', 1.5)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
-        self.minimum_data_len = rospy.get_param("path_publisher/minimum_data_length",1000)
+        self.minimum_data_len = rospy.get_param("path_publisher/minimum_json_length",100)
         distance_to_slowdown_on_ends = rospy.get_param("/path_publisher/distance_to_slowdown_on_ends", 3)
         self.mission_continue = rospy.get_param("patrol/mission_continue", True) 
         self.interpolate_with_rtk = rospy.get_param("path_publisher/interpolate_with_rtk",False)
@@ -453,7 +453,6 @@ class GlobalGpsPathPub:
                 prev_pose = odom_pose
 
             dis = distance_btw_poses(odom_pose, prev_pose)
-            # accumulated_distance = accumulated_distance + dis   
             # linear interpolating the highest path_resolution with parameter   
             if dis >= self.max_dis_btw_points:  
                 # TODo interpolate  
@@ -476,7 +475,7 @@ class GlobalGpsPathPub:
                         odom_pose_.position.x, odom_pose_.position.y, odom_pose_.position.z = px_updated, py_updated, \
                                                                                             self.rear_axle_center_height_from_ground
                         odom_pose_.orientation = yaw_to_quaternion(angle)
-                        # Trajectory
+                        # Trajectory 
                         lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long) 
 
                         dis = distance_btw_poses(odom_pose_, prev_pose_)
@@ -497,7 +496,8 @@ class GlobalGpsPathPub:
                 else:
                     rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
                 pass  
-                        
+            
+            accumulated_distance = accumulated_distance + dis        
             prev_pose = odom_pose 
             # Trajectory msg filling
             traj_pt_msg = TrajectoryPoint() 

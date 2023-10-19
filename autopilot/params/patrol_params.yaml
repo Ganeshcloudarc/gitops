@@ -1,6 +1,7 @@
 path_publisher:
   max_dis_btw_points : 0.5 # meters
   distance_to_slowdown_on_ends : 3
+  minimum_json_length : 100
   path_resolution : 0.1 # 10 cms
   interpolate_without_rtk : False # True-to interpolate points even though the rtk is lost
   interpolate_with_rtk: True #True-linear interpolation between the high path resolution (max_dis_btw_points)
