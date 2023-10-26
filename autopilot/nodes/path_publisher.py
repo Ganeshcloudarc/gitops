@@ -25,6 +25,10 @@ try :
     from fastkml import kml
     from fastkml import geometry
     import geometry_msgs.msg as gmsg
+    from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray, KeyValue
+    from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper
+
+
 
 except Exception as e: 
     import rospy 
@@ -34,6 +38,10 @@ except Exception as e:
 
 def get_tie(theta):
     return np.array([np.cos(theta), np.sin(theta)])
+OK = DiagnosticStatus.OK
+ERROR = DiagnosticStatus.ERROR
+WARN = DiagnosticStatus.WARN
+STALE = DiagnosticStatus.STALE
 
 
 class GlobalGpsPathPub:
@@ -44,6 +52,11 @@ class GlobalGpsPathPub:
         self.coordinate =[] 
         self.coordinate_x =[] 
         self.coordinate_y =[] 
+        self.path_pub_diagnostics = rospy.Publisher("path_publisher_diagnostics",DiagnosticArray, queue_size=1, latch = True)
+        self.diagnostics_status= DiagnosticStatusWrapper() 
+        self.diagnostics_array = DiagnosticArray() 
+        self.diagnostics_status.name = rospy.get_name()
+        self.diagnostics_status.hardware_id = 'zekrom_v1'
         self.curve_dist = rospy.get_param("path_publisher/curve_dist",10)
         self.smooth_path = rospy.get_param("path_publisher/smooth_path",False)
         self.curve_angle = rospy.get_param("path_publisher/rdp_angle",0.09)
@@ -52,8 +65,11 @@ class GlobalGpsPathPub:
         # self.path_res = rospy.get_param("path_publisher/path_resolution",0.1)
         self.max_forward_speed = rospy.get_param('/patrol/max_forward_speed', 1.5)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
+        self.minimum_data_len = rospy.get_param("path_publisher/minimum_json_length",100)
         distance_to_slowdown_on_ends = rospy.get_param("/path_publisher/distance_to_slowdown_on_ends", 3)
-        self.mission_continue = rospy.get_param("patrol/mission_continue", True)
+        self.mission_continue = rospy.get_param("patrol/mission_continue", True) 
+        self.interpolate_with_rtk = rospy.get_param("path_publisher/interpolate_with_rtk",False)
+        self.interpolate_without_rtk = rospy.get_param("path_publisher/interpolate_without_rtk",False)
         self.max_dis_btw_points = rospy.get_param("path_publisher/max_dis_btw_points", 0.5)
         self.path_resolution = rospy.get_param("path_publisher/path_resolution", 0.1)
         self.steering_limits_to_slow_down = rospy.get_param("path_publisher/steering_limits_to_slow_down", 10)
@@ -81,6 +97,13 @@ class GlobalGpsPathPub:
         self.polygon_xy_filled_pub = rospy.Publisher('/polygon_xy_filled_', PolygonStamped,
                                            queue_size=1, latch=True)
 
+    def publisher_diagnostics(self): 
+        self.diagnostics_array.status = [] 
+        self.diagnostics_array.status.append(self.diagnostics_status)
+        self.diagnostics_array.header.stamp = rospy.Time.now()
+        self.path_pub_diagnostics.publish(self.diagnostics_array)
+
+
     def to_polygon(self, xy_list):
         polygon_st = PolygonStamped()
         polygon_st.header.frame_id = 'map'
@@ -88,7 +111,7 @@ class GlobalGpsPathPub:
             point = gmsg.Point()
             point.x, point.y = x, y
             polygon_st.polygon.points.append(point) 
-        return polygon_st
+        return polygon_st 
 
     def from_json(self):
         data = None 
@@ -138,6 +161,7 @@ class GlobalGpsPathPub:
                                 px_upd = px + self.path_resolution * math.cos(angle_line) 
                                 py_upd = py + self.path_resolution * math.sin(angle_line)
                                 self.interploted.append([px_upd,py_upd])  
+                        
                     else: 
                         rospy.loginfo("setting the same turning points ")
                         element_1 = self.curve_points[i] 
@@ -160,71 +184,103 @@ class GlobalGpsPathPub:
                 rospy.loginfo("json is updated") 
                 
             else : 
-                print(self.smooth_path)
-                rospy.loginfo("smooth_path is false")
+                rospy.loginfo("smooth_path is false")     
 
         except Exception as error:
             rospy.logerr('Error In Reading mission file ' + str(error))
-            rospy.signal_shutdown('Error In Reading mission file ' + str(error))
-        if 'coordinates' in data.keys() and "odometry" in data.keys():
+            self.diagnostics_status.summary(ERROR,"Error in Reading Mission file") 
+            self.diagnostics_status.add("Error Occured",str(error)) 
+            self.publisher_diagnostics()  
+            return
+        odom_key = 'odometry'
+        coord_key = 'coordinates'
+        feature_key = 'features'
+        if coord_key in data.keys() and odom_key in data.keys():
             rospy.loginfo("odometry values found")
             self.from_odometry(data)
 
-        elif 'coordinates' in data.keys():
-            long_lat_list = data['coordinates']
-            if len(long_lat_list) >= 2:
-                self.publish_path_from_long_lat(long_lat_list)
+        elif coord_key in data.keys():
+            long_lat_list = data[coord_key]
+            if len(long_lat_list) >= self.minimum_data_len:
+                self.publish_path_from_long_lat(long_lat_list) 
             else:
                 rospy.logerr("No points available in mission file")
-                rospy.signal_shutdown("No points available in mission file")
-        elif 'features' in data.keys():
-            feature = data['features'][0]
+                self.diagnostics_status.summary(ERROR,"No points available in mission file") 
+                self.diagnostics_status.add("Coordinates Length ",len(long_lat_list)) 
+                self.publisher_diagnostics()  
+                return
+        elif feature_key in data.keys(): 
+            feature = data['features'][0] 
             # first feature
-            if feature['geometry']['type'] == "LineString":
-                rospy.loginfo("type matched to LineString")
-
-            else:
-                rospy.logerr(f"geometry does not match, Required LineString, given :{feature['geometry']['type']}")
-                rospy.signal_shutdown(
-                    f"geometry does not match, Required LineString, given :{feature['geometry']['type']}")
-
-            long_lat_list = feature['geometry']['coordinates']
-            if len(long_lat_list) >= 2:
-                self.publish_path_from_long_lat(long_lat_list)
+            if feature['geometry']['type'] == "LineString": 
+                rospy.loginfo("type matched to LineString")  
+            else: 
+                rospy.logerr(f"geometry does not match, Required LineString, given :{feature['geometry']['type']}") 
+                self.diagnostics_status.summary(ERROR,"Geometry does not match")  
+                self.diagnostics_status.add("LineString",feature['geometry']['type']) 
+                self.publisher_diagnostics()  
+                return
+            long_lat_list = feature['geometry']['coordinates'] 
+            if len(long_lat_list) >= 2: 
+                self.publish_path_from_long_lat(long_lat_list) 
             else:
                 rospy.logerr("No points available in mission file")
-                rospy.signal_shutdown("No points available in mission file")
+                self.diagnostics_status.summary(ERROR,"No points available in mission file") 
+                self.diagnostics_status.add(" Mission_data_Length ",len(long_lat_list))
+                self.publisher_diagnostics() 
+                return
         else:
             rospy.logerr("could not found proper fields in mission file")
-            rospy.signal_shutdown("No points available in mission file")
+            self.diagnostics_status.summary(ERROR,f"could not find proper field {coord_key},{odom_key} in mission file") 
+            self.diagnostics_status.add(" coord status", coord_key in data.keys()) 
+            self.diagnostics_status.add(" odom status",odom_key in data.keys() )
+            self.publisher_diagnostics()  
+            return
 
     def from_kml(self):
 
         try:
             with open(self.mission_file_dir, 'r') as geo_fence:
-                doc = geo_fence.read().encode('utf-8')
+                doc = geo_fence.read().encode('utf-8') 
         except Exception as error:
             rospy.logerr('Error In Reading mission file ' + str(error))
-            rospy.signal_shutdown('Error In Reading mission file ' + str(error))
+            self.diagnostics_status.summary(ERROR,"Error in reading Mission file") 
+            self.diagnostics_status.add("Error Ocurred ",str(error))
+            self.publisher_diagnostics() 
+            return
+        try:         
+            k = kml.KML()
+            k.from_string(doc)
+            long_lat_list = []
+            for i in k.features():
+                for j in i.features():
+                    if isinstance(j.geometry, geometry.LineString):
+                        polygon = j.geometry
+                        for coordinates in polygon.coords:
+                            # lat, long format
+                            long_lat_list.append([coordinates[0], coordinates[1]])  
 
-        k = kml.KML()
-        k.from_string(doc)
-        long_lat_list = []
-        for i in k.features():
-            for j in i.features():
-                if isinstance(j.geometry, geometry.LineString):
-                    polygon = j.geometry
-                    for coordinates in polygon.coords:
-                        # lat, long format
-                        long_lat_list.append([coordinates[0], coordinates[1]])
-                else:
-                    rospy.logerr(f"KML file format is not LineString")
-                    rospy.signal_shutdown("KML file format is not LineString")
-        if len(long_lat_list) >= 2:
-            self.publish_path_from_long_lat(long_lat_list)
-        else:
-            rospy.logerr("No points available in mission file")
-            rospy.signal_shutdown("No points available in mission file")
+            # to further publish only if they accept and run with try condition
+            if len(long_lat_list) >= 2:
+                self.publish_path_from_long_lat(long_lat_list) 
+                self.diagnostics_status.summary(OK,f"Happily published  {rospy.get_name()}") 
+                self.diagnostics_status.add("Length ",len(long_lat_list))  
+                self.publisher_diagnostics() 
+
+            else:
+                rospy.logerr("No points available in mission file")
+                self.diagnostics_status.summary(ERROR,f"only {len(long_lat_list)} points available in mission file") 
+                self.diagnostics_status.add("Length ",len(long_lat_list))
+                self.publisher_diagnostics()  
+                return
+
+        except Exception as error: 
+            rospy.logerr(f"KML file format is not LineString")
+            self.diagnostics_status.summary(ERROR,"KML not in LineString Format") 
+            self.diagnostics_status.add("Error Ocurred",str(error))
+            self.publisher_diagnostics() 
+            return
+
 
     def set_home_position(self, home_lat, home_long, home_alt=-60):
         geo_point = GeoPointStamped()
@@ -337,16 +393,23 @@ class GlobalGpsPathPub:
         self.trajectory_velocity_marker_pub.publish(trajectory_to_marker(traj_msg, self.max_forward_speed))
         rospy.loginfo("PUBLISHED GLOBAL GPS PATH")
 
-    def from_odometry(self, data):
-        data_keys = data.keys()
-        data_len = len(data['coordinates'])
-        odom_key_name = "odometry"
-        gps_key_name = "coordinates"
-        if gps_key_name in data_keys and odom_key_name in data_keys:
+    def from_odometry(self, data): 
+        data_keys = data.keys() 
+        rtk_status = data['Is_RTK_Good']
+        data_len = len(data['coordinates'])  
+        odom_key_name = "odometry" 
+        gps_key_name = "coordinates" 
+        gps_coord_key_name = "gps_coordinates"
+        if gps_key_name in data_keys and odom_key_name in data_keys and gps_coord_key_name in data_keys :
             rospy.loginfo("gps coordinates and Odometry fields are  in  mission file")
         else:
             rospy.logwarn("No gps coordinates and Odometry fields are  in  mission file")
-            sys.exit('No gps coordinates and Odometry fields are  in  mission file')
+            self.diagnostics_status.summary(ERROR,f"No field {odom_key_name} {gps_key_name} {gps_coord_key_name} in mission file") 
+            self.diagnostics_status.add("odometry field ",gps_key_name in data_keys) 
+            self.diagnostics_status.add("coordinates field ",odom_key_name in data_keys) 
+            self.diagnostics_status.add("gps coordinates fiels",gps_coord_key_name in data_keys )
+            self.publisher_diagnostics() 
+            return 
 
         # Setting home position for mavros node
         home_lat = data['coordinates'][0][1]
@@ -364,41 +427,92 @@ class GlobalGpsPathPub:
 
         # Filling the Trajectory_msg
         accumulated_distance = 0
-        prev_pose = Pose()
+        prev_pose = Pose()             
+        max_path_resolution = []
+        
+        if data_len < self.minimum_data_len: 
+            rospy.logerr(f"less than minimum_waypoints {data_len}")
+            self.diagnostics_status.summary(ERROR,f"CAUTION - {data_len} Number of Waypoints") 
+            self.diagnostics_status.add("LEN-WAYPOINTS",data_len)
+            self.publisher_diagnostics() 
+            return
+        last_index = 0
         for i in range(len(data['coordinates'])):
-
             # Odom based path
             lon, lat = data['coordinates'][i][0], data['coordinates'][i][1]
             odom_position = data['odometry'][i]['pose']['pose']['position']
             # print("odom position",odom_position)
             odom_orientation = data['odometry'][i]['pose']['pose']['orientation']
+            
             odom_pose = Pose()
             odom_pose.position.x, odom_pose.position.y, odom_pose.position.z = odom_position['x'], odom_position['y'], \
-                                                                               self.rear_axle_center_height_from_ground
+                                                                            self.rear_axle_center_height_from_ground
             odom_pose.orientation = Quaternion(odom_orientation['x'], odom_orientation['y'], odom_orientation['z'],
-                                               odom_orientation['w'])
+                                            odom_orientation['w'])
             if i == 0:
                 prev_pose = odom_pose
 
             dis = distance_btw_poses(odom_pose, prev_pose)
-            accumulated_distance = accumulated_distance + dis
-            prev_pose = odom_pose
-            if dis >= self.max_dis_btw_points:
-                # TODo interpolate
-                pass
+            # linear interpolating the highest path_resolution with parameter   
+            if dis >= self.max_dis_btw_points:  
+                # TODo interpolate  
+                # if rtk_Status and interplote param is true internal interpolation would occur  
+                if((rtk_status and self.interpolate_with_rtk)or(not rtk_status and self.interpolate_without_rtk)): 
+                    rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
+                    internal_path_res = distance_btw_poses(odom_pose,prev_pose)
+                    # rospy.loginfo_once("internal path resolution %s", str(internal_path_res))
+                    rospy.logwarn_once("Interpolating the internal path resolution is %s meters", str(internal_path_res))
+                    n_points = internal_path_res // self.path_resolution
+                    angle = angle_btw_poses(odom_pose,prev_pose)
+                    prev_pose_ = prev_pose
+                    for j in range(0, int(n_points)):
+                        # odom path
+                        px = trajectory_msg.points[-1].pose.position.x
+                        py = trajectory_msg.points[-1].pose.position.y
+                        px_updated = px + self.path_resolution * math.cos(angle)
+                        py_updated = py + self.path_resolution * math.sin(angle)
+                        odom_pose_ = Pose()
+                        odom_pose_.position.x, odom_pose_.position.y, odom_pose_.position.z = px_updated, py_updated, \
+                                                                                            self.rear_axle_center_height_from_ground
+                        odom_pose_.orientation = yaw_to_quaternion(angle)
+                        # Trajectory 
+                        lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long) 
 
+                        dis = distance_btw_poses(odom_pose_, prev_pose_)
+                        accumulated_distance = accumulated_distance + dis
+                        prev_pose_ = odom_pose_
+
+                        # Trajectory msg filling
+                        traj_pt_msg = TrajectoryPoint()
+                        traj_pt_msg.pose = odom_pose_
+                        traj_pt_msg.gps_pose.position.latitude = lat
+                        traj_pt_msg.gps_pose.position.longitude = lon
+                        # traj_pt_msg.longitudinal_velocity_mps =
+                        traj_pt_msg.index = last_index
+                        last_index = last_index + 1
+                        traj_pt_msg.accumulated_distance_m = accumulated_distance
+                        trajectory_msg.points.append(traj_pt_msg)
+                                                  
+                else:
+                    rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
+                pass  
+            
+            accumulated_distance = accumulated_distance + dis        
+            prev_pose = odom_pose 
             # Trajectory msg filling
-            traj_pt_msg = TrajectoryPoint()
-            traj_pt_msg.pose = odom_pose
+            traj_pt_msg = TrajectoryPoint() 
+            traj_pt_msg.pose = odom_pose  
             traj_pt_msg.gps_pose.position.latitude = lat
-            traj_pt_msg.gps_pose.position.longitude = lon
+            traj_pt_msg.gps_pose.position.longitude = lon  
             # traj_pt_msg.longitudinal_velocity_mps =
-            traj_pt_msg.index = i
+            traj_pt_msg.index = last_index 
+            last_index = last_index+1
             traj_pt_msg.accumulated_distance_m = accumulated_distance
-            trajectory_msg.points.append(traj_pt_msg)
+            trajectory_msg.points.append(traj_pt_msg)    
+            
         # connecting the first and last way points
-        i = i + 1
-        if self.mission_continue:
+      
+        if self.mission_continue: 
             distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[0].pose)
             rospy.loginfo("distance between first and last way point %s", str(distance))
             # if distance > self.avg_lhd:
@@ -431,7 +545,8 @@ class GlobalGpsPathPub:
                 traj_pt_msg.gps_pose.position.latitude = lat
                 traj_pt_msg.gps_pose.position.longitude = lng
                 # traj_pt_msg.longitudinal_velocity_mps =
-                traj_pt_msg.index = i + j
+                traj_pt_msg.index = last_index
+                last_index = last_index +1
                 traj_pt_msg.accumulated_distance_m = accumulated_distance
                 trajectory_msg.points.append(traj_pt_msg)
             # else:
@@ -461,24 +576,27 @@ class GlobalGpsPathPub:
             else:
                 trajectory_msg.points[i].longitudinal_velocity_mps = max(
                     self.speed_reduce_factor * np.interp(abs(delta_degrees),
-                                                         [self.steering_limits_to_slow_down,
-                                                          vehicle_data.motion_limits.max_steering_angle],
-                                                         [self.max_forward_speed,
-                                                          self.min_forward_speed]), self.min_forward_speed)
+                                                        [self.steering_limits_to_slow_down,
+                                                        vehicle_data.motion_limits.max_steering_angle],
+                                                        [self.max_forward_speed,
+                                                        self.min_forward_speed]), self.min_forward_speed)
                 # trajectory_msg.points[i].longitudinal_velocity_mps =  np.interp(abs(delta_degrees),
                 #                                                     [self.steering_limits_to_slow_down,
                 #                                                     vehicle_data.motion_limits.max_steering_angle],
                 #                                                     [self.max_forward_speed,
                 #                                                     self.min_forward_speed])
-
         marker_arr = trajectory_to_marker(trajectory_msg, self.max_forward_speed)
         self.trajectory_velocity_marker_pub.publish(marker_arr)
-        path = trajectory_to_path(trajectory_msg)
-        self.gps_path_pub.publish(path)
-        self.global_trajectory_pub.publish(trajectory_msg)
-        rospy.loginfo("global_trajectory_published")
-        rospy.loginfo('Details of ' + str(i) + " are published from file " + str(mission_file))
+        path = trajectory_to_path(trajectory_msg)  
+        self.gps_path_pub.publish(path) 
+        self.global_trajectory_pub.publish(trajectory_msg) 
+        rospy.loginfo("global_trajectory_published") 
+        rospy.loginfo('Details of ' + str(i) + " are published from file " + str(mission_file))  
+        self.diagnostics_status.summary(OK,f"Happily published  {rospy.get_name()}") 
+        self.diagnostics_status.add("Length ",len(data['coordinates']))  
+        self.publisher_diagnostics() 
 
+      
     def target_index(self, robot_pose, close_point_ind): 
         """
         search index of target point in the reference path. The following implementation was inspired from
@@ -514,15 +632,16 @@ if __name__ == "__main__":
         except Exception as e:
             rospy.logerr(f"Could not found autopilot package, consider souring it, ERROR: {e}")
             rospy.signal_shutdown(f"Could not found autopilot package, consider souring it, ERROR: {e}")
-
+    gps_path_pub = GlobalGpsPathPub(mission_file_dir)
     fail_exists = os.path.isfile(mission_file_dir)
     if not fail_exists:
-        rospy.logerr(f"mission file does not exist, path: {mission_file_dir}")
-        rospy.signal_shutdown(f"mission file does not exist, path: {mission_file_dir}")
+        rospy.logerr(f"mission file does not exist, path: {mission_file_dir}") 
+        gps_path_pub.diagnostics_status.summary(ERROR,f"mission file does not exist, path: {mission_file_dir}")
+        gps_path_pub.diagnostics_status.add(" mission file dir ",mission_file_dir)
+        gps_path_pub.publisher_diagnostics() 
+        # rospy.signal_shutdown(f"mission file does not exist, path: {mission_file_dir}") 
     else:
-        rospy.loginfo("mission file exists in file directory")
-
-    gps_path_pub = GlobalGpsPathPub(mission_file_dir)
+        rospy.loginfo("mission file exists in file directory") 
 
     if '.json' in mission_file or ".geojson" in mission_file:
         gps_path_pub.from_json()
@@ -532,5 +651,4 @@ if __name__ == "__main__":
     else:
         rospy.logerr(f"No proper extension to input mission file, path: {mission_file_dir}")
         rospy.signal_shutdown(f"No proper extension to input mission file, path: {mission_file_dir}")
-    
     rospy.spin()

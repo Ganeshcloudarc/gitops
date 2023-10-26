@@ -115,6 +115,7 @@ class VehicleSafety {
       nh.param("/vehicle_safety/use_inner_geo_fence", use_inner_geo_fence);
   float steering_diff_th = nh.param("/vehicle_safety/STEER_DIFF_TH", steering_diff_th);
   float steering_stuck_time_th = nh.param("/vehicle_safety/STEER_STUCK_TIME_TH", steering_stuck_time_th);
+  bool is_save_path = nh.param("/vehicle_safety/is_save_path", is_save_path);
   bool is_inside_geo_fence;
   bool is_with_in_no_go_zone;
   double time_to_launch;
@@ -187,6 +188,18 @@ class VehicleSafety {
 
   void callback_number(const sensor_msgs::NavSatFix &msg) {
     cov_value = msg.position_covariance;
+  }
+
+  int return_diagnostic_summary(){
+    //function to return diagnostic summary type(WARN/ERROR) based on param 
+    if (is_save_path){
+      // ROS_WARN_STREAM("CTE :::: WARN " << is_save_path);
+      return WARN;
+    }
+    else{
+      // ROS_WARN_STREAM("CTE ::: ERROR " << is_save_path);
+      return ERROR;
+    }
   }
 
   double sensor_accuracy(boost::array<double, 9> cov) {
@@ -380,7 +393,7 @@ class VehicleSafety {
             start_time = time(0);
           }
           if ((time(0) - start_time) > GPS_FIX_THR) {
-            stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT");
+            stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT. GPS 1: " + std::to_string(gps1_fix) + ", GPS 2: " + std::to_string(gps2_fix));
             stat.add("GPS1 Fix Type", gps1_fix);
             stat.add("GPS2 Fix Type", gps2_fix);
             stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
@@ -393,7 +406,7 @@ class VehicleSafety {
             stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
           }
         } else {
-          stat.summary(ERROR, "ERROR: GPS FIX LOST");
+          stat.summary(ERROR, "ERROR: GPS FIX LOST. GPS 1: " + std::to_string(gps1_fix) + ", GPS 2: " + std::to_string(gps2_fix));
           stat.add("GPS1 Fix Type", gps1_fix);
           stat.add("GPS2 Fix Type", gps2_fix);
           stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
@@ -452,10 +465,10 @@ class VehicleSafety {
 
       else {
         stat.summaryf(
-            ERROR, "No update on Tracking Controller from last : %f secs", elapsed_sec);
+            return_diagnostic_summary(), "No update on Tracking Controller from last : %f secs", elapsed_sec);
       }
     } else {
-      stat.summary(ERROR, "Waiting for Tracking Controller diagnose");
+      stat.summary(return_diagnostic_summary(), "Waiting for Tracking Controller diagnose");
     }
 
     // flag1 = 0;
@@ -464,7 +477,7 @@ class VehicleSafety {
   void heading_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat) {
     if (reset_head == 1) {
       if (mavros_head == -1) {
-        stat.summary(ERROR, "Heading None");
+        stat.summary(WARN, "Heading None");
         stat.add("Heading Value", mavros_head);
       } else {
         int found = 0;
@@ -488,7 +501,7 @@ class VehicleSafety {
             stat.add("mavros heading", mavros_head);
             stat.add("Calculated heading", calc_heading);
           } else {
-            stat.summary(ERROR, "Heading ERROR");
+            stat.summary(WARN, "Heading ERROR");
             stat.add("mavros heading", mavros_head);
             stat.add("Calculated heading", calc_heading);
           }
@@ -497,7 +510,7 @@ class VehicleSafety {
         found = 0;
       }
     } else {
-      stat.summary(ERROR, "Heading ERROR");
+      stat.summary(WARN, "Heading ERROR");
       stat.add("mavros heading", mavros_head);
       stat.add("Calculated heading", calc_heading);
     }
