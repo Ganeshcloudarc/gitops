@@ -16,6 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   tf2_geometry_msgs
   lidar_obstacle_detector
+  costmap_2d
+  autopilot_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -110,7 +112,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES auto_nav
- CATKIN_DEPENDS roscpp rospy std_msgs pcl_ros tf2_ros tf2_geometry_msgs lidar_obstacle_detector
+ CATKIN_DEPENDS roscpp rospy std_msgs pcl_ros tf2_ros tf2_geometry_msgs lidar_obstacle_detector costmap_2d autopilot_msgs laser_geometry
 #  DEPENDS system_lib
 )
 
@@ -136,6 +138,11 @@ ${catkin_INCLUDE_DIRS}
 # add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_executable(pointcloud_map_node src/PointcloudMap/pointcloud_map.cpp)
 # set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+add_executable(costmap_sub src/cpp/costmap_node.cpp)
+
+add_executable(autonav_core_node src/cpp/autonav_core.cpp)
+add_executable(sample_pub src/cpp/sample_pub.cpp)
+
 
 # add_dependencies(local_pointcloud_map_node 
 #   ${${PROJECT_NAME}_EXPORTED_TARGETS}
@@ -148,7 +155,22 @@ target_link_libraries(pointcloud_map_node
   # ${${PROJECT_NAME}_LIBRARY}
   # ${PROJECT_NAME}
 )
+target_link_libraries(costmap_sub
+  ${catkin_LIBRARIES}
+  # ${${PROJECT_NAME}_LIBRARY}
+  # ${PROJECT_NAME}
+)
 
+target_link_libraries(autonav_core_node
+  ${catkin_LIBRARIES}
+  # ${${PROJECT_NAME}_LIBRARY}
+  # ${PROJECT_NAME}
+)
+target_link_libraries(sample_pub
+  ${catkin_LIBRARIES}
+  # ${${PROJECT_NAME}_LIBRARY}
+  # ${PROJECT_NAME}
+)
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context

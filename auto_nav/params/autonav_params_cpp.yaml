@@ -1,0 +1,32 @@
+loop_frequency : 10 
+enable_moving_avg_filter : true
+moving_avg_filter_window_size : 20
+pub_debug_topics : true
+use_previous_line : false 
+end_point_reach_th : 3
+local_traj_length : 8
+
+orchard_details:
+  row_spacing : 6.2
+  tree_width : 2.3
+  tree_width_tolerance : 0.3
+
+turnings:
+  forward_point_dis : 2
+  radius_to_check_turn : 15
+  mininum_turn_radius : 6
+
+ransac:
+  max_iterations : 50
+
+dwa:
+  enable : true
+  costmap_topic : "/costmap_node/costmap/costmap"
+  wheel_base : 2.5
+  constant_speed : 1
+  steering_agle_lim : 30
+  steering_angle_increment : 1
+  path_len : 6
+  path_resolution : 0.1
+
+
