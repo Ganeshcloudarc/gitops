@@ -717,20 +717,18 @@ class ObstacleStopPlanner:
 
     def zed_objects_callback(self, data):
         start = time.time()
-        self.zed_data_in_time = time.time()
+        # self.zed_data_in_time = time.time()
         data_in_map_frame = None
-        # for i in data.objects:
-        #     print(i)
         if data.header.frame_id == "map":
             data_in_map_frame = data
-        else:
+        else: 
             data_in_map_frame = transform_zed_objects(data, "map")
-        # data_in_map_frame = data
-        # self.zed_objects = data
+            
+        # transform_zed_objects() fn returns None on TF Error
         if data_in_map_frame is not None:
+            self.zed_data_in_time = time.time() # start time only when no tf error
             self.transformed_zed_objects_publisher.publish(data_in_map_frame)
             self.zed_objects = data_in_map_frame
-
         rospy.logdebug(f"time taken for zed objects callback: {time.time() - start} ")
 
     def find_close_object_zed(self, objects, point):
