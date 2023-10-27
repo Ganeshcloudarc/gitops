@@ -43,6 +43,7 @@ namespace auto_nav
             if (lineMagnitude < 1e-9) {
                 distance = v1.norm(); // P1 and P2 are very close, so return the distance to P1
             }
+            distance /= lineMagnitude;
             if (abs(distance) <= offset)
                 inliers_inds.push_back(i);
         }
