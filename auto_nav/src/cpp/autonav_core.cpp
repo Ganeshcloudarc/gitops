@@ -326,7 +326,7 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             { Eigen::Vector3d point = local_map_points[i];
               point[2] = 0.0;
               double distance_to_line = distanceToLine(point,L1,L2);
-              if (abs(distance_to_line) < 6)
+              if (abs(distance_to_line) < row_spacing)
               {
                 all_close_points.push_back(point);
                 if(distance_to_line >0)
