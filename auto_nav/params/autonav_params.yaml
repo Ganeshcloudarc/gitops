@@ -24,8 +24,8 @@ auto_nav:
     max_iterations : 50 # number of iterations to find the best line fit using the ransac linear regression method.
 
   moving_avarage_filter:
-    enable : True
+    enable : true
     window_size : 10 # How many previous lines to average.
 
-  use_previous_line : true # To use best ransac line which is collision free, Vehicle might not go in exact center after keepin, But maintains to go between the tree.
+  use_previous_line : False # To use best ransac line which is collision free, Vehicle might not go in exact center after keepin, But maintains to go between the tree.
 
