@@ -24,8 +24,8 @@ patrol:
   enable_cte_based_speed_control : True
 
 pure_pursuit:
-  min_look_ahead_dis : 2 # meters
-  max_look_ahead_dis : 4 # meters
+  min_look_ahead_dis : 3 # meters
+  max_look_ahead_dis : 6 # meters
   speed_to_lookahead_ratio : 1
   speed_curvature_ratio : 2
   kp_speed : 0.5 # The speed control gain to adjust speed based on cte.
