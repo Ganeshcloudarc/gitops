@@ -201,6 +201,9 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
 
     ros::Rate loop_rate(loop_frequency);
     int close_index = -1;
+    int turn_start_index = -1;
+    int turn_end_index = -1;
+
     
     DwaPathGenerator dwa_path_gen(dwa_wheel_base, dwa_steering_agle_lim, dwa_constant_speed, dwa_path_len, dwa_path_resolution);
       if (pub_debug_topics)
@@ -253,6 +256,9 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             close_index = 1;
             loop_rate.sleep();
             ros::spinOnce();
+            in_turn_status = false;
+            turn_start_index = -1;
+            turn_end_index = -1;
             continue;
             
           }
@@ -269,34 +275,70 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
         front_pose_pub.publish(pst);
         ROS_DEBUG("front pose is publshed");
         }
-   
+
         // Checking for Turning point whose every point is 2 meters apart
-        int p2_index = traj_helper.next_point_within_dist(close_index, forward_point_dis);
+        int p1_index = traj_helper.next_point_within_dist(close_index, forward_point_dis);
+
+        int p2_index = traj_helper.next_point_within_dist(p1_index, forward_point_dis);
+        
         int p3_index = traj_helper.next_point_within_dist(p2_index, forward_point_dis);
-        vector<double> p1 = {traj_helper.get_trajectory_point_by_index(close_index).pose.position.x, traj_helper.get_trajectory_point_by_index(close_index).pose.position.y};
+        vector<double> p1 = {traj_helper.get_trajectory_point_by_index(p1_index).pose.position.x, traj_helper.get_trajectory_point_by_index(p1_index).pose.position.y};
         vector<double> p2 = {traj_helper.get_trajectory_point_by_index(p2_index).pose.position.x, traj_helper.get_trajectory_point_by_index(p2_index).pose.position.y};
         vector<double> p3 = {traj_helper.get_trajectory_point_by_index(p3_index).pose.position.x, traj_helper.get_trajectory_point_by_index(p3_index).pose.position.y};
         float circum_radius = auto_nav::circumRadius(p1,p2,p3);
         ROS_DEBUG_STREAM("circum_radius : "<<circum_radius);
-
-        if (abs(circum_radius) < radius_to_check_turn or in_turn_status == true)
+        auto close_pose = traj_helper.get_trajectory_point_by_index(close_index).pose;
+        Vector3d start_point_v(cos(tf::getYaw(close_pose.orientation)), sin(tf::getYaw(close_pose.orientation)), 0);
+        if (abs(circum_radius) < radius_to_check_turn or in_turn_status == true )
         { 
-          
-          
+        
           ROS_WARN("Turn detected");
-          autopilot_msgs::Trajectory turn_traj;
-          turn_traj.header.frame_id = "map";
-          for(int i = close_index; i <traj_helper.getLength(); i++)
-          { 
+          if (turn_start_index == -1 and turn_end_index == -1)
+          {
+            turn_start_index = close_index;
+            for(int i = turn_start_index; i <traj_helper.getLength(); i++)
+            { 
+              auto traj_pose= traj_helper.get_trajectory_point_by_index(i).pose;
+              Vector3d end_point_v(traj_pose.position.x- close_pose.position.x, traj_pose.position.y- close_pose.position.y, 0);
+              float dot_pro = start_point_v.dot(end_point_v);
+              ROS_DEBUG_STREAM("dot pro : " <<dot_pro);
+              if (dot_pro < 0)
+              {
+                
+                break;
+              }
+              
+              turn_end_index = i;
+              in_turn_status = true;
+          }}
+          if (close_index > turn_end_index)
+            {in_turn_status = false;
+            turn_start_index = -1;
+             turn_end_index = -1;
 
-            if (abs(traj_helper.get_trajectory_point_by_index(i).accumulated_distance_m - traj_helper.get_trajectory_point_by_index(close_index).accumulated_distance_m) > local_traj_length)
-            {
-              break;
             }
-
+          autopilot_msgs::Trajectory turn_traj;
+          nav_msgs::Path turn_path;
+          turn_traj.header.frame_id = "map";
+          turn_path.header.frame_id = "map";
+          int loop_end_index;
+          if(turn_end_index+60 < traj_helper.getLength())
+              loop_end_index = turn_end_index+60;
+          else
+              loop_end_index = traj_helper.getLength();
+          for(int i = close_index; i <loop_end_index; i++)
+          { 
+            ROS_DEBUG_STREAM("i :" << i);
+            ROS_DEBUG_STREAM("lenght :" <<traj_helper.getLength());
             turn_traj.points.push_back(traj_helper.get_trajectory_point_by_index(i));
+            geometry_msgs::PoseStamped pst;
+            pst.header.frame_id = "map";
+            pst.pose = traj_helper.get_trajectory_point_by_index(i).pose;
+            turn_path.poses.push_back(pst);
           }
           local_traj_pub.publish(turn_traj);
+          local_path_pub.publish(turn_path);
+
           ROS_INFO("Turn trajectory published");
           slope_list.clear();
           intercept_list.clear();
