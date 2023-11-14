@@ -33,6 +33,7 @@
 #include "dwa_path_ganerator.cpp"
 #include <tf2/LinearMath/Quaternion.h>
 #include "costmap_manager.hpp"
+#include <costmap_2d/costmap_2d_ros.h>
 using namespace kiss_icp_ros::utils;
 
 namespace auto_nav
@@ -60,7 +61,7 @@ class AutoNavCore
         ros::Publisher local_traj_pub,local_path_pub, center_line_pub, left_line_pub, right_line_pub, path_percent_publisher, front_pose_pub;
         ros::Publisher map_point_cloud_pub, left_liners_cloud_pub,right_inliers_cloud_pub;
         ros::Publisher lanes_marker_pub, dwa_marker_pub, dwa_collsion_free_marker_pub, ransac_samples_pub;
-        ros::Publisher vibration_path_pub;
+        ros::Publisher vibration_path_pub, dwa_best_traj_marker_pub;
         nav_msgs::Odometry::ConstPtr curr_odom;
         autopilot_msgs::Trajectory local_traj, global_traj;
         sensor_msgs::LaserScan::ConstPtr curr_scan, curr_local_scan;
@@ -69,9 +70,9 @@ class AutoNavCore
         bool odom_data_received, global_traj_data_received, curr_scan_data_received, curr_local_scan_data_receiced;
         laser_geometry::LaserProjection scan_projector;
         laser_geometry::LaserProjection local_scan_projector;
-        //  costmap_2d::Costmap2DROS* costmap_ros;
+         costmap_2d::Costmap2DROS* costmap_ros_;
 
-        //  costmap_2d::Costmap2D costmap_;
+         costmap_2d::Costmap2D* costmap_;
         OccupencyGridManager* occ_manager;
         vector<double> slope_list;
         vector<double> intercept_list;
@@ -99,7 +100,8 @@ odom_data_received(false), global_traj_data_received(false), curr_scan_data_rece
 {
   ros::NodeHandle private_nh("~");
   loadParams(private_nh);
-  // costmap_ros = new costmap_2d::Costmap2DROS("/costmap_node/costmap/costmap", tf2_buffer);
+  if(use_dwa)
+    costmap_ros_ = new costmap_2d::Costmap2DROS("/costmap", tf2_buffer);
   // ROS_DEBUG_STREAM(costmap_ros->getGlobalFrameID());
   scan_sub = private_nh.subscribe<sensor_msgs::LaserScan>("/laser_scan", 1, &AutoNavCore::scanCallback, this);
   local_scan_sub = private_nh.subscribe<sensor_msgs::LaserScan>("/local_cloud_laser_scan", 1, &AutoNavCore::localScanCallback, this);
@@ -122,6 +124,8 @@ odom_data_received(false), global_traj_data_received(false), curr_scan_data_rece
   right_inliers_cloud_pub = private_nh.advertise<sensor_msgs::PointCloud2>("/right_inliers", 1);
   dwa_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("/dwa_paths", 1,true);
   dwa_collsion_free_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("/dwa_paths_collsion_free", 1,true);
+  dwa_best_traj_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("/dwa_best_traj", 1,true);
+
   ransac_samples_pub = private_nh.advertise<visualization_msgs::Marker>("/ransac_samples", 1,true);
   vibration_path_pub =  private_nh.advertise<nav_msgs::Path>("vibration_path", 1);
   }
@@ -177,10 +181,10 @@ void AutoNavCore::loadParams(ros::NodeHandle private_nh)
 
 void AutoNavCore::main_loop(ros::NodeHandle private_nh)
 {   
-    if(use_dwa)
-      {
-        occ_manager = new OccupencyGridManager(private_nh, costmap_topic, true);
-      }
+    // if(use_dwa)
+    //   {
+    //     occ_manager = new OccupencyGridManager(private_nh, costmap_topic, true);
+    //   }
     //intial sensor check
     ros::Rate rate(5);
     while(ros::ok())
@@ -203,6 +207,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
     int close_index = -1;
     int turn_start_index = -1;
     int turn_end_index = -1;
+    bool reset_costmap = true;
+
 
     
     DwaPathGenerator dwa_path_gen(dwa_wheel_base, dwa_steering_agle_lim, dwa_constant_speed, dwa_path_len, dwa_path_resolution);
@@ -694,8 +700,13 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           if(use_dwa)
           {
 
+            //initialize the copy of the costmap the controller will use
+            costmap_ = costmap_ros_->getCostmap();
+            // costmap_->raytraceLine(start_point_center_lane.x, start_point_center_lane.y, forward_point_center_lane.x, forward_point_center_lane.y);
+
           // Checking collsions on center line on costmap
-          pair<bool, unsigned char> center_collision = occ_manager->get_line_cost_world(start_point_center_lane.x, start_point_center_lane.y, forward_point_center_lane.x, forward_point_center_lane.y);
+          pair<bool, unsigned char> center_collision = raytraceLineCost(*costmap_, start_point_center_lane.x, start_point_center_lane.y, forward_point_center_lane.x, forward_point_center_lane.y);
+          ROS_DEBUG_STREAM("first" <<center_collision.first <<" second : " <<static_cast<unsigned int>(center_collision.second));
           if (center_collision.first)
           {
             if (center_collision.second == 0)
@@ -729,11 +740,11 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             { unsigned int mx,my;
               // ROS_DEBUG_STREAM("world to map :"<<"x : "<<dwa_paths[i][j][0] <<"y :" <<dwa_paths[i][j][1]<<"cost_val :" <<occ_manager->costmap_2d.worldToMap(dwa_paths[i][j][0], dwa_paths[i][j][1], mx, my));
                 
-              if (occ_manager->costmap_2d.worldToMap(dwa_paths[i][j][0], dwa_paths[i][j][1], mx, my))
+              if (costmap_->worldToMap(dwa_paths[i][j][0], dwa_paths[i][j][1], mx, my))
               { 
                 
                 // ROS_DEBUG_STREAM("cell cost : "<<static_cast<unsigned int>(occ_manager->costmap_2d.getCost(mx, my)));
-                if (occ_manager->costmap_2d.getCost(mx, my) != 0)
+                if (costmap_->getCost(mx, my) != 0)
                 {
                   collision_found  = true;
                   break;
@@ -754,17 +765,26 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           
 
           ROS_DEBUG_STREAM("collision free patths len: "<<collision_free_path_ids.size());
+          ROS_DEBUG_STREAM("costmap reset status : "<< reset_costmap );
           if (collision_free_path_ids.size() == 0)
           {
             ROS_ERROR("Could not found collision free  published");
+            // costmap_ = costmap_ros_->getCostmap();
+            if (reset_costmap == true)
+             { costmap_ros_->resetLayers();
+               reset_costmap = false;
+             }
             loop_rate.sleep();
             ros::spinOnce();
             continue;
 
           }
-          
-          // dwa_collsion_free_marker_pub.publish(dwa_path_gen.get_dwa_paths_marker_array(collision_free_paths, "map"));
+          reset_costmap = true;
+
+          if(pub_debug_topics){
+          dwa_collsion_free_marker_pub.publish(dwa_path_gen.get_dwa_paths_marker_array(collision_free_paths, "map"));
           ROS_DEBUG_STREAM("collision_free_paths published");
+          }
           // selecting the final path, closest to center line.
           // geometry_msgs::Point robot_point, robot_forward_point,start_point_center_lane, forward_point_center_lane ;
           // double moving_avg_center_lane_heading = atan(forward_point_center_lane.y - start_point_center_lane.y / forward_point_center_lane.x - start_point_center_lane.x);
@@ -801,8 +821,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           }
           if(pub_debug_topics)
           {
-            dwa_collsion_free_marker_pub.publish(dwa_path_gen.get_dwa_paths_marker_array(collision_free_paths[min_cost_index], "map"));
-            ROS_DEBUG_STREAM("collision_free_paths published");
+            dwa_best_traj_marker_pub.publish(dwa_path_gen.get_dwa_paths_marker_array(collision_free_paths[min_cost_index], "map"));
+            ROS_DEBUG_STREAM("DWA_best_traj published");
           }
 
 

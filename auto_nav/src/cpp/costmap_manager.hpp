@@ -5,6 +5,67 @@
 #include<cmath>
 using namespace std;
 namespace auto_nav{
+        std::pair<bool,unsigned char> raytraceLineCost(costmap_2d::Costmap2D &costmap,double x1, double y1, double x2, double y2)
+        {
+            unsigned int mx1,my1,mx2,my2;
+            if (costmap.worldToMap(x1, y1, mx1, my1) and costmap.worldToMap(x2, y2, mx2, my2))
+            {
+                // unsigned char cost=  get_line_cost_map(mx1,my1,mx2,my2);
+
+                 unsigned char cost;
+                // Calculate differences and absolute differences between coordinates
+                int dx_ = mx2 - mx1;
+                int dy_ = my2 - my1;
+                int dx = abs(dx_);
+                int dy = abs(dy_);
+                //  calculate the direction of the line
+                // int sx = 1 if x1 < x2 else -1
+                // int sy = 1 if y1 < y2 else -1
+                int sx = (mx1<mx2) ? 1 : -1;
+                int sy = (my1<my2) ? 1 :-1;
+                int error = dx-dy;
+
+                int x,y;
+                x = mx1;
+                y = my1;
+                bool collision_found;
+                // cout<<x1<<" "<<y1<<" "<<endl;
+                // cout<<x2<<" "<<y2<<" "<<endl;
+                while (x != mx2 or y !=my2 )
+                {   //cout<<"x : " <<x <<" y : "<<y1;
+                    int double_error = 2 * error;
+                    if (double_error > -dy){
+                        error -= dy;
+                        x+=sx;
+                    }
+                    if (double_error < dx){
+                            error += dx;
+                            y += sy;
+                    }
+                
+                    cost = costmap.getCost(x, y);
+                    // cout<<"x :" <<x<<" y:"<<y<<endl;
+                    // cout<<"cost :"<<static_cast<unsigned int>(cost)<<endl;
+                    if (cost != 0)
+                        {   //cout<<"COST is not ZERO"<<endl;
+                            return std::make_pair(true, cost);
+                        }
+                
+                }
+
+                //  cout<<"REACHED END OF LOOP"<<endl;
+                unsigned char c = 0;
+                std::make_pair(true, c);
+            }
+            else
+            {
+                return std::make_pair(false, 0);
+            }
+        
+        }
+
+
+    
 
 
 class OccupencyGridManager
