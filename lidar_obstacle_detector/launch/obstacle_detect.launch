@@ -13,6 +13,8 @@
   <node name="obstacle_detector_node" pkg="lidar_obstacle_detector" type="obstacle_detector_node" output="screen">
     <!-- Input Topic Names -->
     <param name="lidar_points_topic"                  value="$(arg points_in)"/>
+    <rosparam command="load" file="$(find boson_hmi)/params/modified_hmi_param.yaml"/>
+
 
     <!-- Output Topic Names -->
     <param name="cloud_ground_topic"                  value="obstacle_detector/cloud_ground"/>
