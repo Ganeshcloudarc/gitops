@@ -8,7 +8,12 @@
     <arg name="lslidar" default="false"/>
 
     <arg name="cloud_in" default="/rslidar_points"/>
-    <arg name="pointcloud_to_laserscan_cloud_in" default="/obstacle_detector/cloud_clusters"/>
+    <!-- 
+            /obstacle_detector/cloud_clusters : It is subjected to get effected by the changes from RQT in live.
+            If you don't want that use the below line.
+            <arg name="cloud_in" value="/obstacle_detector/object_cloud"/> -->
+    <!-- <arg name="pointcloud_to_laserscan_cloud_in" default="/obstacle_detector/cloud_clusters"/> -->
+    <arg name="pointcloud_to_laserscan_cloud_in" default="/obstacle_detector/object_cloud"/>
     <arg name="cloud_to_scan_config" default="cloud_to_laser_180_params.yaml"/>
     <arg name="lidar_obstacle_detector_config" default="rs_lidar_config.yaml"/>
     <param name = "/obstacle_stop_planner/mission_continue" value = "$(arg mission_continue)"/>

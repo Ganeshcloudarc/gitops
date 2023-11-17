@@ -60,6 +60,7 @@ class ObstacleDetectorNode
   ros::Subscriber sub_lidar_points;
   ros::Publisher pub_cloud_ground;
   ros::Publisher pub_cloud_clusters;
+  ros::Publisher pub_object_cloud;
   ros::Publisher pub_jsk_bboxes;
   ros::Publisher pub_autoware_objects;
   dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
@@ -70,13 +71,15 @@ class ObstacleDetectorNode
   jsk_recognition_msgs::BoundingBox transformJskBbox(const Box& box, const std_msgs::Header& header, const geometry_msgs::Pose& pose_transformed);
   autoware_msgs::DetectedObject transformAutowareObject(const Box& box, const std_msgs::Header& header, const geometry_msgs::Pose& pose_transformed);
   void publishDetectedObjects(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>&& cloud_clusters, const std_msgs::Header& header);
+
+ 
 };
 
 // Dynamic parameter server callback function
 void dynamicParamCallback(lidar_obstacle_detector::obstacle_detector_Config& config, uint32_t level)
 {
   // Pointcloud Filtering Parameters
-  ROS_INFO("dynamicParamCallback");
+  // ROS_DEBUG("dynamicParamCallback");
   USE_PCA_BOX = config.use_pca_box;
   USE_TRACKING = config.use_tracking;
   VOXEL_GRID_SIZE = config.voxel_grid_size;
@@ -99,12 +102,14 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
   std::string lidar_points_topic;
   std::string cloud_ground_topic;
   std::string cloud_clusters_topic;
+  std::string object_cloud_topic;
   std::string jsk_bboxes_topic;
   std::string autoware_objects_topic;
   
   ROS_ASSERT(private_nh.getParam("lidar_points_topic", lidar_points_topic));
   ROS_ASSERT(private_nh.getParam("cloud_ground_topic", cloud_ground_topic));
   ROS_ASSERT(private_nh.getParam("cloud_clusters_topic", cloud_clusters_topic));
+  ROS_ASSERT(private_nh.getParam("object_cloud_topic", object_cloud_topic));
   ROS_ASSERT(private_nh.getParam("jsk_bboxes_topic", jsk_bboxes_topic));
   ROS_ASSERT(private_nh.getParam("autoware_objects_topic", autoware_objects_topic));
   ROS_ASSERT(private_nh.getParam("bbox_target_frame", bbox_target_frame_));
@@ -114,47 +119,50 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
   sub_lidar_points = nh.subscribe(lidar_points_topic, 1, &ObstacleDetectorNode::lidarPointsCallback, this);
   pub_cloud_ground = nh.advertise<sensor_msgs::PointCloud2>(cloud_ground_topic, 1);
   pub_cloud_clusters = nh.advertise<sensor_msgs::PointCloud2>(cloud_clusters_topic, 1);
+  pub_object_cloud = nh.advertise<sensor_msgs::PointCloud2>(object_cloud_topic, 1);
   pub_jsk_bboxes = nh.advertise<jsk_recognition_msgs::BoundingBoxArray>(jsk_bboxes_topic, 1);
   pub_autoware_objects = nh.advertise<autoware_msgs::DetectedObjectArray>(autoware_objects_topic, 1);
-
+  // Dynamic Parameter Server & Function
+  // f = boost::bind(&dynamicParamCallback, _1, _2);
+  // server.setCallback(f);
   bool use_recon;
   private_nh.getParam("rqt_reconfigure", use_recon);
   if (use_recon)
   {
-    ROS_INFO("rqt is true");
-  //   dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
-  //   dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config>::CallbackType f;
+    ROS_DEBUG("rqt is true");
+    // dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config> server;
+    // dynamic_reconfigure::Server<lidar_obstacle_detector::obstacle_detector_Config>::CallbackType f;
 
-  //   // // Dynamic Parameter Server & Function
+    // // Dynamic Parameter Server & Function
     f = boost::bind(&dynamicParamCallback, _1, _2);
     server.setCallback(f);
   }
   else
   {
-    ROS_INFO("rqt is False");
-    private_nh.getParam("use_pca_box", USE_PCA_BOX);
-    private_nh.getParam("use_tracking", USE_TRACKING);
-    private_nh.getParam("voxel_grid_size", VOXEL_GRID_SIZE);
+    ROS_DEBUG("rqt is False");
+    private_nh.getParam("/lidar_obstacle_detector/use_pca_box", USE_PCA_BOX);
+    private_nh.getParam("/lidar_obstacle_detector/use_tracking", USE_TRACKING);
+    private_nh.getParam("/lidar_obstacle_detector/voxel_grid_size", VOXEL_GRID_SIZE);
     float roi_max_x, roi_max_y, roi_max_z;
     float roi_min_x, roi_min_y, roi_min_z;
     float crop_box_max_x, crop_box_max_y, crop_box_max_z;
     float crop_box_min_x, crop_box_min_y, crop_box_min_z;
 
-    private_nh.getParam("roi_max_x", roi_max_x);
-    private_nh.getParam("roi_max_y", roi_max_y);
-    private_nh.getParam("roi_max_z", roi_max_z);
+    private_nh.getParam("/lidar_obstacle_detector/roi_max_x", roi_max_x);
+    private_nh.getParam("/lidar_obstacle_detector/roi_max_y", roi_max_y);
+    private_nh.getParam("/lidar_obstacle_detector/roi_max_z", roi_max_z);
 
-    private_nh.getParam("roi_min_x", roi_min_x);
-    private_nh.getParam("roi_min_y", roi_min_y);
-    private_nh.getParam("roi_min_z", roi_min_z);
+    private_nh.getParam("/lidar_obstacle_detector/roi_min_x", roi_min_x);
+    private_nh.getParam("/lidar_obstacle_detector/roi_min_y", roi_min_y);
+    private_nh.getParam("/lidar_obstacle_detector/roi_min_z", roi_min_z);
 
-    private_nh.getParam("crop_box_max_x", crop_box_max_x);
-    private_nh.getParam("crop_box_max_y", crop_box_max_y);
-    private_nh.getParam("crop_box_max_z", crop_box_max_z);
+    private_nh.getParam("/lidar_obstacle_detector/crop_box_max_x", crop_box_max_x);
+    private_nh.getParam("/lidar_obstacle_detector/crop_box_max_y", crop_box_max_y);
+    private_nh.getParam("/lidar_obstacle_detector/crop_box_max_z", crop_box_max_z);
 
-    private_nh.getParam("crop_box_min_x", crop_box_min_x);
-    private_nh.getParam("crop_box_min_y", crop_box_min_y);
-    private_nh.getParam("crop_box_min_z", crop_box_min_z);
+    private_nh.getParam("/lidar_obstacle_detector/crop_box_min_x", crop_box_min_x);
+    private_nh.getParam("/lidar_obstacle_detector/crop_box_min_y", crop_box_min_y);
+    private_nh.getParam("/lidar_obstacle_detector/crop_box_min_z", crop_box_min_z);
 
 
     ROI_MAX_POINT = Eigen::Vector4f(roi_max_x, roi_max_y, roi_max_z, 1);
@@ -163,16 +171,16 @@ ObstacleDetectorNode::ObstacleDetectorNode() : tf2_listener(tf2_buffer)
     CROP_BOX_MIN_POINT = Eigen::Vector4f(crop_box_min_x, crop_box_min_y, crop_box_min_z, 1);
 
 
-    private_nh.getParam("ground_threshold", GROUND_THRESH);
-    private_nh.getParam("cluster_threshold", CLUSTER_THRESH);
-    private_nh.getParam("cluster_max_size", CLUSTER_MAX_SIZE);
-    private_nh.getParam("cluster_min_size", CLUSTER_MIN_SIZE);
-    private_nh.getParam("displacement_threshold", DISPLACEMENT_THRESH);
+    private_nh.getParam("/lidar_obstacle_detector/ground_threshold", GROUND_THRESH);
+    private_nh.getParam("/lidar_obstacle_detector/cluster_threshold", CLUSTER_THRESH);
+    private_nh.getParam("/lidar_obstacle_detector/cluster_max_size", CLUSTER_MAX_SIZE);
+    private_nh.getParam("/lidar_obstacle_detector/cluster_min_size", CLUSTER_MIN_SIZE);
+    private_nh.getParam("/lidar_obstacle_detector/displacement_threshold", DISPLACEMENT_THRESH);
 
-    private_nh.getParam("iou_threshold", IOU_THRESH);
-    private_nh.getParam("neighbors", NEIGHOBORS);
-    private_nh.getParam("standard_deviation", STANDARD_DEVIATION);
-    ROS_DEBUG_STREAM("Cluster Threshold" << CLUSTER_THRESH);
+    private_nh.getParam("/lidar_obstacle_detector/iou_threshold", IOU_THRESH);
+    private_nh.getParam("/lidar_obstacle_detector/neighbors", NEIGHOBORS);
+    private_nh.getParam("/lidar_obstacle_detector/standard_deviation", STANDARD_DEVIATION);
+    ROS_DEBUG_STREAM("/lidar_obstacle_detector/Cluster Threshold " << CLUSTER_THRESH);
 
 
   }
@@ -223,7 +231,7 @@ void ObstacleDetectorNode::publishClouds(const std::pair<pcl::PointCloud<pcl::Po
   obstacle_cloud->header = header;
 
   pub_cloud_ground.publish(std::move(ground_cloud));
-  pub_cloud_clusters.publish(std::move(obstacle_cloud));
+  pub_object_cloud.publish(std::move(obstacle_cloud));
 }
 
 jsk_recognition_msgs::BoundingBox ObstacleDetectorNode::transformJskBbox(const Box& box, const std_msgs::Header& header, const geometry_msgs::Pose& pose_transformed)
@@ -260,16 +268,36 @@ autoware_msgs::DetectedObject ObstacleDetectorNode::transformAutowareObject(cons
 
 void ObstacleDetectorNode::publishDetectedObjects(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>&& cloud_clusters, const std_msgs::Header& header)
 {
+  ROS_DEBUG_STREAM("Cluster" << CLUSTER_THRESH);
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cluster_clouds; // Store all cluster clouds
+
   for (auto& cluster : cloud_clusters)
   {
     // Create Bounding Boxes
-    Box box = USE_PCA_BOX? 
-      obstacle_detector->pcaBoundingBox(cluster, obstacle_id_) : 
+    Box box = USE_PCA_BOX ?
+      obstacle_detector->pcaBoundingBox(cluster, obstacle_id_) :
       obstacle_detector->axisAlignedBoundingBox(cluster, obstacle_id_);
-    
-    obstacle_id_ = (obstacle_id_ < SIZE_MAX)? ++obstacle_id_ : 0;
+
+    obstacle_id_ = (obstacle_id_ < SIZE_MAX) ? ++obstacle_id_ : 0;
     curr_boxes_.emplace_back(box);
+
+    cluster_clouds.push_back(cluster); // Store the cluster cloud
   }
+
+  // merge all cluster clouds into one
+  pcl::PointCloud<pcl::PointXYZ>::Ptr all_cluster_clouds(new pcl::PointCloud<pcl::PointXYZ>);
+  for (const auto& cluster_cloud : cluster_clouds)
+  {
+    *all_cluster_clouds += *cluster_cloud;
+  }
+
+  // Convert the merged point cloud to sensor_msgs::PointCloud2
+  sensor_msgs::PointCloud2::Ptr all_cluster_clouds_msg(new sensor_msgs::PointCloud2);
+  pcl::toROSMsg(*all_cluster_clouds, *all_cluster_clouds_msg);
+  all_cluster_clouds_msg->header = header;
+
+  ROS_INFO_THROTTLE(10, "Publishing All Cluster Clouds");
+  pub_cloud_clusters.publish(all_cluster_clouds_msg); // Publish all cluster clouds at once
 
   // Re-assign Box ids based on tracking result
   if (USE_TRACKING)

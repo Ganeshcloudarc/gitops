@@ -1,32 +1,40 @@
-use_pca_box: False
-use_tracking: False
+lidar_obstacle_detector:
+  use_pca_box: False
+  use_tracking: False
 
-voxel_grid_size: 0.2
-roi_max_x: 70
-roi_max_y : 30
-roi_max_z : 1
+  voxel_grid_size: 0.2
+  roi_max_x: 70
+  roi_max_y : 30
+  roi_max_z : 1
 
-roi_min_x: 0
-roi_min_y: -30
-roi_min_z: -2
+  roi_min_x: 0
+  roi_min_y: -30
+  roi_min_z: -2
 
-crop_box_max_x: 0
-crop_box_max_y: 0
-crop_box_max_z: 0
+  crop_box_max_x: 0
+  crop_box_max_y: 0
+  crop_box_max_z: 0
 
-crop_box_min_x: 0
-crop_box_min_y: 0
-crop_box_min_z: 0
+  crop_box_min_x: 0
+  crop_box_min_y: 0
+  crop_box_min_z: 0
 
-neighbors : 50
-standard_deviation : 1
+  neighbors : 50
+  standard_deviation : 1
 
-ground_threshold: 0.4
+  ground_threshold: 0.4
 
-cluster_threshold: 0.7
-cluster_max_size: 5000
-cluster_min_size: 9
+  cluster_threshold: 0.7 # 70 cm
+  cluster_max_size: 5000
+  cluster_min_size: 9
 
-displacement_threshold: 1.0
-iou_threshold: 1.0
+  displacement_threshold: 1.0
+  iou_threshold: 1.0
 
+
+# Be careful setting the right value for cluster_threshold. 
+# If you take a very small value, it can happen that an actual object can be seen as multiple clusters.
+# On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster.
+# So our recommendation is to just test and try out which value suits your dataset.
+
+# We impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points.
