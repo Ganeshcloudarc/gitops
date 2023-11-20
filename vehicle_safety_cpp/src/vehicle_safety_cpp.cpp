@@ -96,7 +96,7 @@ class VehicleSafety {
   float curr_coordinates_lat = 0, curr_coordinates_long = 0;
   double gps_accuracy = -1, sensor_accuracy_value, GPS_ACC_IDEAL, GPS_ACC_THR;
   int calc_heading = 0;
-  int gps1_fix, gps2_fix;
+  int gps1_fix, gps2_fix, gps1_h_acc_data,gps1_h_acc_th_mm;
   float position_covariance;
   long start_time_gps, start_time;
   long gps_lost_time, gps_start_time;
@@ -116,6 +116,7 @@ class VehicleSafety {
   float steering_diff_th = nh.param("/vehicle_safety/STEER_DIFF_TH", steering_diff_th);
   float steering_stuck_time_th = nh.param("/vehicle_safety/STEER_STUCK_TIME_TH", steering_stuck_time_th);
   bool is_save_path = nh.param("/vehicle_safety/is_save_path", is_save_path);
+  int gps1_h_acc_th = nh.param("/vehicle_safety/GPS1_H_ACC_TH", gps1_h_acc_th);
   bool is_inside_geo_fence;
   bool is_with_in_no_go_zone;
   double time_to_launch;
@@ -272,6 +273,7 @@ class VehicleSafety {
   void heading_failsafe(const mavros_msgs::GPSRAW &data) {
     reset_head = 1;
     gps1_fix = data.fix_type;
+    gps1_h_acc_data = data.h_acc;
     time_on_gps_fix_cb = ros::Time::now();
     // start_time_ros = ros::Time::now();
     // ROS_ERROR_STREAM("callbakck ros time : " << start_time_ros);
@@ -339,7 +341,7 @@ class VehicleSafety {
 
   void gps_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat) {
     std::vector<int> default_value = {6};
-    std::vector<int> gps1_fix_list, gps2_fix_list;
+    std::vector<int> gps1_fix_list,gps2_fix_list;
     ros::param::param<std::vector<int>>("/vehicle_safety/GPS1_FIX_TH",
                                         gps1_fix_list, default_value);
     ros::param::param<std::vector<int>>("/vehicle_safety/GPS2_FIX_TH",
@@ -353,7 +355,7 @@ class VehicleSafety {
 
     int val;
     auto start = std::chrono::system_clock::now();
-
+    
     gps_accuracy = sensor_accuracy(cov_value);
 
     if (time_on_gps_fix_cb != ros::Time(0)) {
@@ -367,13 +369,13 @@ class VehicleSafety {
             stat.add("GPS ACCURACY LOW", gps_accuracy);
           }
         }
-      } else {
-        stat.add("GPS ACCURACY NONE", gps_accuracy);
-      }
+      } else { 
+        stat.add("GPS ACCURACY NONE", gps_accuracy); 
+      } 
        
       ros::Duration elapsed  = ros::Time::now() - time_on_gps_fix_cb;
       double elapsed_sec = elapsed.toSec(); //local variable
-
+      gps1_h_acc_th_mm = gps1_h_acc_th*10; //input data is cm --> mm(gps1_h_acc_data)
       // ROS_WARN_STREAM("ROS TIME : " << time_on_gps_fix_cb << " ELAPSED : " << elapsed_sec << " Elapsed " << elapsed);
       
       if (elapsed_sec < GPS_FIX_CB_TIMEOUT) {
@@ -388,18 +390,28 @@ class VehicleSafety {
           stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
           stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
           start_time = 0;
-        } else if (gps1_fix == 5 && gps2_fix == 6) {
-          if (start_time == 0) {
-            start_time = time(0);
-          }
-          if ((time(0) - start_time) > GPS_FIX_THR) {
-            stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT. GPS 1: " + std::to_string(gps1_fix) + ", GPS 2: " + std::to_string(gps2_fix));
+        } else if (gps1_h_acc_data <= gps1_h_acc_th_mm){
+            stat.summary(OK, "GPS FIX OK");
             stat.add("GPS1 Fix Type", gps1_fix);
             stat.add("GPS2 Fix Type", gps2_fix);
             stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
             stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
+            stat.add("GPS1 H_ACC", gps1_h_acc_data);
+            stat.add("GPS1 H_ACC_THRESHOLD", gps1_h_acc_th_mm);
+            start_time = 0;
+        } else if (gps1_fix == 5 && gps2_fix == 6) {
+          
+          if (start_time == 0) {
+            start_time = time(0);  
+          }
+          if ((time(0) - start_time) > GPS_FIX_THR) {
+            stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT. GPS 1: " + std::to_string(gps1_fix) + ", GPS 2: " + std::to_string(gps2_fix));
+            stat.add("GPS1 Fix Type", gps1_fix); 
+            stat.add("GPS2 Fix Type", gps2_fix);
+            stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
+            stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
           } else {
-            stat.summary(WARN, "WARN: GPS FIX LOST");
+            stat.summary(WARN, "WARN: GPS FIX LOST"); 
             stat.add("GPS1 Fix Type", gps1_fix);
             stat.add("GPS2 Fix Type", gps2_fix);
             stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
