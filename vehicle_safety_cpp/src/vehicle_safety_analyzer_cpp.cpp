@@ -3,7 +3,7 @@
 #include <ros/console.h>
 #include <diagnostic_updater/publisher.h>
 #include <ackermann_msgs/AckermannDrive.h>
-#include <pilot/vehicle_stop_command.h>
+#include <pilot_msgs/vehicle_stop_command.h>
 #include <ctime>
 #include <map> 
 #include <string>
@@ -29,8 +29,8 @@ class FailSafeAutoPilot
         
     FailSafeAutoPilot()
     {
-        stop_cmd_publisher = fs.advertise<pilot::vehicle_stop_command>("/vehicle/stop_command", 1,this);
-        pilot::vehicle_stop_command vehicle_stop_command_msg;
+        stop_cmd_publisher = fs.advertise<pilot_msgs::vehicle_stop_command>("/vehicle/stop_command", 1,this);
+        pilot_msgs::vehicle_stop_command vehicle_stop_command_msg;
         if (use_vehicle_safety)
         {
             vehicle_safety_diagnose = fs.subscribe("/vehicle_safety_diagnostics", 1, &FailSafeAutoPilot::vehicle_safety_diagnose_cb, this);
@@ -83,7 +83,7 @@ class FailSafeAutoPilot
             fail_status = false;
         }
 
-        pilot::vehicle_stop_command vehicle_stop_command_msg;
+        pilot_msgs::vehicle_stop_command vehicle_stop_command_msg;
 
         if(fail_status == true)
         {

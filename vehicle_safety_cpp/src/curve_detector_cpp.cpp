@@ -3,7 +3,7 @@
 #include <ros/console.h>
 #include <diagnostic_updater/publisher.h>
 #include <ackermann_msgs/AckermannDrive.h>
-#include <pilot/vehicle_stop_command.h>
+#include <pilot_msgs/vehicle_stop_command.h>
 #include <ctime>
 #include <map>
 #include <string>

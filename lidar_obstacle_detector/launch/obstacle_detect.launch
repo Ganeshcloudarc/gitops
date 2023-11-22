@@ -7,17 +7,19 @@
  <arg name="rqt_reconfigure" default="false"/>
 
  <arg name="bbox_target_frame" default="rslidar"/>
- <arg name="rviz" default="true"/>
+ <arg name="rviz" default="false"/>
+ <rosparam command="load" file="$(find lidar_obstacle_detector)/params/$(arg config_file)"/>
 
   <node name="obstacle_detector_node" pkg="lidar_obstacle_detector" type="obstacle_detector_node" output="screen">
     <!-- Input Topic Names -->
     <param name="lidar_points_topic"                  value="$(arg points_in)"/>
-    <rosparam command="load" file="$(find lidar_obstacle_detector)/params/$(arg config_file)"/>
+    <rosparam command="load" file="$(find boson_hmi)/params/modified_hmi_param.yaml"/>
 
 
     <!-- Output Topic Names -->
     <param name="cloud_ground_topic"                  value="obstacle_detector/cloud_ground"/>
     <param name="cloud_clusters_topic"                value="obstacle_detector/cloud_clusters"/>
+    <param name="object_cloud_topic"                  value="obstacle_detector/object_cloud"/>
     <param name="jsk_bboxes_topic"                    value="obstacle_detector/jsk_bboxes"/>
     <param name="autoware_objects_topic"              value="obstacle_detector/objects"/>
     <!-- Parameters -->
