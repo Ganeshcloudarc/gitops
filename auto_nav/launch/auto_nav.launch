@@ -19,7 +19,7 @@
         <arg name="scan_out" value="laser_scan"/>
     </include>
 
-    <include file="$(find collision_check)/launch/costmap2.launch"/>
+    <!-- <include file="$(find collision_check)/launch/costmap2.launch"/> -->
 
     <!-- autonav node -->
 <!--    <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen' required="true"/>-->
