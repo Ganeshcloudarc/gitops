@@ -118,6 +118,11 @@
         
         <node name="auto_nav_bag_record" pkg="rosbag" type="record"
             args="record -o $(env HOME)/.bags/auto_nav -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/local_cloud_map|/global_cloud_map|/rslidar_points|/lslidar_point_cloud" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+         <node name="auto_nav_bag_small_record" pkg="rosbag" type="record"
+               args="record -o $(env HOME)/.bags/auto_nav _small  /global_gps_path /global_gps_trajectory /lanes
+                /local_trajectory /mavros/gpsstatus/gps1/raw /mavros/gpsstatus/gps2/raw /pilot_status 
+                /pure_pursuit_diagnose /target_pose /tf /tf_static /vehicle/cmd_drive_safe 
+                /vehicle/foot_print /vehicle/gps /vehicle/odom " if="$(eval arg('record') and arg('hardware_in_loop'))"/>
     </group>
 
     
