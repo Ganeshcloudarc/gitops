@@ -21,7 +21,6 @@ ransac:
 
 dwa:
   enable : true
-  costmap_topic : "/costmap_node/costmap/costmap"
   wheel_base : 2.5
   constant_speed : 1
   steering_agle_lim : 30

@@ -67,9 +67,10 @@ class OccupancyGridManager(object):
                                                  queue_size=1)
         rospy.loginfo("Waiting for '" +
                       str(self._sub.resolved_name) + "'...")
+        rate = rospy.Rate(0.1)
         while self._occ_grid_metadata is None and \
                 self._grid_data is None and not rospy.is_shutdown():
-            rospy.sleep(0.1)
+            rate.sleep()
         rospy.loginfo("OccupancyGridManager for '" +
                       str(self._sub.resolved_name) +
                       "' initialized!")

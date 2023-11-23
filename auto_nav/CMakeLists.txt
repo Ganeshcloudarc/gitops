@@ -18,6 +18,8 @@ find_package(catkin REQUIRED COMPONENTS
   lidar_obstacle_detector
   costmap_2d
   autopilot_msgs
+  autopilot_utils
+  
 )
 
 ## System dependencies are found with CMake's conventions
@@ -109,13 +111,13 @@ find_package(catkin REQUIRED COMPONENTS
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
- INCLUDE_DIRS include
- LIBRARIES auto_nav
- CATKIN_DEPENDS roscpp rospy std_msgs pcl_ros tf2_ros tf2_geometry_msgs lidar_obstacle_detector costmap_2d autopilot_msgs laser_geometry
-#  DEPENDS system_lib
-)
 
+catkin_package(
+  INCLUDE_DIRS include
+  LIBRARIES ${PROJECT_NAME}
+  CATKIN_DEPENDS roscpp
+#  DEPENDS other non-ROS libs
+)
 ###########
 ## Build ##
 ###########
@@ -127,10 +129,8 @@ include
 ${catkin_INCLUDE_DIRS}
 )
 
-## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/auto_nav.cpp
-# )
+
+
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries

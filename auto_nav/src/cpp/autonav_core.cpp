@@ -1,98 +1,6 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <ros/ros.h>
-#include <ros/console.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <tf2_ros/transform_listener.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
-#include <tf/transform_listener.h>
-#include <sensor_msgs/LaserScan.h>
-#include <nav_msgs/Odometry.h>
-#include <nav_msgs/Path.h>
-#include<autopilot_msgs/Trajectory.h>
-#include<autopilot_msgs/TrajectoryPoint.h>
-#include <std_msgs/Float32.h>
-#include "std_msgs/String.h"
-#include <geometry_msgs/Pose.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/PolygonStamped.h>
-#include <geometry_msgs/Polygon.h>
-#include <geometry_msgs/Point32.h>
-#include <sstream>
-#include "trajectory_common.cpp"
-#include "pose_utils.cpp"
-#include "autonav_utils.hpp"
-#include <laser_geometry/laser_geometry.h>
-#include "tf_utils.hpp"
-#include "Utils.hpp"
-#include<visualization_msgs/MarkerArray.h>
-#include<visualization_msgs/Marker.h>
-#include "dwa_path_ganerator.cpp"
-#include <tf2/LinearMath/Quaternion.h>
-#include "costmap_manager.hpp"
-#include <costmap_2d/costmap_2d_ros.h>
-using namespace kiss_icp_ros::utils;
+#include<auto_nav/autonav_core.h>
 
-namespace auto_nav
-{
-class AutoNavCore 
-{
-    public:
-        AutoNavCore();
-        virtual ~AutoNavCore() {};
-        ros::NodeHandle nh;
-        tf2_ros::Buffer tf2_buffer;
-        tf2_ros::TransformListener tf2_listener;
-        
-        autopilot_utils::TrajectoryHelper traj_helper;
 
-    private:
-        void localScanCallback(const sensor_msgs::LaserScan::ConstPtr& local_scan);
-        void scanCallback(const sensor_msgs::LaserScan::ConstPtr& local_scan);
-        void trajectoryCallback(const autopilot_msgs::Trajectory::ConstPtr& trajectory);
-        void odomCallback(const nav_msgs::Odometry::ConstPtr& odom);
-        void main_loop(ros::NodeHandle);
-        void loadParams(ros::NodeHandle);
-        ros::Subscriber scan_sub, local_scan_sub, trajectory_sub, odometry_sub;
-        // ros::publisher local_path_pub;
-        ros::Publisher local_traj_pub,local_path_pub, center_line_pub, left_line_pub, right_line_pub, path_percent_publisher, front_pose_pub;
-        ros::Publisher map_point_cloud_pub, left_liners_cloud_pub,right_inliers_cloud_pub;
-        ros::Publisher lanes_marker_pub, dwa_marker_pub, dwa_collsion_free_marker_pub, ransac_samples_pub;
-        ros::Publisher vibration_path_pub, dwa_best_traj_marker_pub;
-        nav_msgs::Odometry::ConstPtr curr_odom;
-        autopilot_msgs::Trajectory local_traj, global_traj;
-        sensor_msgs::LaserScan::ConstPtr curr_scan, curr_local_scan;
-        geometry_msgs::Pose curr_robot_pose;
-        nav_msgs::Path vibration_path;
-        bool odom_data_received, global_traj_data_received, curr_scan_data_received, curr_local_scan_data_receiced;
-        laser_geometry::LaserProjection scan_projector;
-        laser_geometry::LaserProjection local_scan_projector;
-         costmap_2d::Costmap2DROS* costmap_ros_;
-
-         costmap_2d::Costmap2D* costmap_;
-        OccupencyGridManager* occ_manager;
-        vector<double> slope_list;
-        vector<double> intercept_list;
-        bool in_turn_status;
-        
-        // Parameters
-        bool use_dwa, enable_moving_avg_filter, pub_debug_topics, use_previous_line, mission_continue;
-        int moving_avg_filter_window_size, ransac_max_iterations, loop_frequency;
-        float row_spacing, tree_width, tree_width_tolerance;
-        float radius_to_check_turn, mininum_turn_radius, forward_point_dis;
-        string costmap_topic;
-        float dwa_constant_speed, dwa_steering_agle_lim,dwa_steering_angle_increment,
-        dwa_path_len,dwa_path_resolution, dwa_wheel_base, local_traj_length;
-        // DwaPathGenerator dwa_path_gen;
-
-        
-
-        
-
-};
 
 AutoNavCore::AutoNavCore() : tf2_listener(tf2_buffer),
 odom_data_received(false), global_traj_data_received(false), curr_scan_data_received(false), curr_local_scan_data_receiced(false), in_turn_status(false)
@@ -100,6 +8,8 @@ odom_data_received(false), global_traj_data_received(false), curr_scan_data_rece
 {
   ros::NodeHandle private_nh("~");
   loadParams(private_nh);
+  dwa_path_gen.update_params(dwa_wheel_base, dwa_steering_agle_lim, dwa_constant_speed, dwa_path_len, dwa_path_resolution);
+
   if(use_dwa)
     costmap_ros_ = new costmap_2d::Costmap2DROS("/costmap", tf2_buffer);
   // ROS_DEBUG_STREAM(costmap_ros->getGlobalFrameID());
@@ -160,7 +70,7 @@ void AutoNavCore::loadParams(ros::NodeHandle private_nh)
 
 
   private_nh.param<float>("turnings/radius_to_check_turn", radius_to_check_turn, 15);
-  private_nh.param<float>("turnings/mininum_turn_radius", radius_to_check_turn, 7);
+  private_nh.param<float>("turnings/minimum_turn_radius", minimum_turn_radius, 7);
   private_nh.param<float>("turnings/forward_point_dis", forward_point_dis, 3);
   private_nh.param<float>("local_traj_length", local_traj_length, 8);
 
@@ -179,48 +89,37 @@ void AutoNavCore::loadParams(ros::NodeHandle private_nh)
 
 }
 
+
+
 void AutoNavCore::main_loop(ros::NodeHandle private_nh)
 {   
-    // if(use_dwa)
-    //   {
-    //     occ_manager = new OccupencyGridManager(private_nh, costmap_topic, true);
-    //   }
-    //intial sensor check
+  // IMP lines for dubins path 
+  // https://github.com/karlkurzer/path_planner/blob/887996746c275e2c8335ae77ea096969079e688f/src/algorithm.cpp#L463
+
     ros::Rate rate(5);
     while(ros::ok())
     {
-    if (curr_local_scan_data_receiced and curr_scan_data_received and global_traj_data_received and odom_data_received)
-    {   ROS_INFO("data received on all sensors");
-        break;
-    }
-    else
-    {
-      ROS_WARN_STREAM("NO data received on all sensors");
-    //   ROS_WARN_STREAM("curr_local_scan_data_receiced" + curr_local_scan_data_receiced );//"  and curr_scan_data_received and global_traj_data_received and odom_data_received
-      rate.sleep();
-      ros::spinOnce();
-    }
-    
+      if (curr_local_scan_data_receiced and curr_scan_data_received and global_traj_data_received and odom_data_received)
+        {   ROS_INFO("data received on all sensors");
+            break;
+        }
+      else
+        {
+          ROS_WARN_STREAM("NO data received on all sensors");
+          // ROS_WARN_STREAM("curr_local_scan_data_receiced" + curr_local_scan_data_receiced );//"  and curr_scan_data_received and global_traj_data_received and odom_data_received
+          rate.sleep();
+          ros::spinOnce();
+        }
     }
 
     ros::Rate loop_rate(loop_frequency);
-    int close_index = -1;
-    int turn_start_index = -1;
-    int turn_end_index = -1;
-    bool reset_costmap = true;
-
-
     
-    DwaPathGenerator dwa_path_gen(dwa_wheel_base, dwa_steering_agle_lim, dwa_constant_speed, dwa_path_len, dwa_path_resolution);
-      if (pub_debug_topics)
-      {
-        std::vector<std::vector<std::vector<double>>> paths = dwa_path_gen.generate_paths({0, 0, 0});
-
-        lanes_marker_pub.publish(dwa_path_gen.get_dwa_paths_marker_array(paths));
-      }
+   
+    
     
     while(ros::ok())
-    {
+    { 
+      marker_arr.markers.clear();
       
         tuple<bool, int> val;
         if (close_index == -1)
@@ -248,12 +147,10 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
         ROS_DEBUG_STREAM("close_index : " << close_index);
 
         // path percentage
-        float path_percent = (global_traj.points[close_index].accumulated_distance_m /
+        path_percent_val.data = (global_traj.points[close_index].accumulated_distance_m /
                             global_traj.points.back().accumulated_distance_m) * 100;
-        std_msgs::Float32 path_percent_val;
-        path_percent_val.data = path_percent;
         path_percent_publisher.publish(path_percent_val);
-        if (path_percent > 95.0 and autopilot_utils::distanceBetweenPoses(curr_robot_pose, global_traj.points.back().pose) < row_spacing)
+        if ( path_percent_val.data > 95.0 and distanceBetweenPoses(curr_robot_pose, global_traj.points.back().pose) < row_spacing)
         {
           if (mission_continue)
           {
@@ -291,10 +188,22 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
         vector<double> p1 = {traj_helper.get_trajectory_point_by_index(p1_index).pose.position.x, traj_helper.get_trajectory_point_by_index(p1_index).pose.position.y};
         vector<double> p2 = {traj_helper.get_trajectory_point_by_index(p2_index).pose.position.x, traj_helper.get_trajectory_point_by_index(p2_index).pose.position.y};
         vector<double> p3 = {traj_helper.get_trajectory_point_by_index(p3_index).pose.position.x, traj_helper.get_trajectory_point_by_index(p3_index).pose.position.y};
-        float circum_radius = auto_nav::circumRadius(p1,p2,p3);
+        float circum_radius = circumRadius(p1,p2,p3);
         ROS_DEBUG_STREAM("circum_radius : "<<circum_radius);
         auto close_pose = traj_helper.get_trajectory_point_by_index(close_index).pose;
         Vector3d start_point_v(cos(tf::getYaw(close_pose.orientation)), sin(tf::getYaw(close_pose.orientation)), 0);
+        /* Auto Turnings 
+        if (abs(circum_radius) < radius_to_check_turn)
+        { 
+          global_turn_detected = true;
+          ROS_WARN("Turn detected");
+        }
+        else{
+          global_turn_detected = false;
+        }
+
+        Auto Turnings end*/ 
+
         if (abs(circum_radius) < radius_to_check_turn or in_turn_status == true )
         { 
         
@@ -349,7 +258,185 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           slope_list.clear();
           intercept_list.clear();
         }
-        else
+        
+
+      
+        /* Auto Turnings start
+       if ((global_turn_detected or  in_turn_status) and !row_end_point.empty())
+        {
+            // check to initiate dubins curve or path till the row_end is reached
+            ROS_ERROR("inside the if condition of turn");
+            in_turn_status = true;
+            if (moving_avg_center_line.valid())
+            {
+              // checking whether vehicle crossed the row_end_point
+              Eigen::Vector3d end_point_to_robot {row_end_point[0]-curr_robot_pose.position.x, row_end_point[1]-curr_robot_pose.position.y , 0};
+              Eigen::Vector3d  unit_vector = unit_vect(moving_avg_center_line.getHeadingAngle());
+              double dot_pro = end_point_to_robot.dot(unit_vector);
+              cout<<"dot_pro"<<dot_pro<<endl;
+              if (dot_pro > 0)
+              {
+                // Both opposuite direction , vehicle is still in the row send the avg_line points
+              
+
+              vector<double> start_point_center_lane = moving_avg_center_line.intersct_point_to_line(std::vector<double>{curr_robot_pose.position.x, curr_robot_pose.position.y});
+              vector<double> forward_point_center_lane = moving_avg_center_line.intersct_point_to_line(std::vector<double>{row_end_point[0], row_end_point[1]});
+              cout<<"before"<<endl;
+              local_trajectory_msg = twoPointsToTrajectory(start_point_center_lane, forward_point_center_lane, 0.1,"map", speed); // speed 1
+              cout<<"afer"<<endl;
+              local_traj_pub.publish(local_trajectory_msg);
+              local_path_pub.publish(trajectoryToPath(local_trajectory_msg));
+              ROS_DEBUG_STREAM("traj and path are published till the end of row");
+
+
+              }
+              else
+              {
+                
+                //vehicle crossed the row
+                // Start Dubins path from the start point to next_row_start_point;
+
+                // Dubins curves connecting mid points
+          double q0[] = {row_end_point[0], row_end_point[1], row_end_point[2]};
+          Eigen::Vector3d dir_vect =  {p1[0]- row_end_point[0], p1[1]- row_end_point[1], 0};
+
+          
+          double crossProduct = unit_vector.x() * dir_vect.y() - unit_vector.y() * dir_vect.x();
+
+          double theta;
+          if(crossProduct<0)
+            theta = -M_PI/2;
+          else 
+            theta = M_PI/2;
+          
+          cout<<"cross_pro :"<< crossProduct<<endl;
+          cout<<"theta :"<< theta<<endl;
+          
+          
+          Eigen::Vector3d vect =  unit_vector * (2*row_spacing);
+          double x_scaled = vect.x() * cos(theta) - vect.y() * sin(theta);
+          double y_scaled = vect.x() * sin(theta) + vect.y() * cos(theta);
+          double q1[] = {row_end_point[0]+x_scaled, row_end_point[1]+y_scaled, row_end_point[2]+ M_PI };
+
+          
+          DubinsPath path;
+          visualization_msgs::Marker DubinsMarker;
+          DubinsMarker.header.frame_id = "map";
+          DubinsMarker.type =  DubinsMarker.LINE_STRIP;
+          DubinsMarker.id = 15;
+          
+          DubinsMarker.color.g = 1.0;
+          DubinsMarker.color.b = 0;
+          DubinsMarker.color.a = 1;
+          DubinsMarker.scale.x = 0.3;
+          DubinsMarker.pose.orientation.w = 1;
+
+          local_trajectory_msg.points.clear();
+
+          // calculate the path
+          dubins_init(q0, q1, minimum_turn_radius, &path);
+          int i = 0;
+          float x = 0.f;
+          float length = dubins_path_length(&path);
+          double dubinsStepSize  = 0.1;
+          x+= dubinsStepSize;
+          unsigned int mx,my;
+          bool collision_found = false;
+          int cost; 
+          double min_dist = 1000000;
+          double mix_x = 0;
+
+          while (x <  length) {
+          double q[3];
+          dubins_path_sample(&path, x, q);
+          double dist = sqrt(pow(curr_robot_pose.position.x - q[0], 2) + 
+                          pow(curr_robot_pose.position.y - q[1],2));
+          if (dist < min_dist)
+            {
+              min_dist = dist;
+              mix_x = x;
+            }
+            x+= dubinsStepSize;
+          }
+          cout<<"mix_x : "<<mix_x<<endl;
+          while (mix_x <  length) {
+            cout<<"mix_x" <<mix_x<<endl;
+            double q[3];
+            dubins_path_sample(&path, mix_x, q);
+            // end_point_to_robot = {q[0]-curr_robot_pose.position.x, q[1]-curr_robot_pose.position.y , 0};
+            // double dist = sqrt(pow(curr_robot_pose.position.x - q[0], 2) + 
+            //               pow(curr_robot_pose.position.y - q[1],2));
+            // Eigen::Vector3d  v_dubins = unit_vect(q[2]);
+
+            // Eigen::Vector3d  v_robot = unit_vect(tf::getYaw(curr_robot_pose.orientation));
+            // dot_pro = end_point_to_robot.dot(v_dubins);
+            // double robot_dot = v_dubins.dot(v_robot);
+
+
+            // if (dot_pro > 0 and robot_dot > 0)
+            //   { 
+                costmap_->worldToMap(q[0], q[1], mx, my);
+                cost = costmap_->getCost(mx, my);
+                // cout<<"cost"<<static_cast<unsigned int>(cost)<<endl;
+                if (cost != 0 ){
+                
+                collision_found  = true;
+                }
+
+                // }
+                 DubinsMarker.points.push_back(VectorToPoint(q));
+            local_trajectory_msg.points.push_back(DubinsPointToTrajectoryPoint(q, mix_x, speed));
+
+
+              
+
+
+           
+
+            mix_x+= dubinsStepSize;
+          }
+          if (collision_found)
+            {
+              ROS_ERROR("collision found on dubins path");
+              ROS_ERROR("stopping the vehicle");
+              for(int i=0; i<local_trajectory_msg.points.size();i++)
+                local_trajectory_msg.points[i].longitudinal_velocity_mps = 0;
+        
+              DubinsMarker.color.r = 1;
+              DubinsMarker.color.g = 0.0; 
+            }
+
+          end_point_to_robot = {local_trajectory_msg.points.back().pose.position.x-curr_robot_pose.position.x, local_trajectory_msg.points.back().pose.position.y-curr_robot_pose.position.y , 0};
+          double dis = distanceBetweenPoses(curr_robot_pose,local_trajectory_msg.points.back().pose );
+          
+          Eigen::Vector3d  unit_vector = unit_vect(tf::getYaw(local_trajectory_msg.points.back().pose.orientation));
+          dot_pro = end_point_to_robot.dot(unit_vector);
+          if (dot_pro > 0 and dis < 1)
+            {
+              ROS_INFO("Completed Dubins path");
+              in_turn_status = false;
+              row_end_point.clear();
+              slope_list.clear();
+              intercept_list.clear();
+
+
+            }
+            
+
+          marker_arr.markers.push_back(DubinsMarker);
+
+          local_traj_pub.publish(local_trajectory_msg);
+          local_path_pub.publish(trajectoryToPath(local_trajectory_msg));
+          ROS_DEBUG_STREAM("Dubins path published ");
+
+              }
+            }
+            else{
+              ROS_INFO("No valid center line found");
+            }
+        }
+         Auto Turnings end*/
+       else
         { 
           ROS_INFO("No turn detected");
           
@@ -541,7 +628,7 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
 
           // Marker to set left and right lines in base_link
           double val = local_traj_length;
-          visualization_msgs::MarkerArray marker_arr;
+          
           // left line
           visualization_msgs::Marker marker_left;
           marker_left.header.frame_id = "base_link";
@@ -621,12 +708,16 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
 
           // Moving avarage filter on center line
           geometry_msgs::TransformStamped transform_to_base_link; 
-          geometry_msgs::Point point1_center_map, point2_center_map;
+          geometry_msgs::Point point1_center_map, point2_center_map, point1_left_map, point2_left_map, point1_right_map, point2_right_map;
           try
           {
             transform_to_base_link = tf2_buffer.lookupTransform("map", "base_link", ros::Time(0));
             tf2::doTransform(point1_center, point1_center_map, transform_to_base_link);
             tf2::doTransform(point2_center, point2_center_map, transform_to_base_link);
+            tf2::doTransform(point1_left, point1_left_map, transform_to_base_link);
+            tf2::doTransform(point2_left, point2_left_map, transform_to_base_link);
+            tf2::doTransform(point1_right, point1_right_map, transform_to_base_link);
+            tf2::doTransform(point2_right, point2_right_map, transform_to_base_link);
           }
           catch (tf2::TransformException& ex)
           {
@@ -661,11 +752,12 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           moving_avg_intercept = intercept_sum / intercept_list.size();
 
           Line moving_avg_center_lane(moving_avg_slope, moving_avg_intercept);
+         
           geometry_msgs::Point robot_point, robot_forward_point,start_point_center_lane, forward_point_center_lane ;
           robot_point.x = curr_robot_pose.position.x;
           robot_point.y = curr_robot_pose.position.y;
-          robot_forward_point.x = curr_robot_pose.position.x + cos(tf::getYaw(curr_robot_pose.orientation)) * local_traj_length;
-          robot_forward_point.y = curr_robot_pose.position.y + sin(tf::getYaw(curr_robot_pose.orientation)) * local_traj_length;
+          robot_forward_point.x = curr_robot_pose.position.x + cos(tf::getYaw(curr_robot_pose.orientation)) * (local_traj_length);
+          robot_forward_point.y = curr_robot_pose.position.y + sin(tf::getYaw(curr_robot_pose.orientation)) * (local_traj_length);
           start_point_center_lane = moving_avg_center_lane.intersct_point_to_line(robot_point);
           forward_point_center_lane = moving_avg_center_lane.intersct_point_to_line(robot_forward_point);
           // Moving avg center line
@@ -684,19 +776,22 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           marker_arr.markers.push_back(marker_center_avg_filter);
           // filtering and pushing.
           double line_heading = atan2(forward_point_center_lane.y - start_point_center_lane.y , forward_point_center_lane.x - start_point_center_lane.x);
-
-          lanes_marker_pub.publish(marker_arr);
-          ROS_DEBUG("lane markers puslished");
+          moving_avg_center_line.update_line(moving_avg_slope, moving_avg_intercept);
+          moving_avg_center_line.updateHeading(line_heading);
+          
           if (pub_debug_topics){
           geometry_msgs::PoseStamped ps;
           ps.header.frame_id = "map";
           ps.pose.position.x = start_point_center_lane.x;
           ps.pose.position.y = start_point_center_lane.y;
-          ps.pose.orientation = autopilot_utils::get_quaternion_from_yaw(line_heading);
+          ps.pose.orientation = get_quaternion_from_yaw(line_heading);
           vibration_path.poses.push_back(ps);
           vibration_path_pub.publish(vibration_path);
           ROS_DEBUG("vibration path is puslished");
           }
+
+
+          
           if(use_dwa)
           {
 
@@ -722,6 +817,170 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           else{
             ROS_ERROR("Could not find cost to line");
           }
+
+          // Finding the row end detection using left lane and right lanes
+          Eigen::Vector3d c1(start_point_center_lane.x, start_point_center_lane.y, 0);
+          Eigen::Vector3d c2(forward_point_center_lane.x, forward_point_center_lane.y, 0);
+          double x_scaled, y_scaled;
+          Eigen::Vector3d vect;
+          vect = c2 - c1;
+          vect =  vect.normalized() * row_spacing/2;
+          x_scaled = vect.x() * cos(M_PI/2) - vect.y() * sin(M_PI/2);
+          y_scaled = vect.x() * sin(M_PI/2) + vect.y() * cos(M_PI/2);
+          Eigen::Vector3d l1(c1.x() + x_scaled, c1.y() + y_scaled, 0.0  );
+          Eigen::Vector3d l2(c2.x() + x_scaled, c2.y() + y_scaled, 0.0  ); 
+        
+          x_scaled = vect.x() * cos(-M_PI/2) - vect.y() * sin(-M_PI/2);
+          y_scaled = vect.x() * sin(-M_PI/2) + vect.y() * cos(-M_PI/2);
+
+          Eigen::Vector3d r1(c1.x() + x_scaled, c1.y() + y_scaled, 0.0  );
+          Eigen::Vector3d r2(c2.x() + x_scaled, c2.y() + y_scaled, 0.0  );
+
+          // Calculate next rows aswell, ll1, ll2, rr1, rr2
+          vect =  vect.normalized() * (row_spacing/2+row_spacing);
+          x_scaled = vect.x() * cos(M_PI/2) - vect.y() * sin(M_PI/2);
+          y_scaled = vect.x() * sin(M_PI/2) + vect.y() * cos(M_PI/2);
+          Eigen::Vector3d ll1(c1.x() + x_scaled, c1.y() + y_scaled, 0.0  );
+          Eigen::Vector3d ll2(c2.x() + x_scaled, c2.y() + y_scaled, 0.0  ); 
+          x_scaled = vect.x() * cos(-M_PI/2) - vect.y() * sin(-M_PI/2);
+          y_scaled = vect.x() * sin(-M_PI/2) + vect.y() * cos(-M_PI/2);
+          Eigen::Vector3d rr1(c1.x() + x_scaled, c1.y() + y_scaled, 0.0  );
+          Eigen::Vector3d rr2(c2.x() + x_scaled, c2.y() + y_scaled, 0.0  );
+
+          
+
+
+          cout<<"l1:  "<< l1 << " l2 :"<< l2<<endl;
+          cout<<"r1:  "<< r1 << " r2 :"<< r2<<endl;
+          // Moving avg center line
+          visualization_msgs::Marker marker_sides_avg_filter;
+          marker_sides_avg_filter.header.frame_id = "map";
+          marker_sides_avg_filter.type =  marker_right.LINE_LIST;
+          marker_sides_avg_filter.id = 4;
+           marker_sides_avg_filter.color.r = 0.5;
+          marker_sides_avg_filter.color.g = 1;
+          marker_sides_avg_filter.color.b = 0.5;
+          marker_sides_avg_filter.color.a = 1;
+          marker_sides_avg_filter.scale.x = 0.3;
+          marker_sides_avg_filter.pose.orientation.w = 1;
+          marker_sides_avg_filter.points.push_back(VectorToPoint(l1));
+          marker_sides_avg_filter.points.push_back(VectorToPoint(l2));
+           marker_sides_avg_filter.points.push_back(VectorToPoint(ll1));
+          marker_sides_avg_filter.points.push_back(VectorToPoint(ll2));
+
+          marker_sides_avg_filter.points.push_back(VectorToPoint(r1));
+          marker_sides_avg_filter.points.push_back(VectorToPoint(r2));
+          marker_sides_avg_filter.points.push_back(VectorToPoint(rr1));
+          marker_sides_avg_filter.points.push_back(VectorToPoint(rr2));
+
+          marker_arr.markers.push_back(marker_sides_avg_filter);
+          
+          // ray trace and find the end of row 
+          // unsigned int mx1,my1,mx2,my2;
+          // if (costmap.worldToMap(x1, y1, mx1, my1) and costmap.worldToMap(x2, y2, mx2, my2))
+          // {
+            
+          // }
+          double lx_free, ly_free,llx_free,lly_free, rx_free, ry_free,rrx_free,rry_free;
+          
+          if (raytraceLineLookGap(*costmap_, l1.x(), l1.y(), l2.x(), l2.y(), lx_free, ly_free, 1))
+          {
+            ROS_ERROR_STREAM("Free left end points detected x :" <<lx_free <<" y:"<< ly_free );
+          }
+          else{
+            ROS_INFO_STREAM("No left free end points detected");
+          }
+          marker_arr.markers.push_back(xy_to_marker(lx_free,ly_free, 10));
+          if (raytraceLineLookGap(*costmap_, ll1.x(), ll1.y(), ll2.x(), ll2.y(), llx_free, lly_free, 1))
+                  {
+                    ROS_ERROR_STREAM("Free left end points detected x :" <<llx_free <<" y:"<< lly_free );
+                  }
+          else{
+            ROS_INFO_STREAM("No left free end points detected");
+          }
+          marker_arr.markers.push_back(xy_to_marker(llx_free,lly_free, 11));
+
+
+           if (raytraceLineLookGap(*costmap_, r1.x(), r1.y(), r2.x(), r2.y(), rx_free, ry_free,1))
+          {
+            ROS_ERROR_STREAM("Free right end points detected x :" <<rx_free <<" y:"<< ry_free );
+          }
+          else{
+            ROS_INFO_STREAM("No right free end points detected");
+          }
+          marker_arr.markers.push_back(xy_to_marker(rx_free,ry_free,12));
+
+          if (raytraceLineLookGap(*costmap_, rr1.x(), rr1.y(), rr2.x(), rr2.y(), rrx_free, rry_free,1))
+          {
+            ROS_ERROR_STREAM("Free right end points detected x :" <<rrx_free <<" y:"<< rry_free );
+          }
+          else{
+            ROS_INFO_STREAM("No right free end points detected");
+          }
+          marker_arr.markers.push_back(xy_to_marker(rrx_free,rry_free,13));
+
+          // Dubins curves connecting mid points
+          double q0[] = {(lx_free+ rx_free)/2, (ly_free+ry_free)/2, line_heading};
+          vect =  vect.normalized() * (2*row_spacing);
+          x_scaled = vect.x() * cos(-M_PI/2) - vect.y() * sin(-M_PI/2);
+          y_scaled = vect.x() * sin(-M_PI/2) + vect.y() * cos(-M_PI/2);
+          double q1[] = {(lx_free+ rx_free)/2 +x_scaled, (ly_free+ry_free)/2+ y_scaled, line_heading+ M_PI };
+
+          row_end_point  = {(lx_free+ rx_free)/2, (ly_free+ry_free)/2, line_heading};
+          
+          DubinsPath path;
+          visualization_msgs::Marker DubinsMarker;
+          DubinsMarker.header.frame_id = "map";
+          DubinsMarker.type =  marker_right.LINE_STRIP;
+          DubinsMarker.id = 15;
+          
+          DubinsMarker.color.g = 1.0;
+          DubinsMarker.color.b = 0;
+          DubinsMarker.color.a = 1;
+          DubinsMarker.scale.x = 0.3;
+          DubinsMarker.pose.orientation.w = 1;
+          
+          // calculate the path
+          dubins_init(q0, q1, minimum_turn_radius, &path);
+          int i = 0;
+          float x = 0.f;
+          float length = dubins_path_length(&path);
+          double dubinsStepSize  = 0.1;
+          x+= dubinsStepSize;
+          unsigned int mx,my;
+          while (x <  length) {
+            double q[3];
+            dubins_path_sample(&path, x, q);
+            costmap_->worldToMap(q[0], q[1], mx, my);
+            int cost = costmap_->getCost(mx, my);
+            // cout<<"cost"<<static_cast<unsigned int>(cost)<<endl;
+            if (cost != 0 ){
+              ROS_ERROR("COLLISION FOUND ON DUBINS CURVES");
+              DubinsMarker.color.r = 1;
+              DubinsMarker.color.g = 0.0;
+              break;
+            }
+
+            DubinsMarker.points.push_back(VectorToPoint(q));
+            x+= dubinsStepSize;
+
+          
+
+          }
+          marker_arr.markers.push_back(DubinsMarker);
+
+
+
+
+
+
+
+        
+
+        
+          ROS_DEBUG("lane markers puslished");
+
+
           std::vector<std::vector<std::vector<double>>> dwa_paths = dwa_path_gen.generate_paths({curr_robot_pose.position.x, curr_robot_pose.position.y,tf::getYaw(curr_robot_pose.orientation)});
 
           if(pub_debug_topics){
@@ -836,12 +1095,12 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             autopilot_msgs::TrajectoryPoint traj_point;
             traj_point.pose.position.x = collision_free_paths[min_cost_index][i][0];
             traj_point.pose.position.y = collision_free_paths[min_cost_index][i][1];
-            traj_point.pose.orientation = autopilot_utils::get_quaternion_from_yaw(collision_free_paths[min_cost_index][i][2]);
+            traj_point.pose.orientation = get_quaternion_from_yaw(collision_free_paths[min_cost_index][i][2]);
             traj_point.longitudinal_velocity_mps = 1;
             if (i == 0)
             traj_point.accumulated_distance_m = 0;
             else
-             traj_point.accumulated_distance_m =  dwa_traj.points.back().accumulated_distance_m + autopilot_utils::distanceBetweenPoses(dwa_traj.points.back().pose, traj_point.pose);
+             traj_point.accumulated_distance_m =  dwa_traj.points.back().accumulated_distance_m + distanceBetweenPoses(dwa_traj.points.back().pose, traj_point.pose);
             dwa_traj.points.push_back(traj_point);
             geometry_msgs::PoseStamped pst;
             pst.header.frame_id = "map";
@@ -867,7 +1126,7 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             autopilot_msgs::TrajectoryPoint traj_point;
             traj_point.pose.position.x =  start_point_center_lane.x + cos(line_heading)*i*dwa_path_resolution;
             traj_point.pose.position.y =  start_point_center_lane.y + sin(line_heading)*i*dwa_path_resolution;
-            traj_point.pose.orientation = autopilot_utils::get_quaternion_from_yaw(line_heading);
+            traj_point.pose.orientation = get_quaternion_from_yaw(line_heading);
             traj_point.longitudinal_velocity_mps = 1;
             traj_point.accumulated_distance_m = i*dwa_path_resolution;
             line_traj.points.push_back(traj_point);
@@ -880,7 +1139,7 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           local_path_pub.publish(line_path);
           ROS_INFO("line_traj and line_path are published");
         }
-
+        lanes_marker_pub.publish(marker_arr);
         }
         loop_rate.sleep();
         ros::spinOnce();
