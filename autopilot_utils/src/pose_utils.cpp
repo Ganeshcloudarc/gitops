@@ -24,19 +24,28 @@ namespace autopilot_utils
     return quaternion_msg;
     }
 
+    double calcDistSquared2D(const geometry_msgs::Point &p, const geometry_msgs::Point &q)
+        {
+        const double dx = p.x - q.x;
+        const double dy = p.y - q.y;
+        return (dx * dx + dy * dy);
+        }
 
-    double normalizeAngle(double angle) {
-    // Normalize the angle to be between 0 and 2π
-    while (angle < 0.0) {
-        angle += 2.0 * M_PI;
-    }
 
-    while (angle >= 2.0 * M_PI) {
-        angle -= 2.0 * M_PI;
-    }
+    double normalizeAngle(double euler)
+        {
+        double res = euler;
+        while (res > M_PI)
+        {
+            res -= (2.0 * M_PI);
+        }
+        while (res < -M_PI)
+        {
+            res += 2.0 * M_PI;
+        }
 
-    return angle;
-}
+        return res;
+        }
 
 Eigen::Vector3d unit_vect(double angle)
     {
