@@ -62,28 +62,56 @@ void TrajectoryHelper::setTrajectory(autopilot_msgs::Trajectory trajectory)
      traj = trajectory;
 }
 
- std::tuple<bool, int> TrajectoryHelper::find_closest_idx_with_dist_ang_thr(geometry_msgs::Pose robot_pose, double distance_th, double angle_th)
-{
-    double dist_min = 1000000000;
-    int idx_min = -1;   
-    double robot_yaw = tf::getYaw(robot_pose.orientation);
+//  std::tuple<bool, int> TrajectoryHelper::find_closest_idx_with_dist_ang_thr(geometry_msgs::Pose robot_pose, double distance_th, double angle_th)
+// {
+//     double dist_min = 1000000000;
+//     int idx_min = -1;   
+//     double robot_yaw = tf::getYaw(robot_pose.orientation);
     
 
-    for(int i = 0; i < traj.points.size(); i++)
-    {
-        double dis = sqrt(pow(robot_pose.position.x - traj.points[i].pose.position.x, 2) + 
-                        pow(robot_pose.position.y - traj.points[i].pose.position.y,2));
+//     for(int i = 0; i < traj.points.size(); i++)
+//     {
+//         double dis = sqrt(pow(robot_pose.position.x - traj.points[i].pose.position.x, 2) + 
+//                         pow(robot_pose.position.y - traj.points[i].pose.position.y,2));
         
-        double  curr_yaw = tf::getYaw( traj.points[i].pose.orientation);
-        if (dis <distance_th  and abs(normalizeAngle(curr_yaw) - normalizeAngle(robot_yaw)) < angle_th)
-        {
-            return std::make_tuple(true, i);  
-        }   
+//         double  curr_yaw = tf::getYaw( traj.points[i].pose.orientation);
+//         if (dis <distance_th  and abs(normalizeAngle(curr_yaw) - normalizeAngle(robot_yaw)) < angle_th)
+//         {
+//             return std::make_tuple(true, i);  
+//         }   
         
-    }
-    return std::make_tuple(false, -1);
+//     }
+//     return std::make_tuple(false, -1);
 
-}
+// }
+
+std::pair<bool, int32_t> TrajectoryHelper::find_closest_idx_with_dist_ang_thr(geometry_msgs::Pose robot_pose, double distance_th, double angle_th)
+    {
+    double dist_squared_min = std::numeric_limits<double>::max();
+    int32_t idx_min = -1;
+    double square_dist = distance_th * distance_th;
+    for(int32_t i = 0; i < static_cast<int32_t>(traj.points.size()); ++i)
+        {
+            const double ds = calcDistSquared2D(traj.points.at(i).pose.position, robot_pose.position);
+            if (ds > square_dist)
+                continue;
+            double yaw_pose = tf::getYaw(robot_pose.orientation);
+            double yaw_ps = tf::getYaw(traj.points.at(i).pose.orientation);
+            double yaw_diff = normalizeAngle(yaw_pose - yaw_ps);
+            if (std::fabs(yaw_diff) > angle_th)
+            continue;
+
+            if (ds < dist_squared_min)
+            {
+            dist_squared_min = ds;
+            idx_min = i;
+            }
+        }
+    return (idx_min >= 0) ? std::make_pair(true, idx_min) : std::make_pair(false, idx_min);
+
+    }
+
+
 
 int  TrajectoryHelper::find_close_pose_after_index(geometry_msgs::Pose curr_pose, int prev_idx, double search_distance)
 {       

@@ -21,7 +21,7 @@ class TrajectoryHelper
         // ~TrajectoryHelper();
         void setTrajectory(autopilot_msgs::Trajectory trajectory);
         int getLength();
-        std::tuple<bool, int>  find_closest_idx_with_dist_ang_thr(geometry_msgs::Pose robot_pose, double dist_thr, double  angle_thr);
+        std::pair<bool, int32_t> find_closest_idx_with_dist_ang_thr(geometry_msgs::Pose robot_pose, double distance_th, double angle_th);
         int find_close_pose_after_index(geometry_msgs::Pose curr_pose, int prev_idx, double search_distance);
         int  next_point_within_dist(int idx, double dist_thr);
         autopilot_msgs::TrajectoryPoint get_trajectory_point_by_index(int idx);
