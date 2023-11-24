@@ -109,7 +109,7 @@ class CollisionMonitor:
         self.observation_details = []
         self.load_params()
 
-        pub_poly = rospy.Publisher("collision_monitor_polygon", PolygonStamped, queue_size=1, latch=True)
+        self.pub_poly = rospy.Publisher("collision_monitor_polygon", PolygonStamped, queue_size=1, latch=True)
         self.diagnostics_pub = rospy.Publisher("/collision_monitor_diagnostics", DiagnosticArray, queue_size=1)
         self.pilot_stop_command_pub = rospy.Publisher("/vehicle/stop_command", vehicle_stop_command, queue_size=1)
         self.diagnostics_arr = DiagnosticArray()
@@ -117,10 +117,10 @@ class CollisionMonitor:
         self.diagnose = DiagnosticStatusWrapper()
         self.diagnose.name = rospy.get_name()
         collision_polygon = self.vehicle_foot_print()
-        polygon_st = PolygonStamped()
-        polygon_st.header.frame_id = self.robot_base_frame
-        polygon_st.polygon = collision_polygon
-        pub_poly.publish(polygon_st)
+        self.polygon_st = PolygonStamped()
+        self.polygon_st.header.frame_id = self.robot_base_frame
+        self.polygon_st.polygon = collision_polygon
+        self.pub_poly.publish(self.polygon_st)
         rospy.loginfo("Polygon published")
         self.polygon_check = PolygonCheck(collision_polygon)
         for source in self.observation_details:
@@ -194,11 +194,12 @@ class CollisionMonitor:
             self.diagnostics_arr.status.append(self.diagnose)
             self.diagnostics_pub.publish(self.diagnostics_arr)
             self.pilot_stop_command_pub.publish(vehicle_stop_msg)
+            self.pub_poly.publish(self.polygon_st)
             rate.sleep()
 
 
     def load_params(self):
-        self.robot_base_frame = rospy.get_param("~collision_monitor/base_frame_id", 1.0)
+        self.robot_base_frame = rospy.get_param("~collision_monitor/base_frame_id", "base_link")
         self.frequency = rospy.get_param("~collision_monitor/frequency", 10)
         self.souce_timeout = rospy.get_param("~collision_monitor/source_timeout", 5)
         self.min_points = rospy.get_param("~collision_monitor/min_points", 4)
