@@ -17,6 +17,37 @@ Author: Ramana ramanab@bosonmotors.com
 """
 
 
+def getLine(x1, y1, x2, y2):
+    rev = False
+    if x1 == x2:  # Perfectly horizontal line, can be solved easily
+        # return [(x1, i) for i in np.arange(y1, y2, abs(y2 - y1) / (y2 - y1))]
+        if y1> y2:
+            t = y1
+            y1 = y2
+            y2 = t
+        return [(x1, i) for i in range(y1, y2)]
+
+    else:  # More of a problem, ratios can be used instead
+        if x1 > x2:  # If the line goes "backwards", flip the positions, to go "forwards" down it.
+            rev = True
+            x = x1
+            x1 = x2
+            x2 = x
+            y = y1
+            y1 = y2
+            y2 = y
+        slope = (y2 - y1) / (x2 - x1)  # Calculate the slope of the line
+        line = []
+        i = 0
+        while x1 + i < x2:  # Keep iterating until the end of the line is reached
+            i += 1
+            line.append((x1 + i, int(y1 + slope * i)))  # Add the next point on the line
+        if rev:
+            line.reverse()
+
+        return line  # Finally, return the line!
+
+
 class OccupancyGridManager(object):
     def __init__(self, topic, subscribe_to_updates=False, base_frame='base_link', world_frame="map"):
         # OccupancyGrid starts on lower left corner
@@ -36,9 +67,10 @@ class OccupancyGridManager(object):
                                                  queue_size=1)
         rospy.loginfo("Waiting for '" +
                       str(self._sub.resolved_name) + "'...")
+        rate = rospy.Rate(0.1)
         while self._occ_grid_metadata is None and \
                 self._grid_data is None and not rospy.is_shutdown():
-            rospy.sleep(0.1)
+            rate.sleep()
         rospy.loginfo("OccupancyGridManager for '" +
                       str(self._sub.resolved_name) +
                       "' initialized!")
@@ -94,29 +126,29 @@ class OccupancyGridManager(object):
                                data.height, data.x:data.x + data.width] = data_np
         # print(self._grid_data)
 
-    # def get_world_x_y(self, costmap_x, costmap_y):
-    #     world_x = costmap_x * self.resolution + self.origin.position.x
-    #     world_y = costmap_y * self.resolution + self.origin.position.y
-    #     return world_x, world_y
+    def get_world_x_y(self, costmap_x, costmap_y):
+        world_x = costmap_x * self.resolution + self.origin.position.x
+        world_y = costmap_y * self.resolution + self.origin.position.y
+        return world_x, world_y
 
     def get_local_x_y(self, costmap_x, costmap_y):
         local_x = costmap_x * self.resolution + self.origin.position.x
         local_y = costmap_y * self.resolution + self.origin.position.y
         return local_x, local_y
 
-    def get_world_x_y(self, costmap_x, costmap_y):
-        if self._reference_frame == self._world_frame:
-            local_x, local_y = self.get_local_x_y(costmap_x, costmap_y)
-            return local_x, local_y
-        else:
-            pose = current_robot_pose(self._world_frame, self._base_frame)
-            yaw = get_yaw(pose.orientation)
-            cos_theta = math.cos(yaw)
-            sin_theta = math.sin(yaw)
-            local_x, local_y = self.get_local_x_y(costmap_x, costmap_y)
-            world_x = pose.position.x + (local_x * cos_theta - local_y * sin_theta)
-            world_y = pose.position.y + (local_x * sin_theta + local_y * cos_theta)
-            return world_x, world_y
+    # def get_world_x_y(self, costmap_x, costmap_y):
+    #     if self._reference_frame == self._world_frame:
+    #         local_x, local_y = self.get_local_x_y(costmap_x, costmap_y)
+    #         return local_x, local_y
+    #     else:
+    #         pose = current_robot_pose(self._world_frame, self._base_frame)
+    #         yaw = get_yaw(pose.orientation)
+    #         cos_theta = math.cos(yaw)
+    #         sin_theta = math.sin(yaw)
+    #         local_x, local_y = self.get_local_x_y(costmap_x, costmap_y)
+    #         world_x = pose.position.x + (local_x * cos_theta - local_y * sin_theta)
+    #         world_y = pose.position.y + (local_x * sin_theta + local_y * cos_theta)
+    #         return world_x, world_y
 
     def get_costmap_x_y(self, local_x, local_y):
         costmap_x = int(
@@ -159,6 +191,165 @@ class OccupancyGridManager(object):
             return True
         else:
             return False
+
+    def get_line_cost_map(self, x1, y1, x2, y2):
+        cost = 0
+        # Calculate differences and absolute differences between coordinates
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+
+        # Calculate the direction of the line
+        sx = 1 if x1 < x2 else -1
+        sy = 1 if y1 < y2 else -1
+
+        # Initialize error
+        error = dx - dy
+
+        # Initialize coordinates
+        x, y = x1, y1
+
+        try:
+            cost = self.get_cost_from_costmap_x_y(x, y)
+            if cost != 0:
+                return cost, self.get_world_x_y(x, y)
+        except:
+            pass
+
+        # Main loop to iterate through the line
+        while x != x2 or y != y2:
+            # Add the current point to the list
+            # Calculate the next coordinates
+            double_error = 2 * error
+            if double_error > -dy:
+                error -= dy
+                x += sx
+            if double_error < dx:
+                error += dx
+                y += sy
+            try:
+                cost = self.get_cost_from_costmap_x_y(x, y)
+                if cost != 0:
+                    return cost, self.get_world_x_y(x, y)
+            except:
+                pass
+
+        return cost, (None, None)
+
+
+
+    def get_line_cost_world(self, x1, y1, x2, y2):
+        x1, y1 = self.get_costmap_x_y(x1, y1)
+        x2, y2 = self.get_costmap_x_y(x2, y2)
+        print("val", self.get_line_cost_map(x1, y1, x2, y2))
+        cost, obs_xy = self.get_line_cost_map(x1, y1, x2, y2)
+        return cost, obs_xy
+
+    """
+    def get_line_cost_world(self, x1, y1, x2, y2):
+        cost = 255
+        x1, y1 = self.get_costmap_x_y(x1, y1)
+        x2, y2 = self.get_costmap_x_y(x2, y2)
+        if x1 == x2:  # Perfectly horizontal line, can be solved easily
+            # return [(x1, i) for i in np.arange(y1, y2, abs(y2 - y1) / (y2 - y1))]
+            print("Samhefjh")
+            if y1 > y2:
+                t = y1
+                y1 = y2
+                y2 = t
+            for y in range(y1, y2):
+                try:
+                    cost = self.get_cost_from_costmap_x_y(x1, y)
+                    print("cost", cost)
+                    if cost != 0:
+                        return cost, self.get_world_x_y(x1, y)
+                except:
+                    pass
+            return 0, self.get_world_x_y(x1, y)
+
+        if x1 > x2:  # If the line goes "backwards", flip the positions, to go "forwards" down it.
+            rev = True
+            x = x1
+            x1 = x2
+            x2 = x
+            y = y1
+            y1 = y2
+            y2 = y
+        slope = (y2 - y1) / (x2 - x1)  # Calculate the slope of the line
+        line = []
+        i = 0
+        while x1 + i < x2:  # Keep iterating until the end of the line is reached
+            i += 1
+            x, y = x1+1, int(y1 + slope * i)
+            try:
+                cost = self.get_cost_from_costmap_x_y(x, y)
+                print("cost", cost)
+                if cost != 0:
+                    return cost, self.get_world_x_y(x, y)
+            except:
+                pass
+
+
+        return cost, self.get_world_x_y(x, y)
+
+    def get_line_cost_world_xy(self, x1, y1, x2, y2):
+        x1, y1 = self.get_costmap_x_y(x1, y1)
+        x2, y2 = self.get_costmap_x_y(x2, y2)
+        x, y = x1, y1
+        # return 0 , self.get_world_x_y(x2, y2)
+        if x1 == x2:  # Perfectly horizontal line, can be solved easily
+            # return [(x1, i) for i in np.arange(y1, y2, abs(y2 - y1) / (y2 - y1))]
+            print("both x and y are same")
+            for y in range(y1, y2):
+                try:
+                    cost = self.get_cost_from_costmap_x_y(x1, y)
+                    print("cost", cost)
+                    if cost != 0:
+                        return cost, self.get_world_x_y(x1, y)
+                except: pass
+            return 0, self.get_world_x_y(x1, y)
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+        gradient = dy / float(dx)
+
+        if gradient > 1:
+            dx, dy = dy, dx
+            x, y = y, x
+            x1, y1 = y1, x1
+            x2, y2 = y2, x2
+
+        p = 2 * dy - dx
+        print(f"x = {x}, y = {y}")
+        # Initialize the plotting points
+        try:
+            cost = self.get_cost_from_costmap_x_y(x, y)
+            print("cost", cost)
+            if cost != 0:
+                return cost, self.get_world_x_y(x,y)
+        except:
+            pass
+
+        for k in range(1, dx + 1):
+            if p > 0:
+                y = y + 1 if y < y2 else y - 1
+                p = p + 2 * (dy - dx)
+            else:
+                p = p + 2 * dy
+
+            x = x + 1 if x < x2 else x - 1
+
+            print(f"x = {x}, y = {y}")
+            # xcoordinates.append(x)
+            # ycoordinates.append(y)
+            try:
+                cost = self.get_cost_from_costmap_x_y(x, y)
+                print("cost", cost)
+                if cost != 0:
+                    return cost, self.get_world_x_y(x,y)
+            except:
+                pass
+        return 0, self.get_world_x_y(x,y)
+        """
+
 
     def get_closest_cell_under_cost(self, x, y, cost_threshold, max_radius):
         """

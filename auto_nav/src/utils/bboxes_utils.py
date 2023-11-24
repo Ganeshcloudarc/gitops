@@ -46,7 +46,7 @@ def filter_bboxes_by_path(path, bboxes, radius):
     left_side = []
     right_side = []
     close_pt_x, close_pt_y = path[0][0], path[0][1]
-    for i in range(len(path)-6):
+    for i in range(len(path) - 6):
         path_x, path_y = path[i][0], path[i][1]
         path_vect = [path[i + 5][0] - path_x, path[i + 5][1] - path_y]
         for j in range(len(bboxes)):
@@ -68,7 +68,8 @@ def filter_bboxes_by_path(path, bboxes, radius):
     left_bboxes = [bboxes[i] for i in left_side]
     right_bboxes = [bboxes[i] for i in right_side]
 
-    filtered_bboxes.sort(key=lambda bbox: math.hypot(close_pt_x - bbox.pose.position.x, close_pt_y - bbox.pose.position.y))
+    filtered_bboxes.sort(
+        key=lambda bbox: math.hypot(close_pt_x - bbox.pose.position.x, close_pt_y - bbox.pose.position.y))
     left_bboxes.sort(key=lambda bbox: math.hypot(close_pt_x - bbox.pose.position.x, close_pt_y - bbox.pose.position.y))
     right_bboxes.sort(key=lambda bbox: math.hypot(close_pt_x - bbox.pose.position.x, close_pt_y - bbox.pose.position.y))
 
@@ -117,3 +118,42 @@ def filter_by_area(bboxes, min_area=0, max_area=100):
         if min_area <= area <= max_area:
             filtered_bboxes.append(box)
     return filtered_bboxes
+
+
+def inside_radius(bboxes, radius):
+    filtered_bboxes = []
+    # filtered_bboxes.boxes =
+    for i in range(len(bboxes.boxes)):
+        dis = math.hypot(bboxes.boxes[i].pose.position.x, bboxes.boxes[i].pose.position.y)
+        # print("dis", dis)
+        if dis <= radius:
+            filtered_bboxes.append(bboxes.boxes[i])
+    return filtered_bboxes
+
+
+def enlarge_bboxes(bboxes, scaling_factor):
+    pass
+
+
+
+
+if __name__ == "__main__":
+    from jsk_recognition_msgs.msg import BoundingBoxArray, BoundingBox
+    bboxes_arr = BoundingBoxArray()
+    for j in range(1, 10):
+        bbox = BoundingBox()
+        bbox.pose.position.x = j
+        bbox.pose.position.y = 0
+        bboxes_arr.boxes.append(bbox)
+    print("original bboxes ", len(bboxes_arr.boxes))
+
+    new_bboxes = inside_radius(bboxes_arr, 8)
+    print("new bboxes len", len(new_bboxes))
+
+
+
+
+
+
+
+

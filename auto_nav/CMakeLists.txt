@@ -16,6 +16,10 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   tf2_geometry_msgs
   lidar_obstacle_detector
+  costmap_2d
+  autopilot_msgs
+  autopilot_utils
+  
 )
 
 ## System dependencies are found with CMake's conventions
@@ -107,13 +111,13 @@ find_package(catkin REQUIRED COMPONENTS
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
- INCLUDE_DIRS include
- LIBRARIES auto_nav
- CATKIN_DEPENDS roscpp rospy std_msgs pcl_ros tf2_ros tf2_geometry_msgs lidar_obstacle_detector
-#  DEPENDS system_lib
-)
 
+catkin_package(
+  INCLUDE_DIRS include
+  LIBRARIES ${PROJECT_NAME}
+  CATKIN_DEPENDS roscpp
+#  DEPENDS other non-ROS libs
+)
 ###########
 ## Build ##
 ###########
@@ -125,10 +129,8 @@ include
 ${catkin_INCLUDE_DIRS}
 )
 
-## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/auto_nav.cpp
-# )
+
+
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -136,6 +138,11 @@ ${catkin_INCLUDE_DIRS}
 # add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_executable(pointcloud_map_node src/PointcloudMap/pointcloud_map.cpp)
 # set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+# add_executable(costmap_sub src/cpp/costmap_node.cpp)
+
+add_executable(autonav_core_node src/cpp/autonav_core.cpp)
+# add_executable(sample_pub src/cpp/sample_pub.cpp)
+
 
 # add_dependencies(local_pointcloud_map_node 
 #   ${${PROJECT_NAME}_EXPORTED_TARGETS}
@@ -148,7 +155,22 @@ target_link_libraries(pointcloud_map_node
   # ${${PROJECT_NAME}_LIBRARY}
   # ${PROJECT_NAME}
 )
+# target_link_libraries(costmap_sub
+#   ${catkin_LIBRARIES}
+#   # ${${PROJECT_NAME}_LIBRARY}
+#   # ${PROJECT_NAME}
+# )
 
+target_link_libraries(autonav_core_node
+  ${catkin_LIBRARIES}
+  # ${${PROJECT_NAME}_LIBRARY}
+  # ${PROJECT_NAME}
+)
+# target_link_libraries(sample_pub
+#   ${catkin_LIBRARIES}
+#   # ${${PROJECT_NAME}_LIBRARY}
+#   # ${PROJECT_NAME}
+# )
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context

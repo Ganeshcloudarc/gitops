@@ -9,8 +9,8 @@ enable_tree_mapping : true
 tree_mapping_topic : "tree_cloud_map"
 gps_home_position_topic : "/mavros/global_position/home"
 voxel_size : 0.5 # voxel size of 
-local_map_size_x : 30 # left and right side 
-local_map_size_y : 30 # forward and backward 
+local_map_size_x : 10 # left and right side
+local_map_size_y : 10 # forward and backward
 min_height_local_frame : 1 # min height wrt local_frame
 max_height_local_frame : 3 # max height wrt local_frame
 
@@ -25,8 +25,8 @@ crop_box_min_z: -3
 
 # Tree clustering parameters
 cluster_threshold: 0.7
-cluster_max_size: 150
-cluster_min_size: 5
+cluster_max_size: 300
+cluster_min_size: 10
 
 # Bouding box by its Area
 min_area : 4 

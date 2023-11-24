@@ -79,7 +79,7 @@ def convert_point(point, from_frame, to_frame):
     if tfBuffer is None or listener is None:
         _init_tf()
     try:
-        trans = tfBuffer.lookup_transform(to_frame, from_frame, rospy.Time.now(), rospy.Duration(2.0))
+        trans = tfBuffer.lookup_transform(to_frame, from_frame,  rospy.Time(0))
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
         rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, from_frame))
         rospy.logerr(str(e))
@@ -296,7 +296,7 @@ def transform_lidar_objects(bbox_arr_data, to_frame):
         trans = tfBuffer.lookup_transform(to_frame, bbox_arr_data.header.frame_id, rospy.Time(0))
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
         rospy.logerr('FAILED TO GET TRANSFORM FROM %s to %s' % (to_frame, bbox_arr_data.header.frame_id))
-        return None, None
+        return None
     for i in range(len(bbox_arr_data.boxes)):
         bbox_arr_data.boxes[i].pose = \
             tf2_geometry_msgs.do_transform_pose(gmsg.PoseStamped(pose=bbox_arr_data.boxes[i].pose), trans).pose
@@ -306,7 +306,7 @@ def transform_lidar_objects(bbox_arr_data, to_frame):
     return bbox_arr_data
 
 
-def bbox_to_corners(bbox):
+def bbox_to_corners(bbox, scale=0):
     """
         finds the corner points from jsk_recognition_msgs/BoundingBox
         :param bbox: (jsk_recognition_msgs/BoundingBox)
@@ -325,8 +325,8 @@ def bbox_to_corners(bbox):
     for x_, y_ in trans_list:
         # print(x_)
         pt = gmsg.Point()
-        pt.x = bbox.pose.position.x + x_ * bbox.dimensions.x
-        pt.y = bbox.pose.position.y + y_ * bbox.dimensions.y
+        pt.x = bbox.pose.position.x + x_ * (bbox.dimensions.x/2 + scale)
+        pt.y = bbox.pose.position.y + y_ * (bbox.dimensions.y/2 + scale)
         # print("x", pt.x)
         # print("x", type(pt.y))
         # print(np.array([pt.x, pt.y]))

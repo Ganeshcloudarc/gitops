@@ -56,8 +56,10 @@
   <build_depend>tf2_ros</build_depend>
   <build_depend>tf2_geometry_msgs</build_depend>
 <build_depend>lidar_obstacle_detector</build_depend>
-
-
+<build_depend>costmap_2d</build_depend>
+<build_depend>autopilot_msgs</build_depend>
+<build_depend>autopilot_utils</build_depend>
+<build_depend>laser_geometry</build_depend>
 
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
@@ -66,7 +68,10 @@
   <build_export_depend>tf2_ros</build_export_depend>
   <build_export_depend>tf2_geometry_msgs</build_export_depend>
   <build_export_depend>lidar_obstacle_detector</build_export_depend>
-
+  <build_export_depend>costmap_2d</build_export_depend>
+  <build_export_depend>autopilot_msgs</build_export_depend>
+  <build_export_depend>autopilot_utils</build_export_depend>
+  <build_export_depend>laser_geometry</build_export_depend>
 
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
@@ -75,7 +80,10 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>tf2_geometry_msgs</exec_depend>  
   <exec_depend>lidar_obstacle_detector</exec_depend>  
-
+  <exec_depend>costmap_2d</exec_depend>  
+  <exec_depend>autopilot_msgs</exec_depend>  
+  <exec_depend>laser_geometry</exec_depend> 
+    <exec_depend>autopilot_utils</exec_depend>   
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

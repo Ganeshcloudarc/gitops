@@ -2,6 +2,7 @@
     <arg name="cloud_in_for_auto_nav" default="/local_cloud_map"/>
     <arg name="cloud_in_for_local_map" default="rslidar_points"/>
     <arg name="mission_continue" default="false"/>
+    <arg name="use_autonav_cpp" default ="true"/>
     <arg name="enable_cloud_mapping" default="true"/>
     <param name="/patrol/mission_continue" value ="$(arg mission_continue)"/>
 
@@ -18,9 +19,27 @@
         <arg name="scan_out" value="laser_scan"/>
     </include>
 
+    <!-- <include file="$(find collision_check)/launch/costmap2.launch"/> -->
+
     <!-- autonav node -->
-    <rosparam command="load" file="$(find auto_nav)/params/autonav_params.yaml"/>
-    <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen' required="true"/>
+<!--    <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen' required="true"/>-->
+    
+    <group if="$(arg use_autonav_cpp)">
+        <node pkg = "auto_nav" type = "autonav_core_node" name = "autonav_core_node" output = 'screen'>
+            <rosparam command="load" file="$(find auto_nav)/params/autonav_params_cpp.yaml"/>
+            <rosparam file="$(find collision_check)/params/costmap_params.yaml" command="load" ns="costmap" />
+        </node>
+    </group>
+    
+    <group unless="$(arg use_autonav_cpp)">
+        <rosparam command="load" file="$(find auto_nav)/params/autonav_params.yaml"/>
+        <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen'/>
+    </group>
+
+    <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+            <arg name="rviz" value="false"/>
+            <arg name="points_in" value="$(arg cloud_in_for_local_map)"/>
+    </include>
 
     <!-- local cloud map node -->
     <include file="$(find auto_nav)/launch/pointcloud_map.launch">

@@ -2,7 +2,7 @@
    <arg name="cloud_in" default="/obstacle_detector/cloud_clusters"/>
    <arg name="scan_out" default="laser_scan"/>
 <!--   <arg name="target_frame" default="base_link"/>-->
-   <arg name="config_file" default="cloud_to_laser_360_params.yaml"/>
+   <arg name="config_file" default="cloud_to_laser_180_params.yaml"/>
 
    <node name='$(anon autonav_pointcloud_to_laserscan_node)' pkg='pointcloud_to_laserscan' type='pointcloud_to_laserscan_node'>
       <remap from="cloud_in" to="$(arg cloud_in)"/>

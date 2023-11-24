@@ -1,19 +1,18 @@
 global_frame: map
 robot_base_frame: base_link
-update_frequency: 5
+update_frequency: 10
 publish_frequency: 15
 
 #set if you want the voxel map published
-publish_voxel_map: true
 
 #set to true if you want to initialize the costmap from a static map
 static_map: false
 
 #begin - COMMENT these lines if you set static_map to true
 rolling_window: true
-width: 50
-height: 50
-resolution: 0.01
+width: 20
+height: 20
+resolution: 0.1
 #end - COMMENT these lines if you set static_map to true
 
 #START VOXEL STUFF
@@ -23,15 +22,21 @@ z_resolution: 0.2
 z_voxels: 10
 unknown_threshold: 10
 mark_threshold: 0
+publish_voxel_map : False
+footprint_clearing_enabled : true
 #END VOXEL STUFF
-transform_tolerance: 0.3
-obstacle_range: 50
-max_obstacle_height: 8
-raytrace_range: 50
-footprint: [[-0.325, -0.325], [-0.325, 0.325], [0.325, 0.325], [0.46, 0.0], [0.325, -0.325]]
+#transform_tolerance: 0.3
+transform_tolerance: 3.0
+
+#obstacle_range: 50
+#max_obstacle_height:
+#raytrace_range: 50
+#footprint: [[-1, -0.65], [-1, 3.35], [1, 3.35], [1, -3.35]]
+footprint: [[-0.65, 1], [-0.65, -1],[3.35, -1], [3.35, 1]]
+
 #robot_radius: 0.46
-footprint_padding: 0.01
-inflation_radius: 0.55
+footprint_padding: 0.2
+inflation_radius: 1.0
 cost_scaling_factor: 10.0
 lethal_cost_threshold: 100
 #observation_sources: base_scan
@@ -44,16 +49,14 @@ lethal_cost_threshold: 100
 ##base_scan: {data_type: LaserScan, expected_update_rate: 0.4,
 ##  observation_persistence: 0.0, marking: true, clearing: true, max_obstacle_height: 0.4, min_obstacle_height: 0.08}
 obstacle_layer:
-    observation_sources: point_cloud_sensor
-    # laser: {sensor_frame: ego_vehicle/lidar,data_type: PointCloud2, clearing: true, marking: true, topic: /carla/ego_vehicle/lidar, inf_is_valid: false}
-    point_cloud_sensor: {sensor_frame: /rslidar, data_type: PointCloud2, topic: /rslidar_points, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.3, max_obstacle_height: 3.0,
-     raytrace_range: 50 ,obstacle_range: 50}
-        #,min_z: 0.1 ,max_z: 8.0}
-        # max_obstacle_height: 3
-        # obstacle_range: 30
-        # raytrace_range: 31
-inflation:
-    inflation_radius: 1.0
+    observation_sources: rslidar lslidar
+#     point_cloud_sensor : {sensor_frame: lslidar,data_type: LaserScan, clearing: true, marking: true, topic: /laser_scan, inf_is_valid: false}
+    rslidar: {sensor_frame: rslidar, data_type: PointCloud2, topic: /rslidar_points, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.3, max_obstacle_height: 1.0,
+     raytrace_range: 30 ,obstacle_range: 30}
+    lslidar: {sensor_frame: lslidar, data_type: PointCloud2, topic: /lslidar_point_cloud, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.3, max_obstacle_height: 1.0,
+     raytrace_range: 30 ,obstacle_range: 30}
+# inflation:
+#     inflation_radius: 5.0
 
 #'''
 #obstacle_layer:

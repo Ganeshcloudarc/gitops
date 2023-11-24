@@ -1,12 +1,20 @@
 <launch>
-   <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
-       <arg name="vehicle_type" value="half_cabin"/>
+    <arg name="vehicle_type" default="half_cabin" doc="It can be either half_cabin or porter"/>
+
+    <arg name="enable_rslidar" default="false"/>
+    <arg name="enable_lslidar" default="true"/>
+    <arg name="enable_zed" default="false"/>
+
+    <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
+        <arg name="vehicle_type" value="$(arg vehicle_type)"/>
         <arg name="vcu_up" default="false"/>
         <arg name="gps_up" default="false"/>
-        <arg name="zed_camera" value="false"/>
+        <arg name="zed_camera" value="$(arg enable_zed)"/>
         <arg name="2d_lidar" value="false"/>
-        <arg name="3d_lidar" value="true"/>
-   </include>
+        <!-- <arg name="3d_lidar" value="$(eval arg('enable_obs_v1') or arg('use_pcl_boxes'))"/> -->
+        <arg name="rslidar" value="$(arg enable_rslidar)"/>
+        <arg name="lslidar" value="$(arg enable_lslidar)"/>
+    </include>
 
     <node name="autonav_bag_record" pkg="rosbag" type="record"
             args="record -o $(env HOME)/.bags/auto_nav_data_collect -a  "/>
