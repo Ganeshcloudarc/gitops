@@ -111,7 +111,7 @@ class CollisionMonitor:
 
         self.pub_poly = rospy.Publisher("collision_monitor_polygon", PolygonStamped, queue_size=1, latch=True)
         self.diagnostics_pub = rospy.Publisher("/collision_monitor_diagnostics", DiagnosticArray, queue_size=1)
-        self.pilot_stop_command_pub = rospy.Publisher("/vehicle/stop_command", vehicle_stop_command, queue_size=1)
+        self.pilot_stop_command_pub = rospy.Publisher("/vehicle/break_command", vehicle_stop_command, queue_size=1)
         self.diagnostics_arr = DiagnosticArray()
         self.diagnostics_arr.header.frame_id = self.robot_base_frame
         self.diagnose = DiagnosticStatusWrapper()
