@@ -257,6 +257,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           ROS_INFO("Turn trajectory published");
           slope_list.clear();
           intercept_list.clear();
+          loop_rate.sleep();
+          ros::spinOnce();
         }
         
 
