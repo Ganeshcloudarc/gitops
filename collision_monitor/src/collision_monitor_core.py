@@ -199,7 +199,7 @@ class CollisionMonitor:
 
 
     def load_params(self):
-        self.robot_base_frame = rospy.get_param("~collision_monitor/base_frame_id", 1.0)
+        self.robot_base_frame = rospy.get_param("~collision_monitor/base_frame_id", "base_link")
         self.frequency = rospy.get_param("~collision_monitor/frequency", 10)
         self.souce_timeout = rospy.get_param("~collision_monitor/source_timeout", 5)
         self.min_points = rospy.get_param("~collision_monitor/min_points", 4)
