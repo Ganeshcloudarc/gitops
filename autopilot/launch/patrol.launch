@@ -12,6 +12,7 @@
     <arg name="obs_stop_planner" default="true"/>
     <arg name="enable_centering" default="false"/>
 
+
     <arg name="enable_zed_obs" default="true"/>
     <arg name="enable_obs_v1" default="true"/>
     <arg name="use_pcl_boxes" default="true"/>
@@ -24,6 +25,10 @@
     <arg name="enable_rqt" default="false"/>
     
     <arg name="allow_reversing" default="true"/>
+
+    <!-- Collision Monitor node -->
+    <arg name="enable_collision_monitor" default="true"/>
+
 
 
 
@@ -119,6 +124,18 @@
         <node name="auto_nav_bag_record" pkg="rosbag" type="record"
             args="record -o $(env HOME)/.bags/auto_nav -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/local_cloud_map|/global_cloud_map|/rslidar_points|/lslidar_point_cloud" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
     </group>
+
+    <!-- collision monitor -->
+    <group if="$(eval arg('enable_collision_monitor'))">
+        <include file="$(find pointcloud_to_laserscan_launcher)/launch/pointcloud_to_laserscan.launch">
+            <arg name="cloud_in" value="$(arg cloud_in)"/>
+            <arg name="scan_out" value="lidar_laser_scan"/>
+            <arg name="config_file" value="lidar_collision_monitor_p2c.yaml"/>
+        </include>
+        <include file="$(find collision_monitor)/launch/collision_monitor.launch">
+        </include>
+    </group>
+
 
     
 

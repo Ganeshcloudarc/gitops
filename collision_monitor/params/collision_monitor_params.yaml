@@ -1,0 +1,23 @@
+collision_monitor:
+  base_frame_id: "base_link" # Robot base frame.
+  source_timeout: 5.0 # before time out
+  frequency: 15 # frequency of the collision monitor node.
+  min_points: 5 # Minimum points inside the polygon to not consider as collision.
+  points : [[-0.65, 1], [-0.65, -1],[3.35, -1], [3.35, 1]] # Foot_print points representing the vehicle wrt base_link
+
+
+  observation_sources: [ "rslidar_scan"] # ["zed_scan"]
+  rslidar_scan:
+    type: "scan"
+    topic: "lidar_laser_scan"
+
+  zed_scan:
+    type: "scan"
+    topic: "/slamware_ros_sdk_server_node/scan"
+
+  pointcloud:
+    type: "pointcloud"
+    topic: "/rslidar_points"
+    min_height: 0.1
+    max_height: 0.5
+
