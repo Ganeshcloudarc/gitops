@@ -16,6 +16,7 @@ patrol:
   cmd_topic            : "/pure_pursuit/cmd_drive"
   pilot_cmd_in         : "/vehicle/cmd_drive_safe"
   wait_time_on_mission_complete  : 2  # secs
+  radius_threshold : 15 #circle radius generated with 3 values--> close pts, lookahead pts, turn_detection_dis
   google_map_center_always : true
   max_forward_speed : 1.0
   min_forward_speed : 0.8
@@ -24,6 +25,7 @@ patrol:
   enable_cte_based_speed_control : True
 
 pure_pursuit:
+  turn_detection_dis : 2 # meters to detect turn from 2 meter of turn 
   min_look_ahead_dis : 3 # meters
   max_look_ahead_dis : 6 # meters
   speed_to_lookahead_ratio : 1
