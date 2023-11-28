@@ -1,6 +1,9 @@
 #include<auto_nav/autonav_core.h>
 
 
+namespace auto_nav
+{
+
 
 AutoNavCore::AutoNavCore() : tf2_listener(tf2_buffer),
 odom_data_received(false), global_traj_data_received(false), curr_scan_data_received(false), curr_local_scan_data_receiced(false), in_turn_status(false)
@@ -8,6 +11,7 @@ odom_data_received(false), global_traj_data_received(false), curr_scan_data_rece
 {
   ros::NodeHandle private_nh("~");
   loadParams(private_nh);
+  diag_status.name =ros::this_node::getName();
   dwa_path_gen.update_params(dwa_wheel_base, dwa_steering_agle_lim, dwa_constant_speed, dwa_path_len, dwa_path_resolution);
 
   if(use_dwa)
@@ -20,7 +24,11 @@ odom_data_received(false), global_traj_data_received(false), curr_scan_data_rece
   local_traj_pub = private_nh.advertise<autopilot_msgs::Trajectory>("/local_gps_trajectory", 1);
   local_path_pub = private_nh.advertise<nav_msgs::Path>("/local_trajectory", 1);
   path_percent_publisher =  private_nh.advertise<std_msgs::Float32>("/osp_path_percentage", 10);
-  lanes_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("/lanes", 1,true);
+  lanes_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("lanes", 1,true);
+  diagnostis_pub = private_nh.advertise<diagnostic_msgs::DiagnosticArray>("autonav_diagnostics", 1,true);
+
+
+
 
 
   if (pub_debug_topics)
@@ -29,14 +37,14 @@ odom_data_received(false), global_traj_data_received(false), curr_scan_data_rece
   left_line_pub = private_nh.advertise<nav_msgs::Path>("left_line", 1);
   right_line_pub = private_nh.advertise<nav_msgs::Path>("right_line", 1);
   front_pose_pub = private_nh.advertise<geometry_msgs::PoseStamped>("front_pose", 1);
-  map_point_cloud_pub = private_nh.advertise<sensor_msgs::PointCloud2>("/map_point_cloud", 1);
-  left_liners_cloud_pub = private_nh.advertise<sensor_msgs::PointCloud2>("/left_inliers", 1);
-  right_inliers_cloud_pub = private_nh.advertise<sensor_msgs::PointCloud2>("/right_inliers", 1);
-  dwa_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("/dwa_paths", 1,true);
-  dwa_collsion_free_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("/dwa_paths_collsion_free", 1,true);
-  dwa_best_traj_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("/dwa_best_traj", 1,true);
+  map_point_cloud_pub = private_nh.advertise<sensor_msgs::PointCloud2>("map_point_cloud", 1);
+  left_liners_cloud_pub = private_nh.advertise<sensor_msgs::PointCloud2>("left_inliers", 1);
+  right_inliers_cloud_pub = private_nh.advertise<sensor_msgs::PointCloud2>("right_inliers", 1);
+  dwa_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("dwa_paths", 1,true);
+  dwa_collsion_free_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("dwa_paths_collsion_free", 1,true);
+  dwa_best_traj_marker_pub = private_nh.advertise<visualization_msgs::MarkerArray>("dwa_best_traj", 1,true);
 
-  ransac_samples_pub = private_nh.advertise<visualization_msgs::Marker>("/ransac_samples", 1,true);
+  ransac_samples_pub = private_nh.advertise<visualization_msgs::Marker>("ransac_samples", 1,true);
   vibration_path_pub =  private_nh.advertise<nav_msgs::Path>("vibration_path", 1);
   }
 
@@ -91,6 +99,7 @@ void AutoNavCore::loadParams(ros::NodeHandle private_nh)
 
 
 
+
 void AutoNavCore::main_loop(ros::NodeHandle private_nh)
 {   
   // IMP lines for dubins path 
@@ -101,12 +110,16 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
     {
       if (curr_local_scan_data_receiced and curr_scan_data_received and global_traj_data_received and odom_data_received)
         {   ROS_INFO("data received on all sensors");
+        diag_status.summary(OK,"data received on all sensors" );
             break;
         }
       else
         {
           ROS_WARN_STREAM("NO data received on all sensors");
           // ROS_WARN_STREAM("curr_local_scan_data_receiced" + curr_local_scan_data_receiced );//"  and curr_scan_data_received and global_traj_data_received and odom_data_received
+          diag_status.summary(ERROR, "NO data received on all sensors");
+          publish_diagnostics();
+
           rate.sleep();
           ros::spinOnce();
         }
@@ -120,6 +133,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
     while(ros::ok())
     { 
       marker_arr.markers.clear();
+      diag_status.clearSummary();
+      diag_status.values.clear();
       
         tuple<bool, int> val;
         if (close_index == -1)
@@ -132,6 +147,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           else
           {
             ROS_WARN_STREAM("No close point found");
+            diag_status.summary(ERROR, "No close point found");
+            publish_diagnostics();
             loop_rate.sleep();
             ros::spinOnce();
             continue;
@@ -157,6 +174,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             ROS_INFO("mission completed");
             ROS_INFO("Restarting the mission");
             close_index = 1;
+            diag_status.summary(ERROR, "mission completed, Restarting the mission");
+            publish_diagnostics();
             loop_rate.sleep();
             ros::spinOnce();
             in_turn_status = false;
@@ -166,6 +185,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             
           }
               ROS_ERROR("mission completed");
+              diag_status.summary(ERROR, "mission completed, Stoping the vehicle");
+              publish_diagnostics();
               return ;
         }
         int forward_path_idx = traj_helper.next_point_within_dist(close_index, row_spacing);
@@ -255,6 +276,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           local_path_pub.publish(turn_path);
 
           ROS_INFO("Turn trajectory published");
+          diag_status.summary(WARN, "Turn detected, forwarding the save path");
+          publish_diagnostics();
           slope_list.clear();
           intercept_list.clear();
           loop_rate.sleep();
@@ -478,6 +501,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           if (left_close_points.size() == 0 or right_close_points.size() == 0)
           {
             ROS_ERROR("No Left points and right points");
+            diag_status.summary(ERROR, "No Left points and right point");
+            publish_diagnostics();
             loop_rate.sleep();
             ros::spinOnce();
             continue;
@@ -604,6 +629,8 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           {
             ROS_WARN("%s", ex.what());
             ROS_ERROR("Could not transform");
+            diag_status.summary(ERROR, ex.what());
+            publish_diagnostics();
             loop_rate.sleep();
             ros::spinOnce();
             continue;
@@ -725,9 +752,11 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           {
             ROS_WARN("%s", ex.what());
             ROS_ERROR("Could not transform");
-               loop_rate.sleep();
-                ros::spinOnce();
-                continue;
+            diag_status.summary(ERROR, ex.what());
+            publish_diagnostics();
+            loop_rate.sleep();
+            ros::spinOnce();
+            continue;
             // return ;
           }
           double slope = (point2_center_map.y - point1_center_map.y)/(point2_center_map.x -point1_center_map.x);
@@ -792,8 +821,7 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           ROS_DEBUG("vibration path is puslished");
           }
 
-
-          
+          diag_status.add("DWA_enabled", use_dwa);
           if(use_dwa)
           {
 
@@ -809,15 +837,18 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             if (center_collision.second == 0)
             {
               ROS_INFO("NO collions found on moving_avg_center_lane");
+              diag_status.add("Line_Collision_status", false);
             }
             else
             {
               ROS_ERROR("collions found on moving_avg_center_lane");
+              diag_status.add("Line_Collision_status", true);
             }
 
           }
           else{
             ROS_ERROR("Could not find cost to line");
+            diag_status.add("Line_Collision_status", "Could not find cost to line");
           }
 
           // Finding the row end detection using left lane and right lanes
@@ -950,6 +981,7 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           double dubinsStepSize  = 0.1;
           x+= dubinsStepSize;
           unsigned int mx,my;
+          // diag_status.add("Dubins_Collision_Status", false);
           while (x <  length) {
             double q[3];
             dubins_path_sample(&path, x, q);
@@ -958,6 +990,7 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             // cout<<"cost"<<static_cast<unsigned int>(cost)<<endl;
             if (cost != 0 ){
               ROS_ERROR("COLLISION FOUND ON DUBINS CURVES");
+              diag_status.add("Dubins_Collision_Status", true);
               DubinsMarker.color.r = 1;
               DubinsMarker.color.g = 0.0;
               break;
@@ -1029,12 +1062,15 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           ROS_DEBUG_STREAM("costmap reset status : "<< reset_costmap );
           if (collision_free_path_ids.size() == 0)
           {
-            ROS_ERROR("Could not found collision free  published");
+            ROS_ERROR("Could not found collision free DWA paths");
+            diag_status.summary(ERROR, "Could not found collision free DWA paths, Restin the costmap");
+            diag_status.add("reset_costmap", reset_costmap);
             // costmap_ = costmap_ros_->getCostmap();
             if (reset_costmap == true)
              { costmap_ros_->resetLayers();
                reset_costmap = false;
              }
+            publish_diagnostics();
             loop_rate.sleep();
             ros::spinOnce();
             continue;
@@ -1098,7 +1134,7 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
             traj_point.pose.position.x = collision_free_paths[min_cost_index][i][0];
             traj_point.pose.position.y = collision_free_paths[min_cost_index][i][1];
             traj_point.pose.orientation = get_quaternion_from_yaw(collision_free_paths[min_cost_index][i][2]);
-            traj_point.longitudinal_velocity_mps = 1;
+            traj_point.longitudinal_velocity_mps = traj_helper.get_trajectory_point_by_index(close_index).longitudinal_velocity_mps;
             if (i == 0)
             traj_point.accumulated_distance_m = 0;
             else
@@ -1112,37 +1148,43 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh)
           local_traj_pub.publish(dwa_traj);
           local_path_pub.publish(dwa_path);
           ROS_INFO("dwa_traj and dwa_path are published");
+          diag_status.summary(OK, "dwa_traj and dwa_path are published");
           }
           
         else{
-          // publish the line
-          // double line_heading = atan( start_point_center_lane.y-forward_point_center_lane.y /start_point_center_lane.x - forward_point_center_lane.x);
-          // double line_heading = atan2(forward_point_center_lane.y - start_point_center_lane.y , forward_point_center_lane.x - start_point_center_lane.x);
-          
-          autopilot_msgs::Trajectory line_traj;
-          line_traj.header.frame_id = "map";
-          nav_msgs::Path line_path;
-          line_path.header.frame_id = "map";
-          for(int i = 0; i<  local_traj_length/dwa_path_resolution; i++ )
-          {
-            autopilot_msgs::TrajectoryPoint traj_point;
-            traj_point.pose.position.x =  start_point_center_lane.x + cos(line_heading)*i*dwa_path_resolution;
-            traj_point.pose.position.y =  start_point_center_lane.y + sin(line_heading)*i*dwa_path_resolution;
-            traj_point.pose.orientation = get_quaternion_from_yaw(line_heading);
-            traj_point.longitudinal_velocity_mps = 1;
-            traj_point.accumulated_distance_m = i*dwa_path_resolution;
-            line_traj.points.push_back(traj_point);
-            geometry_msgs::PoseStamped pst;
-            pst.header.frame_id = "map";
-            pst.pose = traj_point.pose;
-            line_path.poses.push_back(pst);
+            // publish the line
+            // double line_heading = atan( start_point_center_lane.y-forward_point_center_lane.y /start_point_center_lane.x - forward_point_center_lane.x);
+            // double line_heading = atan2(forward_point_center_lane.y - start_point_center_lane.y , forward_point_center_lane.x - start_point_center_lane.x);
+            
+            autopilot_msgs::Trajectory line_traj;
+            line_traj.header.frame_id = "map";
+            nav_msgs::Path line_path;
+            line_path.header.frame_id = "map";
+            for(int i = 0; i<  local_traj_length/dwa_path_resolution; i++ )
+            {
+              autopilot_msgs::TrajectoryPoint traj_point;
+              traj_point.pose.position.x =  start_point_center_lane.x + cos(line_heading)*i*dwa_path_resolution;
+              traj_point.pose.position.y =  start_point_center_lane.y + sin(line_heading)*i*dwa_path_resolution;
+              traj_point.pose.orientation = get_quaternion_from_yaw(line_heading);
+              traj_point.longitudinal_velocity_mps = traj_helper.get_trajectory_point_by_index(close_index).longitudinal_velocity_mps;
+              traj_point.accumulated_distance_m = i*dwa_path_resolution;
+              line_traj.points.push_back(traj_point);
+              geometry_msgs::PoseStamped pst;
+              pst.header.frame_id = "map";
+              pst.pose = traj_point.pose;
+              line_path.poses.push_back(pst);
+            }
+              local_traj_pub.publish(line_traj);
+              local_path_pub.publish(line_path);
+              ROS_INFO("line_traj and line_path are published");
+              diag_status.summary(OK, "line_traj and line_path are published");
+            
+            
           }
-          local_traj_pub.publish(line_traj);
-          local_path_pub.publish(line_path);
-          ROS_INFO("line_traj and line_path are published");
+        
         }
+        publish_diagnostics();
         lanes_marker_pub.publish(marker_arr);
-        }
         loop_rate.sleep();
         ros::spinOnce();
         
@@ -1177,6 +1219,14 @@ void AutoNavCore::odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
     curr_odom = odom;
     odom_data_received = true;
     curr_robot_pose = odom->pose.pose;
+}
+
+inline void AutoNavCore::publish_diagnostics()
+{
+  diagnostic_msgs::DiagnosticArray msg;
+  msg.status.push_back(diag_status);
+  msg.header.stamp = ros::Time::now(); // Add timestamp for ROS 0.10
+  diagnostis_pub.publish(msg);
 }
 
 

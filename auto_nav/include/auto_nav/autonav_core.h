@@ -40,6 +40,10 @@
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <costmap_2d/costmap_2d_ros.h>
+#include <diagnostic_msgs/DiagnosticStatus.h>
+#include <diagnostic_msgs/DiagnosticArray.h>
+
+#include<diagnostic_updater/DiagnosticStatusWrapper.h>
 
 
 
@@ -61,6 +65,10 @@ class AutoNavCore
         tf2_ros::TransformListener tf2_listener;
         
         autopilot_utils::TrajectoryHelper traj_helper;
+        int OK = diagnostic_msgs::DiagnosticStatus::OK;
+        int ERROR = diagnostic_msgs::DiagnosticStatus::ERROR;
+        int WARN = diagnostic_msgs::DiagnosticStatus::WARN;
+        int STALE = diagnostic_msgs::DiagnosticStatus::STALE;
 
     private:
         void localScanCallback(const sensor_msgs::LaserScan::ConstPtr& local_scan);
@@ -75,12 +83,14 @@ class AutoNavCore
         ros::Publisher map_point_cloud_pub, left_liners_cloud_pub,right_inliers_cloud_pub;
         ros::Publisher lanes_marker_pub, dwa_marker_pub, dwa_collsion_free_marker_pub, ransac_samples_pub;
         ros::Publisher vibration_path_pub, dwa_best_traj_marker_pub;
+        ros::Publisher diagnostis_pub;
         nav_msgs::Odometry::ConstPtr curr_odom;
         autopilot_msgs::Trajectory local_traj, global_traj;
         sensor_msgs::LaserScan::ConstPtr curr_scan, curr_local_scan;
         geometry_msgs::Pose curr_robot_pose;
         nav_msgs::Path vibration_path;
         bool odom_data_received, global_traj_data_received, curr_scan_data_received, curr_local_scan_data_receiced;
+        inline void publish_diagnostics();
         laser_geometry::LaserProjection scan_projector;
         laser_geometry::LaserProjection local_scan_projector;
          costmap_2d::Costmap2DROS* costmap_ros_;
@@ -127,4 +137,6 @@ class AutoNavCore
         double speed  =1;
         visualization_msgs::MarkerArray marker_arr;
         bool in_turn_status = false;
+        diagnostic_updater::DiagnosticStatusWrapper diag_status;
 };
+}
