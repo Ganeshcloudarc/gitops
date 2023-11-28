@@ -1,6 +1,4 @@
 obstacle_stop_planner:
-  horn_time : 3 # horn time when obstacle is detected 
-  obstacle_horn_time : 3 # horn for 3 seconds when obstacle is found
   stop_line_buffer : 5 # distance to be maintained from obstacle from front tip of vehicle (m).
   slow_line_buffer : 2 # distance to be slow down to stop with the smooth stop before stop index 
   radial_off_set_to_vehicle_width : 0.3 # offset search radius to add vehicle width.

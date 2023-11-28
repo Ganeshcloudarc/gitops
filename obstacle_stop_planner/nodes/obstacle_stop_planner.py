@@ -49,8 +49,7 @@ try:
     from velocity_planner import VelocityPlanner
     from autopilot_utils.footprint_transform import transform_footprint_circles
     from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray, KeyValue
-    from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper 
-
+    from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper
 
 except Exception as e: 
     import rospy
@@ -82,7 +81,7 @@ STALE = DiagnosticStatus.STALE
 class ObstacleStopPlanner: 
 
     def __init__(self):
-       
+        # publisher for obstacle_stop_plannner diagnostics 
         self.publisher = rospy.Publisher("/obstacle_stop_planner_diagnostics", DiagnosticArray, queue_size=1,latch= True) 
         self.diagnostics_publisher = DiagnosticStatusWrapper() 
         self.diagnostics_publisher.name = rospy.get_name()
@@ -117,8 +116,7 @@ class ObstacleStopPlanner:
         self.robot_min_speed_th = rospy.get_param("patrol/min_forward_speed", 0.8)
         self._smoother = TrajectorySmoother(sigma, kernal_size, self.robot_min_speed_th)
         self._traj_manager = TrajectoryManager()
-        self.horn_time = rospy.get_param("obstacle_stop_planner/obstacle_horn_time",3)
-        self._stop_line_buffer = rospy.get_param("obstacle_stop_planner/stop_line_buffer", 3.0) 
+        self._stop_line_buffer = rospy.get_param("obstacle_stop_planner/stop_line_buffer", 3.0)
         self.slow_line_buffer = rospy.get_param("obstacle_stop_planner/slow_line_buffer",2.0)
         self.velocity_speed_profile_enable = rospy.get_param("obstacle_stop_planner/velocity_speed_profile_enable",True)
         # ros parameters for Obstacle stop planner
@@ -160,9 +158,9 @@ class ObstacleStopPlanner:
             rospy.Subscriber(bbox_topic, BoundingBoxArray, self.pcl_bboxes_callback)
             self.bbox_pub = rospy.Publisher("collision_bbox", BoundingBox, queue_size=1)
             # self.box_corner_pub = rospy.Publisher("corner_boxes", PolygonStamped, queue_size=1)
-            self.collision_points_polygon = rospy.Publisher("collision_points_polygon", PolygonStamped, queue_size=1) 
-        if self.use_zed_detections: 
-            rospy.loginfo("Running zed Obs") 
+            self.collision_points_polygon = rospy.Publisher("collision_points_polygon", PolygonStamped, queue_size=1)
+        if self.use_zed_detections:
+            rospy.loginfo("Running zed Obs")
             rospy.Subscriber(self.zed_objects_topic, ObjectsStamped, self.zed_objects_callback, queue_size=1)
             self.transformed_zed_objects_publisher = rospy.Publisher('/obstacle_stop_planner/transformed_zed_obj',
                                                                      ObjectsStamped, queue_size=1)
@@ -186,7 +184,6 @@ class ObstacleStopPlanner:
         self.circles_polygon_pub = rospy.Publisher('/obstacle_stop_planner/collision_checking_circles', PolygonStamped,
                                                    queue_size=2, latch=True)
         self.path_percent_publisher = rospy.Publisher("/osp_path_percentage",Float32, queue_size=1 ,latch=True)
-        self.horn_publisher = rospy.Publisher("/horn_at_obs_found",Bool,queue_size=1,latch=False)
         self.count_mission_repeat = 0
         self.main_loop()
 
@@ -242,7 +239,7 @@ class ObstacleStopPlanner:
             is_global_path_ok = False
             sensor_msg+=" global trajectory"
         sensor_status = is_lidar_sensor_healthy and is_zed_sensor_healthy and is_global_path_ok
-        return sensor_status,sensor_msg 
+        return sensor_status,sensor_msg
 
     def main_loop(self):
         # TODO: publish stop, slow_down margin's circle
@@ -275,7 +272,7 @@ class ObstacleStopPlanner:
             loop_start_time = time.time()
             # checks whether data from lidar sensor is updated.
 
-            if loop_start_time - self.odom_data_in_time > self._TIME_OUT_FROM_ODOM: 
+            if loop_start_time - self.odom_data_in_time > self._TIME_OUT_FROM_ODOM:
                 rospy.logwarn("No update on odom (robot position)")
                 self.diagnostics_publisher.summary(ERROR,"No update on odom (robot position)") 
                 self.diagnostics_publisher.add("Last Odom time",loop_start_time - self.odom_data_in_time) 
@@ -283,7 +280,7 @@ class ObstacleStopPlanner:
                 rate.sleep()  
                 continue
             if self.use_obs_v1 or self.use_pcl_boxes:
-                if loop_start_time - self.laser_data_in_time > self._TIME_OUT_FROM_LASER: 
+                if loop_start_time - self.laser_data_in_time > self._TIME_OUT_FROM_LASER:
                     rospy.logwarn(f"No update on laser data from last {loop_start_time - self.laser_data_in_time}")
                     self.diagnostics_publisher.summary(ERROR,"No update on laser data") 
                     self.diagnostics_publisher.add("Last laser time",loop_start_time - self.laser_data_in_time)  
@@ -491,8 +488,8 @@ class ObstacleStopPlanner:
                     trajectory_msg.points = copy.deepcopy(
                         self._traj_in.points[self._close_idx:end_idx])
                     for point in trajectory_msg.points:
-                        point.longitudinal_velocity_mps = 0.0 
-                    horn = 1
+                        point.longitudinal_velocity_mps = 0.0
+
                     self.local_traj_publisher.publish(trajectory_msg)
                     self.publish_velocity_marker(trajectory_msg)
                     rospy.logwarn("Obstacle found near Vehicle, Stopping the vehicle")
@@ -577,7 +574,6 @@ class ObstacleStopPlanner:
             # print("collision index",collision_index)
             print("self.index_old after loop", self._close_idx)
             if obstacle_found:
-                
                 dis_to_obstacle = abs(self._traj_in.points[collision_index].accumulated_distance_m -
                                       self._traj_in.points[self._close_idx].accumulated_distance_m)
                 # print(dis_to_obstacle)
@@ -585,9 +581,10 @@ class ObstacleStopPlanner:
                                             self._traj_in.points[front_tip_idx].accumulated_distance_m)
                 rospy.logwarn(f"obstacle found at {dis_to_obstacle} meters ") 
                 
-                # if obstacle distance is less than _stop_line_buffer -> hard stop 
+                # if obstacle distance is less than _stop_line_buffer -> hard stop
                 if dis_to_obstacle < self._stop_line_buffer + self._base_to_front:
-                    horn = 1 # to publish the obstacle found details to collision.py for horn via autopilot auxillary command 
+                    
+                    # TODO apply break directly to pilot
                     rospy.logwarn("obstacle is very close, applying hard breaking")
                     self.diagnostics_publisher.summary(ERROR,"OBSTACLE IS VERY CLOSE ")
                     self.diagnostics_publisher.add("APPLYING BREAK ",True) 
@@ -602,7 +599,6 @@ class ObstacleStopPlanner:
                      
 
                 else:
-                    horn = 0
                     rospy.loginfo("obstacle dis is more than the stop_distance")
                     # find the stop index
                     stop_index = collision_index
@@ -672,7 +668,6 @@ class ObstacleStopPlanner:
                             trajectory_msg.points.append(traj_point) 
                         
             else:
-                horn = 0
                 if self.vehicle_stop_init_time_for_obs is not None:
                     if time.time() - self.vehicle_stop_init_time_for_obs > self.stop_threshold_time_for_obs:
                         rospy.loginfo("No obstacle found")
@@ -698,9 +693,7 @@ class ObstacleStopPlanner:
                     self.publish(self.diagnostics_publisher) 
                     for i in range(self._close_idx, collision_index):
                         trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[i]))
-
-            # obstacle found status publishing for horn to pure_pursuit_collision.py
-            self.horn_publisher.publish(horn)
+               
             self.local_traj_publisher.publish(trajectory_msg)
             self.publish_points(collision_points)
             print("robot_speed", self.robot_speed)
