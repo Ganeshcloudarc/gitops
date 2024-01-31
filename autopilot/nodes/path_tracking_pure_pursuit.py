@@ -22,7 +22,9 @@ try:
     from ackermann_msgs.msg import AckermannDrive
     from sensor_msgs.msg import NavSatFix
     from nav_msgs.msg import Path
-    from std_msgs.msg import Float32
+    from std_msgs.msg import Float32 
+    from pilot_msgs.msg import auxillary_commands
+
 
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
@@ -32,6 +34,7 @@ try:
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
     from autopilot_msgs.msg import ControllerDiagnose, FloatKeyValue
+    from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray, KeyValue
 except Exception as e:
     import rospy
     rospy.logerr("No module %s", str(e))
@@ -61,7 +64,7 @@ class PurePursuitController:
         self.robot_state = None
         self.trajectory_data = None
         self.updated_traj_time = time.time()
-
+        self.turn_horn = False
         #PID parameters
         self.cte = 0
         self.sum_cte = 0
@@ -76,13 +79,17 @@ class PurePursuitController:
 
         self.is_pp_pid = rospy.get_param("/patrol/pp_with_pid",False)
         # ros parameters
+        self.enable_auxillary_commands = rospy.get_param("/patrol/enable_auxillary_commands",True)
+        self.enable_turning_horn = rospy.get_param("/patrol/enable_turning_horn",True)
+        self.radius_threshold = rospy.get_param("/patrol/radius_threshold",15)
         self.max_speed = rospy.get_param("/patrol/max_forward_speed", 1.8) # default value of max speed is max forward speed.
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
         self.max_backward_speed = abs(rospy.get_param("/patrol/max_backward_speed",1.0)) # doing abs() as reversing uses same logic as forward wrt to speed
         self.min_backward_speed = abs(rospy.get_param("/patrol/min_backward_speed",0.8))
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
-        self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
+        self.max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6) 
+        self.turn_detection_dis = rospy.get_param("/pure_pursuit/turn_detection_dis",2)
         self.avg_look_ahead = (self.min_look_ahead_dis + self.max_look_ahead_dis) / 2
         self.time_out_from_input_trajectory = rospy.get_param("/pure_pursuit/time_out", 3)
         trajectory_in_topic = rospy.get_param("/trajectory_in", "/global_gps_trajectory")
@@ -96,11 +103,12 @@ class PurePursuitController:
         self.search_point_distance = 5
         self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
         self.enable_cte_based_speed_control = rospy.get_param("/patrol/enable_cte_based_speed_control", False)
-
         cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
 
         # Publishers
-        self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10)
+        self.turn_publisher = rospy.Publisher("/auxillary_functions_publisher",auxillary_commands,queue_size=1)
+        self.turn_pose_pub = rospy.Publisher('/turn_pose',PoseStamped,queue_size=2)
+        self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10) 
         self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
         self.close_pose_pub = rospy.Publisher('/close_pose', PoseStamped, queue_size=2)
         self.mission_count_pub = rospy.Publisher('/mission_count', Float32, queue_size=2, latch=True)
@@ -112,7 +120,6 @@ class PurePursuitController:
         self.robot_speed = None
 
         self.ackermann_msg = AckermannDrive()
-
         rospy.Subscriber(trajectory_in_topic, Trajectory, self.trajectory_callback)
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
         rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
@@ -122,12 +129,12 @@ class PurePursuitController:
         while not rospy.is_shutdown():
             if self.trajectory_data and self.robot_state and self.gps_robot_state:
                 rospy.loginfo("trajectory_data and robot_state and gps_robot_state are available")
-                break
-            else:
+                break 
+            else: 
                 rospy.logwarn("waiting for trajectory_data or robot_state or gps_robot_state")
-                rate.sleep()
-        self.main_loop()
-
+                rate.sleep() 
+        self.main_loop() 
+    
     def main_loop(self):
 
         diagnostic_msg = ControllerDiagnose()
@@ -137,7 +144,8 @@ class PurePursuitController:
         prev_steering_angle = 0
         prev_speed = 0
         prev_time = time.time()
-
+        turn_pose_msg = PoseStamped()
+        turn_pose_msg.header.frame_id = "map"
         target_pose_msg = PoseStamped()
         target_pose_msg.header.frame_id = "map"
         close_pose_msg = PoseStamped()
@@ -237,8 +245,11 @@ class PurePursuitController:
                 #     self.is_reverse = True
                 #     rospy.logerr("Reverse")
             
-            target_point_ind, lhd = self.find_target_index(robot_pose, self.index_old, lhd)
-            close_point_ind = self.index_old
+            # find the turn index on top on the path with respect to close pt and lhd
+            target_point_ind, lhd  = self.find_target_index(robot_pose, self.index_old, lhd)
+            turn_ind,tud = self.find_target_index(robot_pose,target_point_ind,self.turn_detection_dis)
+            close_point_ind = self.index_old   
+
 
             if target_point_ind >= self.trajectory_len - 1:
                 self.count_mission_repeat += 1
@@ -297,23 +308,64 @@ class PurePursuitController:
                     diagnostic_msg.message = "completed mission"
                     self.controller_diagnose_pub.publish(diagnostic_msg)
                     break
-
             # Publishing close and target poses.
             close_pose_msg.pose = self.trajectory_data.points[close_point_ind].pose
             self.close_pose_pub.publish(close_pose_msg)
             target_pose_msg.pose = self.trajectory_data.points[target_point_ind].pose
             self.target_pose_pub.publish(target_pose_msg)
-
+            turn_pose_msg.pose = self.trajectory_data.points[turn_ind].pose 
+            self.turn_pose_pub.publish(turn_pose_msg)
+           
             target_point_angle = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
             alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
            
             # robot_position = (3, 3)
             robot_position = (robot_pose.position.x,robot_pose.position.y) 
+            robot_x, robot_y = robot_pose.position.x,robot_pose.position.y
             # nearest_point = (5, 5)
             nearest_point = (close_pose_msg.pose.position.x,close_pose_msg.pose.position.y)
+            nearest_point_x, nearest_point_y = close_pose_msg.pose.position.x,close_pose_msg.pose.position.y
             # lookahead_point = (7, 6)
             lookahead_point = (target_pose_msg.pose.position.x,target_pose_msg.pose.position.y)
+            lookahead_point_x, lookahead_point_y = target_pose_msg.pose.position.x,target_pose_msg.pose.position.y
+            # turn_point is 2 mtrs from lookahead_point 
+            turn_point = (turn_pose_msg.pose.position.x,turn_pose_msg.pose.position.y)
+            turn_pts_x , turn_pts_y = turn_pose_msg.pose.position.x,turn_pose_msg.pose.position.y
+            # cross_product of 3pts(close_pts, looahaead pts, turn_pts)
+            turn_cross = self.calculate_cross_product(nearest_point,lookahead_point,turn_point) 
+            # when to check the points recorded are with the radius of circle
+            circum_rad = self.calculate_radius(robot_x,robot_y,lookahead_point_x,lookahead_point_y,turn_pts_x,turn_pts_y)
+            # when the circum radius is less than 15 it is assumed to be turn 
 
+            # initialising auxillary commands to be false at initial
+            if self.enable_auxillary_commands: 
+                self.turn_command_data = auxillary_commands()
+                
+                if circum_rad < self.radius_threshold: 
+                        rospy.logwarn("turn detected")  
+                        #publishes horn when this parameter is enabled 
+                        if self.enable_turning_horn and not self.turn_horn: 
+                            self.turn_command_data.horn = True 
+                            self.turn_horn = True 
+                        elif self.enable_turning_horn and self.turn_horn: 
+                            self.turn_command_data.horn = False
+                       
+
+                        #publishes right and left turns
+                        if turn_cross > 0:  
+                            self.turn_command_data.right_indicator = True  
+                            rospy.loginfo("right")  
+                        elif turn_cross < 0: 
+                            self.turn_command_data.left_indicator = True  
+                            rospy.loginfo("left")
+                        else: 
+                            rospy.loginfo("on path")
+
+                else: 
+                    self.turn_horn = False
+                self.turn_publisher.publish(self.turn_command_data)
+
+        
             cross_product = self.calculate_cross_product(robot_position, nearest_point, lookahead_point)
             if cross_product > 0:
                 result = "right"
@@ -403,24 +455,40 @@ class PurePursuitController:
             diagnostic_msg.lateral_velocity_dps = steering_angle - prev_steering_angle / time.time() - prev_time
             diagnostic_msg.acceleration_mps2 = speed - prev_speed / time.time() - prev_time
             diagnostic_msg.target_pose = target_pose_msg.pose
-            diagnostic_msg.target_gps_pose = self.trajectory_data.points[target_point_ind].gps_pose
+            diagnostic_msg.target_gps_pose = self.trajectory_data.points[target_point_ind].gps_pose 
             diagnostic_msg.vehicle_pose = robot_pose
             diagnostic_msg.vehicle_gps_pose = self.gps_robot_state
             k1 = FloatKeyValue("close_index", close_point_ind)
-            k2 = FloatKeyValue("target_index", target_point_ind)
+            k2 = FloatKeyValue("target_index", target_point_ind) 
             path_percent = (self.trajectory_data.points[close_point_ind].accumulated_distance_m /
                             self.trajectory_data.points[-1].accumulated_distance_m) * 100
             k3 = FloatKeyValue("path_completed_percentage", round(path_percent, 3))
-            diagnostic_msg.values.extend([k1, k2, k3])
-            # diagnostic_msg.values["close_index"] = 10
+            diagnostic_msg.values.extend([k1, k2, k3]) 
+            # diagnostic_msg.values["close_index"] = 10 
             self.controller_diagnose_pub.publish(diagnostic_msg)
             prev_steering_angle = steering_angle
-            prev_time = time.time()
-            prev_speed = speed
+            prev_time = time.time() 
+            prev_speed = speed 
             # removing this sleep increasing the speed
-            diagnostic_msg = None
-            rate.sleep()
-            # return 0
+            diagnostic_msg = None 
+            rate.sleep() 
+            # return 0 
+    
+               
+    def calculate_radius(self,x1, y1, x2, y2, x3, y3):
+        # Calculate the lengths of the sides of the triangle formed by the three points
+        a = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        b = math.sqrt((x3 - x2)**2 + (y3 - y2)**2)
+        c = math.sqrt((x1 - x3)**2 + (y1 - y3)**2)
+
+        # Calculate the semi-perimeter of the triangle
+        s = (a + b + c) / 2
+
+        # Calculate the radius of the circumcircle (the circle that passes through all three points)
+        radius = (a * b * c) / (4 * math.sqrt(s * (s - a) * (s - b) * (s - c)))
+
+        return radius 
+
 
     def pp_with_pid(self,lhd,alpha):
         '''
@@ -446,7 +514,6 @@ class PurePursuitController:
         deld = self.e2-self.e1
         self.e1 = self.cte
         strAngle = delp + deli + delpp
-        
         return strAngle
 
     def find_first_close_point(self, robot_pose):
@@ -469,6 +536,7 @@ class PurePursuitController:
                     len(index_list)) + "points are close, But No Heading is not okay for them", 0, 0
             return False, "Found " + str(
                 len(index_list)) + "points are close, But No Heading is not okay for them", 0, 0
+
 
     # def find_close_point(self, robot_pose, old_close_index):
     #     close_dis = distance_btw_poses(robot_pose, self.trajectory_data.points[old_close_index].pose)
@@ -501,6 +569,7 @@ class PurePursuitController:
         else:
             return self.trajectory_len - 1, 0
 
+
     def find_target_index(self, robot_pose, close_point_ind, lhd):
         """
         search index of target point in the reference path. The following implementation was inspired from
@@ -512,7 +581,7 @@ class PurePursuitController:
         Returns:
             target_index, distance
         """
-
+        
         close_dis = self.trajectory_data.points[close_point_ind].accumulated_distance_m
         for ind in range(close_point_ind, self.trajectory_len):
             path_acc_distance = self.trajectory_data.points[ind].accumulated_distance_m - close_dis
@@ -521,7 +590,7 @@ class PurePursuitController:
         return ind, distance_btw_poses(robot_pose, self.trajectory_data.points[ind].pose)
 
     def calc_nearest_ind(self, robot_pose):
-        """
+        """ 
         calc index of the nearest point to current position
         Args:
             robot_pose: pose of robot
@@ -532,7 +601,7 @@ class PurePursuitController:
         ind = np.argmin(distance_list)
         dis = distance_list[ind]
         return ind, dis
-
+   
     def trajectory_callback(self, data):
         self.trajectory_data = data
         self.trajectory_len = len(self.trajectory_data.points)
@@ -604,9 +673,7 @@ class PurePursuitController:
         vector_Q = np.array([nearest_point[0] - robot_position[0], nearest_point[1] - robot_position[1]])
 
         # Calculate the cross product (P x Q)
-        cross_product = np.cross(vector_P, vector_Q)
-        rospy.logdebug(cross_product)
-        
+        cross_product = np.cross(vector_P, vector_Q) 
         return cross_product
         # if cross_product > 0.3:
         #     return "Right"  

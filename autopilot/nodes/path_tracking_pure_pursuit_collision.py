@@ -13,12 +13,14 @@ try:
     import time
     import sys
     # ros messages
-    from nav_msgs.msg import Path, Odometry
+    from nav_msgs.msg import Path, Odometry 
     from geometry_msgs.msg import Point, PoseArray, PoseStamped
-    from std_msgs.msg import Header, Float32
+    from std_msgs.msg import Header, Float32, Bool
     from geographic_msgs.msg import GeoPointStamped
     from ackermann_msgs.msg import AckermannDrive
     from sensor_msgs.msg import NavSatFix
+    from pilot_msgs.msg import auxillary_commands
+
 
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
@@ -41,12 +43,15 @@ class PurePursuitController:
     def __init__(self):
         self.gps_robot_state = None
         self.path_percent = None
+        self.obs_horn = None
         self.robot_state = None
         self.trajectory_data = None
         self.updated_traj_time = time.time()
         prev_steering_angle = 0
         prev_time = 0
         prev_speed = 0
+        obstacle_horn = False
+        turn_horn = False
 
         #PID parameters
         self.cte = 0
@@ -59,10 +64,13 @@ class PurePursuitController:
 
         self.is_pp_pid = rospy.get_param("/patrol/pp_with_pid", False)
 
-        # ros parameters
+        # ros parameters 
+        self.enable_auxillary_commands = rospy.get_param("/patrol/enable_auxillary_commands",True)
+        self.enable_turning_horn = rospy.get_param("/patrol/enable_turning_horn",True)
         self.max_speed = rospy.get_param("/patrol/max_forward_speed", 1.8) # default value of max speed is max forward speed.
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.5)
+        self.radius_threshold = rospy.get_param("/patrol/radius_threshold",15) #circle radius generated with 3 values--> close pts, lookahead pts, turn_detection_dis
         self.max_backward_speed = abs(rospy.get_param("/patrol/max_backward_speed",1.0)) # doing abs() as reversing uses same logic as forward wrt to speed
         self.min_backward_speed = abs(rospy.get_param("/patrol/min_backward_speed",0.8))
         self.min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
@@ -79,10 +87,11 @@ class PurePursuitController:
         cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
 
         # Publishers
+        self.turn_publisher = rospy.Publisher("/auxillary_functions_publisher",auxillary_commands,queue_size=1)
         self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10)
         target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
         close_pose_pub = rospy.Publisher('/close_pose', PoseStamped, queue_size=2)
-
+        turn_pose_pub = rospy.Publisher('/turn_pose',PoseStamped,queue_size=2)
         controller_diagnose_pub = rospy.Publisher("pure_pursuit_diagnose", ControllerDiagnose, queue_size=2)
 
         # ros subscribers
@@ -93,6 +102,7 @@ class PurePursuitController:
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
         rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
         rospy.Subscriber("/osp_path_percentage",Float32, self.path_percent_callback)
+        rospy.Subscriber("/horn_at_obs_found",Bool, self.obs_horn_callback)
         rospy.logdebug(f"Subscriber initiated, {trajectory_in_topic} , {odom_topic}, {gps_topic}")
         time.sleep(1)
         rate = rospy.Rate(1)
@@ -157,6 +167,7 @@ class PurePursuitController:
                     continue
                 else:
                     target_point_ind, lhd = self.target_index(robot_pose, close_point_ind)
+                    turn_ind, tud = self.target_index(robot_pose,target_point_ind)
                 if target_point_ind == -1:
                     self.send_ack_msg(0, 0, 0)
                     rospy.loginfo("Lhd is less than min_look_ahead distance, reached end of local_traj")
@@ -174,7 +185,10 @@ class PurePursuitController:
                 close_pose.header.frame_id = "map"
                 close_pose.pose = self.trajectory_data.points[close_point_ind].pose
                 close_pose_pub.publish(close_pose)
-
+                turn_pose_msg = PoseStamped()
+                turn_pose_msg.header.frame_id = "map"
+                turn_pose_msg.pose = self.trajectory_data.points[turn_ind].pose 
+                turn_pose_pub.publish(turn_pose_msg)
 
                 # slope = angle_btw_poses(self.trajectory_data.points[target_point_ind].pose, robot_pose)
                 # alpha = slope - get_yaw(robot_pose.orientation)
@@ -191,11 +205,58 @@ class PurePursuitController:
                 alpha = -(target_point_angle - get_yaw(robot_pose.orientation))
                 # robot_position = (3, 3)
                 robot_position = (robot_pose.position.x,robot_pose.position.y) 
+                robot_x ,robot_y = robot_pose.position.x,robot_pose.position.y
                 # nearest_point = (5, 5)
                 nearest_point = (close_pose.pose.position.x,close_pose.pose.position.y)
+                nearest_point_x, nearest_point_y = close_pose.pose.position.x,close_pose.pose.position.y         
                 # lookahead_point = (7, 6)
                 lookahead_point = (target_pose.pose.position.x,target_pose.pose.position.y)
+                lookahead_point_x ,lookahead_point_y = target_pose.pose.position.x,target_pose.pose.position.y
+                # turn_point is 2 mtrs from lookahead_point 
+                turn_point = (turn_pose_msg.pose.position.x,turn_pose_msg.pose.position.y)
+                turn_pts_x , turn_pts_y = turn_pose_msg.pose.position.x,turn_pose_msg.pose.position.y
+                # cross_product of 3pts(close_pts, looahaead pts, turn_pts)
+                turn_cross = self.calculate_cross_product(nearest_point,lookahead_point,turn_point) 
+                # when to check the points recorded are with the radius of circle
+                circum_rad = self.calculate_radius(robot_x,robot_y,lookahead_point_x,lookahead_point_y,turn_pts_x,turn_pts_y)
+                # when the circum radius is less than 15 it is assumed to be turn  
 
+                # initialize auxillary command function with false
+                if self.enable_auxillary_commands: 
+                    self.turn_command_data = auxillary_commands()
+                    if circum_rad < self.radius_threshold: 
+                            # horn once during a turn
+                            if self.enable_turning_horn:
+                                if not turn_horn: 
+                                    self.turn_command_data.horn = True
+                                    turn_horn = True
+
+                            # turn detected
+                            if turn_cross > 0:  
+                                # positive cross product indicates the right turn
+                                self.turn_command_data.right_indicator = True  
+                            elif turn_cross < 0: 
+                                # positive cross product indicates the left turn
+                                self.turn_command_data.left_indicator = True  
+                            else:  
+                                pass
+                                # otherwise assumed to be in straight line - on path 
+                    else: 
+                        turn_horn = False
+
+                    # horn command from obsp
+                    if self.obs_horn and not obstacle_horn:  
+                        self.turn_command_data.horn = True
+                        obstacle_horn = True
+
+                    elif self.obs_horn == False: 
+                        obstacle_horn = False  
+                    else: 
+                        pass 
+                   
+                    self.turn_publisher.publish(self.turn_command_data)   
+
+                    
                 cross_product = self.calculate_cross_product(robot_position, nearest_point, lookahead_point)
                 if cross_product > 0:
                     result = "right"
@@ -305,9 +366,12 @@ class PurePursuitController:
                 rospy.logerr(f"Error occured :{err}")
                 rate.sleep()
                 continue 
+
     def path_percent_callback(self,data):  
         self.path_percent = data.data 
-
+    
+    def obs_horn_callback(self,data): 
+        self.obs_horn = data.data 
 
     def target_index(self, robot_pose, close_point_ind):
         """
@@ -341,6 +405,20 @@ class PurePursuitController:
         rospy.logdebug(cross_product)
 
         return cross_product
+    def calculate_radius(self,x1, y1, x2, y2, x3, y3):
+        # Calculate the lengths of the sides of the triangle formed by the three points
+        a = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        b = math.sqrt((x3 - x2)**2 + (y3 - y2)**2)
+        c = math.sqrt((x1 - x3)**2 + (y1 - y3)**2)
+
+        # Calculate the semi-perimeter of the triangle
+        s = (a + b + c) / 2
+
+        # Calculate the radius of the circumcircle (the circle that passes through all three points)
+        radius = (a * b * c) / (4 * math.sqrt(s * (s - a) * (s - b) * (s - c)))
+
+        return radius 
+
 
     def pp_with_pid(self,lhd,alpha):
         '''
