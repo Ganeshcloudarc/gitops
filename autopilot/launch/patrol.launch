@@ -18,8 +18,8 @@
     <arg name="use_pcl_boxes" default="true"/>
 
     <!-- Don't enable both rslidar and lslidar at once -->
-    <arg name="enable_rslidar" default="true"/>
-    <arg name="enable_lslidar" default="false"/>
+    <arg name="enable_rslidar" default="false"/>
+    <arg name="enable_lslidar" default="true"/>
     <!-- OBS CONFIG END -->
     <arg name="pp_with_pid" default="true"/>
     <arg name="enable_rqt" default="false"/>
@@ -114,8 +114,7 @@
         <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
         
         <include file="$(find auto_nav)/launch/auto_nav.launch">
-            <arg name="cloud_in_for_local_map" value="$(arg cloud_in)"/>
-            <arg name="cloud_in_for_auto_nav" value="local_cloud_map"/>
+            <arg name="cloud_in_for_auto_nav" value="$(arg cloud_in)"/>
             <arg name="mission_continue" value="$(arg mission_continue)"/>
 
         </include>

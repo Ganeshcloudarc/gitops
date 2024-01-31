@@ -1,6 +1,6 @@
 odom_topic : "vehicle/odom"
 global_frame : "map"
-local_frame : "base_link"
+local_frame : "map"
 enable_global_cloud_map : false
 global_cloud_map_topic : "global_cloud_map"
 enable_local_cloud_map : true 
@@ -8,9 +8,9 @@ local_cloud_map_topic : "local_cloud_map"
 enable_tree_mapping : true
 tree_mapping_topic : "tree_cloud_map"
 gps_home_position_topic : "/mavros/global_position/home"
-voxel_size : 0.5 # voxel size of 
-local_map_size_x : 10 # left and right side
-local_map_size_y : 10 # forward and backward
+voxel_size : 0.3 # voxel size of 
+local_map_size_x : 20 # left and right side
+local_map_size_y : 20 # forward and backward
 min_height_local_frame : 1 # min height wrt local_frame
 max_height_local_frame : 3 # max height wrt local_frame
 

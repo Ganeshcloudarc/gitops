@@ -1,28 +1,27 @@
 <launch>
-    <arg name="bag_file" default="/home/boson/bags/april-2023/auto_nav_2023-04-26-10-17-23.bag"/>
-    <arg name="rviz" default="true"/>
-<!--    <arg namr="rate" default=""-->
-    <param name="auto_nav/ransac/tolerance" value="3"/>
-      <param name=" auto_nav/ransac/max_iterations" value="50"/>
-<!--    auto_nav/ransac/max_iterations-->
+    <arg name="bag_file" default="/home/boson/ssd/mango_farm_rslidar_bags/boson_save_path_ls_lidar_points_2024-01-11-17-24-03.bag"/>
+    <arg name="mission_file" default="Invalid_default.json"/>
+    <arg name="cloud_in" default="lslidar_point_cloud"/>
+    <param name="use_sim_time" value ="true"/>
 
-<!--    <node name="autonav_bag_record" pkg="rosbag" type="record"-->
-<!--            args="record -o $(env HOME)/.bags/auto_nav -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points" if="$(eval record)"/>-->
-
-    <rosparam command="load" file="$(find auto_nav)/params/autonav_params.yaml"/>
-
-    <node pkg = "auto_nav" type = "autonav_node.py" name = "autonav_node" output = 'screen' />
-<!--    <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />-->
 
 
     <node name="autonav_bag_play" pkg="rosbag" type="play"
-            args="$(arg bag_file) --topics /tf /tf_static /laser_scan  /vehicle/odom /global_gps_trajectory /global_gps_path /vehicle/foot_print /mavros/global_position/global"/>
+            args="$(arg bag_file) --topics /tf /tf_static   /lslidar_point_cloud /vehicle/odom /global_gps_trajectory /global_gps_path /vehicle/foot_print /mavros/global_position/global --clock -r 0.5 -s 100"/>
+    
+    <!-- path publisher -->
+    <include file="$(find autopilot)/launch/path_publisher.launch" >
+            <arg name="mission_file" value="$(arg mission_file)"/>
+    </include>
 
-<!--     <node name="autonav_bag_play" pkg="rosbag" type="play"-->
-<!--            args="$(arg bag_file) &#45;&#45;topics /tf /tf_static /laser_scan  /vehicle/odom /global_gps_trajectory /global_gps_path /vehicle/foot_print"/>-->
+    <!-- autonav -->
+    <include file="$(find auto_nav)/launch/auto_nav.launch" >
+            <arg name="cloud_in_for_local_map" value="$(arg cloud_in)"/>
+    </include>
 
+    <node name="rviz_autonav" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/lsm_on_inliers.rviz" />
+    <node name="lidar_view" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/lidar_obstacle_detector_tuning.rviz" />
 
-    <node name="rviz_autonav" pkg="rviz" type="rviz" args="-d $(find auto_nav)/rviz/lsm_on_inliers.rviz" if = "$(eval arg('rviz'))"/>
-
+    
 
 </launch>

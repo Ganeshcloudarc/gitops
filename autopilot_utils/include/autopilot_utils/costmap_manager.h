@@ -11,6 +11,7 @@ namespace autopilot_utils
 {
     bool raytraceLineLookGap(costmap_2d::Costmap2D &costmap,double x1, double y1, double x2, double y2, double &x_free, double &y_free, double gap_len);
     std::pair<bool,unsigned char> raytraceLineCost(costmap_2d::Costmap2D &costmap,double x1, double y1, double x2, double y2);
+    std::pair<bool,unsigned char> raytraceLineCost(costmap_2d::Costmap2D &costmap,double x1, double y1, double x2, double y2, unsigned char cost_th);
 
     class OccupencyGridManager
         {   public:

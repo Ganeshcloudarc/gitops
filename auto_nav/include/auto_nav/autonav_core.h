@@ -71,13 +71,13 @@ class AutoNavCore
         int STALE = diagnostic_msgs::DiagnosticStatus::STALE;
 
     private:
-        void localScanCallback(const sensor_msgs::LaserScan::ConstPtr& local_scan);
+        void localPointcloudsCallback(const sensor_msgs::PointCloud2::ConstPtr& local_scan);
         void scanCallback(const sensor_msgs::LaserScan::ConstPtr& local_scan);
         void trajectoryCallback(const autopilot_msgs::Trajectory::ConstPtr& trajectory);
         void odomCallback(const nav_msgs::Odometry::ConstPtr& odom);
         void main_loop(ros::NodeHandle);
         void loadParams(ros::NodeHandle);
-        ros::Subscriber scan_sub, local_scan_sub, trajectory_sub, odometry_sub;
+        ros::Subscriber scan_sub, local_pointcloud_sub, trajectory_sub, odometry_sub;
         // ros::publisher local_path_pub;
         ros::Publisher local_traj_pub,local_path_pub, center_line_pub, left_line_pub, right_line_pub, path_percent_publisher, front_pose_pub;
         ros::Publisher map_point_cloud_pub, left_liners_cloud_pub,right_inliers_cloud_pub;
@@ -86,10 +86,11 @@ class AutoNavCore
         ros::Publisher diagnostis_pub;
         nav_msgs::Odometry::ConstPtr curr_odom;
         autopilot_msgs::Trajectory local_traj, global_traj;
-        sensor_msgs::LaserScan::ConstPtr curr_scan, curr_local_scan;
+        sensor_msgs::LaserScan::ConstPtr curr_scan;
+        sensor_msgs::PointCloud2::ConstPtr local_pointcloud;
         geometry_msgs::Pose curr_robot_pose;
         nav_msgs::Path vibration_path;
-        bool odom_data_received, global_traj_data_received, curr_scan_data_received, curr_local_scan_data_receiced;
+        bool odom_data_received, global_traj_data_received, curr_scan_data_received, curr_local_cloud_data_received;
         inline void publish_diagnostics();
         laser_geometry::LaserProjection scan_projector;
         laser_geometry::LaserProjection local_scan_projector;
@@ -102,7 +103,7 @@ class AutoNavCore
         // bool in_turn_status;
         
         // Parameters
-        bool use_dwa, enable_moving_avg_filter, pub_debug_topics, use_previous_line, mission_continue;
+        bool use_costmap_for_dwa, enable_moving_avg_filter, pub_debug_topics, use_previous_line, mission_continue, use_global_path_for_ransac, enable_center_line_collision_checking;
         int moving_avg_filter_window_size, ransac_max_iterations, loop_frequency;
         float row_spacing, tree_width, tree_width_tolerance;
         float radius_to_check_turn, minimum_turn_radius, forward_point_dis;
@@ -122,7 +123,7 @@ class AutoNavCore
         vector<double> next_row_start_point, next_left_row_start_point, next_right_row_start_point;
 
         bool valid_turn_found,global_turn_detected; 
-        bool reset_costmap = true;
+        bool reset_costmap_once;
         int close_index = -1;
         int turn_start_index = -1;
         int turn_end_index = -1;

@@ -4,16 +4,10 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /PointCloud21
-        - /PointCloud22
-        - /Pose1
-        - /Pose2
-        - /VibrationPath1
-        - /vibrationcpp1
         - /Odometry1/Shape1
-        - /Map1
+        - /MarkerArray4
       Splitter Ratio: 0.40575915575027466
-    Tree Height: 725
+    Tree Height: 365
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -69,14 +63,14 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
+        Max Value: 0
+        Min Value: 0
         Value: true
       Axis: Z
       Channel Name: intensity
       Class: rviz/PointCloud2
       Color: 0; 85; 255
-      Color Transformer: FlatColor
+      Color Transformer: AxisColor
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false
@@ -89,7 +83,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.10000000149011612
       Style: Flat Squares
-      Topic: /left_inliers
+      Topic: /autonav_core_node/left_inliers
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -97,14 +91,14 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
+        Max Value: 0
+        Min Value: 0
         Value: true
       Axis: Z
       Channel Name: intensity
       Class: rviz/PointCloud2
       Color: 0; 255; 0
-      Color Transformer: FlatColor
+      Color Transformer: AxisColor
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false
@@ -117,7 +111,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.10000000149011612
       Style: Flat Squares
-      Topic: /right_inliers
+      Topic: /autonav_core_node/right_inliers
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -128,7 +122,7 @@ Visualization Manager:
       Enabled: true
       Name: Polygon
       Queue Size: 10
-      Topic: /vehicle/foot_print
+      Topic: /autonav_core_node/costmap/footprint
       Unreliable: false
       Value: true
     - Alpha: 1
@@ -184,10 +178,10 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Class: jsk_rviz_plugin/TFTrajectory
-      Enabled: false
+      Enabled: true
       Name: TFTrajectory
-      Value: false
-      color: 25; 255; 240
+      Value: true
+      color: 0; 255; 0
       duration: 10000
       frame: base_link
       line_width: 0.10000000149011612
@@ -515,37 +509,25 @@ Visualization Manager:
         All Enabled: true
         base_link:
           Value: true
-        chassis:
+        base_link_frd:
           Value: true
-        fl_axle:
+        gps_link:
           Value: true
-        fr_axle:
-          Value: true
-        front_left_wheel:
-          Value: true
-        front_right_wheel:
+        lslidar:
           Value: true
         map:
           Value: true
+        map_ned:
+          Value: true
         odom:
           Value: true
-        rear_left_wheel:
-          Value: true
-        rear_right_wheel:
+        odom_ned:
           Value: true
         rplidar:
           Value: true
         rslidar:
           Value: true
-        steering_wheel:
-          Value: true
-        velodyne:
-          Value: true
-        velodyne_base_link:
-          Value: true
-        zed2i_base_link:
-          Value: true
-        zed2i_base_link_optical:
+        zed_camera:
           Value: true
       Marker Alpha: 1
       Marker Scale: 1
@@ -555,30 +537,24 @@ Visualization Manager:
       Show Names: true
       Tree:
         map:
+          map_ned:
+            {}
           odom:
             base_link:
-              chassis:
-                fl_axle:
-                  front_left_wheel:
-                    {}
-                fr_axle:
-                  front_right_wheel:
-                    {}
-                rear_left_wheel:
-                  {}
-                rear_right_wheel:
-                  {}
-                steering_wheel:
-                  {}
+              base_link_frd:
+                {}
+              gps_link:
+                {}
+              lslidar:
+                {}
               rplidar:
                 {}
               rslidar:
-                velodyne_base_link:
-                  velodyne:
-                    {}
-              zed2i_base_link:
-                zed2i_base_link_optical:
-                  {}
+                {}
+              zed_camera:
+                {}
+            odom_ned:
+              {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -591,77 +567,6 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        chassis:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        fl_axle:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        fr_axle:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        front_left_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        front_right_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rear_left_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rear_right_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rplidar:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        rslidar:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        steering_wheel:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        velodyne:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        velodyne_base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        zed2i_base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        zed2i_base_link_optical:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -894,10 +799,10 @@ Visualization Manager:
     - Class: jsk_rviz_plugin/OverlayDiagnostic
       Enabled: true
       Name: OverlayDiagnostic
-      Topic: /autonav_diagnostics
+      Topic: /autonav_core_node/autonav_diagnostics
       Value: true
       alpha: 0.800000011920929
-      diagnostics namespace: /autonav_node
+      diagnostics namespace: /autonav_core_node
       left: 128
       size: 128
       stall duration: 5
@@ -905,28 +810,28 @@ Visualization Manager:
       type: SAC
     - Class: rviz/MarkerArray
       Enabled: true
-      Marker Topic: /lanes
+      Marker Topic: /autonav_core_node/lanes
       Name: MarkerArray
       Namespaces:
         "": true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: false
+      Enabled: true
       Marker Topic: /dwa_paths
       Name: MarkerArray
       Namespaces:
         {}
       Queue Size: 100
-      Value: false
+      Value: true
     - Class: rviz/MarkerArray
-      Enabled: false
-      Marker Topic: /dwa_paths_collsion_free
+      Enabled: true
+      Marker Topic: /autonav_core_node/dwa_paths_collsion_free
       Name: MarkerArray
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
-      Value: false
+      Value: true
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
@@ -988,7 +893,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 40.058597564697266
+      Distance: 12.642983436584473
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -996,9 +901,9 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.4936159551143646
-        Y: -3.51662540435791
-        Z: -16.17570686340332
+        X: -0.22677503526210785
+        Y: -8.942519187927246
+        Z: 15.021220207214355
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -1006,7 +911,7 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5697963237762451
       Target Frame: base_link
-      Yaw: 3.1022250652313232
+      Yaw: 0.010397205129265785
     Saved:
       - Class: rviz/Orbit
         Distance: 62.84008026123047
@@ -1035,8 +940,8 @@ Window Geometry:
   Hide Left Dock: true
   Hide Right Dock: true
   Image:
-    collapsed: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000001800000035efc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003b0000035e000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000c00430061006d0065007200610000000000ffffffff0000000000000000fb0000000a0049006d00610067006502000000000000003b00000280000001e0000000010000010f0000035efc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003b0000035e000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007380000003efc0100000002fb0000000800540069006d00650100000000000007380000030700fffffffb0000000800540069006d00650100000000000004500000000000000000000007380000035e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+    collapsed: true
+  QMainWindow State: 000000ff00000000fd0000000400000000000001800000035efc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003b0000035e000000c700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000c00430061006d0065007200610000000000ffffffff0000000000000000fb0000000a0049006d00610067006502000000000000003b00000156000003a2fb0000000a0049006d006100670065000000003b0000035e0000001600ffffff000000010000010f0000035efc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003b0000035e000000a000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007380000003efc0100000002fb0000000800540069006d00650100000000000007380000030700fffffffb0000000800540069006d00650100000000000004500000000000000000000007380000035e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:

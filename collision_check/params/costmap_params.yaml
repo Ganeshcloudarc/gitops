@@ -27,10 +27,10 @@ footprint_clearing_enabled : true
 #END VOXEL STUFF
 #transform_tolerance: 0.3
 transform_tolerance: 3.0
-
+range_max: 30
 #obstacle_range: 50
 #max_obstacle_height:
-#raytrace_range: 50
+raytrace_range: 50
 #footprint: [[-1, -0.65], [-1, 3.35], [1, 3.35], [1, -3.35]]
 footprint: [[-0.65, 1], [-0.65, -1],[3.35, -1], [3.35, 1]]
 
@@ -39,6 +39,11 @@ footprint_padding: 0.2
 inflation_radius: 1.0
 cost_scaling_factor: 10.0
 lethal_cost_threshold: 100
+
+inflater_layer:
+  inflation_radius: 1.0
+  cost_scaling_factor: 10.0
+
 #observation_sources: base_scan
 #  base_scan: {sensor_frame: ego_vehicle/lidar, data_type: PointCloud2, topic: /carla/ego_vehicle/lidar, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.1, max_obstacle_height: 3.0,min_z: 0.1 ,max_z: 8.0}
 #obstacle_layer:
@@ -49,12 +54,15 @@ lethal_cost_threshold: 100
 ##base_scan: {data_type: LaserScan, expected_update_rate: 0.4,
 ##  observation_persistence: 0.0, marking: true, clearing: true, max_obstacle_height: 0.4, min_obstacle_height: 0.08}
 obstacle_layer:
-    observation_sources: rslidar lslidar
+    observation_sources: base_scan  # rslidar lslidar
 #     point_cloud_sensor : {sensor_frame: lslidar,data_type: LaserScan, clearing: true, marking: true, topic: /laser_scan, inf_is_valid: false}
     rslidar: {sensor_frame: rslidar, data_type: PointCloud2, topic: /rslidar_points, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.3, max_obstacle_height: 1.0,
-     raytrace_range: 30 ,obstacle_range: 30}
+     raytrace_range: 30.9 ,obstacle_range: 30, observation_persistence: 0.0, range_max: 30 }
     lslidar: {sensor_frame: lslidar, data_type: PointCloud2, topic: /lslidar_point_cloud, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.3, max_obstacle_height: 1.0,
-     raytrace_range: 30 ,obstacle_range: 30}
+     raytrace_range: 30.9 ,obstacle_range: 30}
+
+    base_scan: {data_type: LaserScan, expected_update_rate: 0.4,
+        observation_persistence: 0.0, marking: true, clearing: true,topic: /laser_scan , obstacle_range: 30, raytrace_range: 30.9, inf_is_valid: true}
 # inflation:
 #     inflation_radius: 5.0
 
@@ -64,3 +72,6 @@ obstacle_layer:
 #    # laser: {sensor_frame: ego_vehicle/lidar,data_type: PointCloud2, clearing: true, marking: true, topic: /carla/ego_vehicle/lidar, inf_is_valid: false}
 #    point_cloud_sensor: {sensor_frame: ego_vehicle/lidar, data_type: PointCloud2, topic: /carla/ego_vehicle/lidar, marking: true, clearing: true,inf_is_valid: false,min_obstacle_height: 0.1, max_obstacle_height: 3.0,min_z: 0.1 ,max_z: 8.0}
 #'''
+plugins:
+- {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"}
+- {name: inflater_layer, type: "costmap_2d::InflationLayer"}

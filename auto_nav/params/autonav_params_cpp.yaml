@@ -5,10 +5,12 @@ pub_debug_topics : true
 use_previous_line : false 
 end_point_reach_th : 3
 local_traj_length : 8
-
+use_global_path_for_ransac : false # whehter to use global path to clasify left and right clouds.
+enable_center_line_collision_checking : false
+reset_costmap_once : false
 orchard_details:
-  row_spacing : 6.2
-  tree_width : 2.3
+  row_spacing : 9
+  tree_width : 2.7
   tree_width_tolerance : 0.3
 
 turnings:
@@ -20,12 +22,12 @@ ransac:
   max_iterations : 50
 
 dwa:
-  enable : true
+  use_costmap : false
   wheel_base : 2.5
   constant_speed : 1
   steering_agle_lim : 30
-  steering_angle_increment : 1
+  steering_angle_increment : 3
   path_len : 6
-  path_resolution : 0.1
+  path_resolution : 0.3
 
 

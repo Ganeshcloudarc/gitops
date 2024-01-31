@@ -132,6 +132,17 @@ class PurePursuitController:
                     controller_diagnose_pub.publish(diagnostic_msg)
                     rate.sleep()
                     continue
+                if len(self.trajectory_data.points) == 0:
+                    rospy.logwarn("received a empty trajectory")
+                    diagnostic_msg.level = diagnostic_msg.ERROR
+                    diagnostic_msg.message = "received a empty trajectory, stoping the vehicle"
+                    diagnostic_msg.stamp = rospy.Time.now()
+                    controller_diagnose_pub.publish(diagnostic_msg)
+                    self.send_ack_msg(0, 0, 1)
+                    rate.sleep()
+                    continue
+
+
 
                 close_point_ind, close_dis = self.calc_nearest_ind(robot_pose)
 
