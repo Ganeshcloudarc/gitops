@@ -64,6 +64,14 @@ base_link:   # center of the rear axle.
     roll: 0.0
     pitch: 0.0
     yaw: 0.0
+  
+  itops_f25: # center of the rear axle to itops_f25 (2d lidar )
+    x: -0.8 # -0.3 for reverse # 2.8 for forward
+    y: 0.0
+    z: 0.4
+    roll: 0.0
+    pitch: 0.0
+    yaw: -3.141 # 0.0 # -3.141 for reverse
 
 
 

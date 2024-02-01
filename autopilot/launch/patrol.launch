@@ -17,9 +17,12 @@
     <arg name="enable_obs_v1" default="true"/>
     <arg name="use_pcl_boxes" default="true"/>
 
-    <!-- Don't enable both rslidar and lslidar at once -->
+    <!-- Don't enable any two of the sensors at once for now. Enable only one at a time RSLidar/LSLidar along with Itops. -->
     <arg name="enable_rslidar" default="false"/>
     <arg name="enable_lslidar" default="true"/>
+
+    <arg name="enable_itops_f25" default="false"/>
+
     <!-- OBS CONFIG END -->
     <arg name="pp_with_pid" default="true"/>
     <arg name="enable_rqt" default="false"/>
@@ -53,6 +56,7 @@
     <param name='/patrol/odom_topic' value = '/vehicle/odom'/>
     <param name="/robot_base_frame" value ="base_link"/>
     <param name="/patrol/enable_obs_v1" value="$(arg enable_obs_v1)"/>
+    <param name="/patrol/enable_itops_f25" value="$(arg enable_itops_f25)"/>
  
     <group if="$(eval arg('hardware_in_loop'))">
        <include file="$(find vehicle_hardware_bringup)/launch/vehicle_core.launch">
@@ -64,6 +68,7 @@
             <!-- <arg name="3d_lidar" value="$(eval arg('enable_obs_v1') or arg('use_pcl_boxes'))"/> -->
             <arg name="rslidar" value="$(arg enable_rslidar)"/>
             <arg name="lslidar" value="$(arg enable_lslidar)"/>
+            <arg name="itops_f25" value="$(arg enable_itops_f25)"/>
        </include>
     </group>
 
@@ -94,10 +99,11 @@
             <arg name="mission_continue" value="$(arg mission_continue)"/>
             <arg name="use_pcl_boxes" value="$(arg use_pcl_boxes)"/>
             <arg name="enable_zed_obs" value="$(arg enable_zed_obs)"/>
-            <arg name="sensor_source" value="$(arg sensor_source)"/>
+             <arg name="sensor_source" value="$(arg sensor_source)"/>
             <arg name="rslidar" value="$(arg enable_rslidar)"/>
             <arg name="lslidar" value="$(arg enable_lslidar)"/>
            
+            <arg name="enable_itops_f25" value="$(arg enable_itops_f25)"/>
         </include>
         <node name="rviz_obstacle_stop_planner" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol_obstacle_stop_planner.rviz" if = "$(eval arg('rviz'))"/>
     </group>
@@ -105,6 +111,8 @@
     <!-- Auto nav  -->
     <arg name="cloud_in" default="/rslidar_points" if = "$(eval arg('enable_rslidar'))"/>
     <arg name="cloud_in" default="/lslidar_point_cloud" if = "$(eval arg('enable_lslidar'))"/>
+    <!-- <arg name="cloud_in" default="/itops_f25/camera/points" unless="$(eval arg('enable_rslidar') or arg('enable_lslidar') and not arg('enable_itops_f25'))"/> -->
+
     <group if="$(eval arg('enable_centering'))">
         <param name="/patrol/allow_reversing" value="false"/>
         <param name="patrol/enable_cte_based_speed_control" value="false"/>
@@ -154,12 +162,12 @@
     <group unless="$(eval arg('enable_centering'))">
         <group if="$(eval arg('pp_with_pid'))">
             <node name="patrol_pid_bag_record" pkg="rosbag" type="record"
-                args="record -o $(env HOME)/.bags/boson_pid_kp_$(arg kp)_ki_$(arg ki)_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud " if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+                args="record -o $(env HOME)/.bags/boson_pid_kp_$(arg kp)_ki_$(arg ki)_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud|/itops_f25/(.*)|/cloud_concatenated" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
         </group>
 
         <group unless="$(eval arg('pp_with_pid'))">
             <node name="patrol_bag_record" pkg="rosbag" type="record"
-                args="record -o $(env HOME)/.bags/boson_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
+                args="record -o $(env HOME)/.bags/boson_$(arg mission_file) -a -x /zed2i/(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud|/itops_f25/(.*)|/cloud_concatenated" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
         </group>
     </group>
     <!-- <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include> -->

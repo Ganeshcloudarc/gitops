@@ -87,4 +87,19 @@
     <child link="rplidar" />
   </joint>
 
+  <link name="itops_f25"/>
+  <joint name="itops_f25_link" type="fixed">
+    <!-- <origin xyz="2.8 0 0.1" rpy="0 0 0" /> -->
+    <origin
+        xyz="${vehicle_info['base_link']['itops_f25']['x']}
+             ${vehicle_info['base_link']['itops_f25']['y']}
+             ${vehicle_info['base_link']['itops_f25']['z']}"
+
+        rpy="${vehicle_info['base_link']['itops_f25']['roll']}
+             ${vehicle_info['base_link']['itops_f25']['pitch']}
+             ${vehicle_info['base_link']['itops_f25']['yaw']}"
+    />
+    <parent link="base_link" />
+    <child link="itops_f25" />
+  </joint>
 </robot>

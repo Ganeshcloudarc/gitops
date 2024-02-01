@@ -4,7 +4,14 @@
 <!--   <arg name="target_frame" default="base_link"/>-->
    <arg name="config_file" default="cloud_to_laser_180_params.yaml"/>
 
-   <node name='osp_pointcloud_to_laserscan_node' pkg='pointcloud_to_laserscan' type='pointcloud_to_laserscan_node'>
+   <!-- <arg name='cloud_in' default="rslidar_points"/> -->
+   <!-- <arg name="scan_out" default="laser_scan"/> -->
+   <arg name="target_frame" default="rslidar"/>
+   <arg name="node_name" default="rslidar_pointcloud_to_laserscan_node"/>
+   <!-- <arg name="min_height" default ="-0.1"/> -->
+
+   <!-- For now, assuming only one point cloud source is launching at a time. either itops/rslidar. -->
+   <node name='$(arg node_name)' pkg='pointcloud_to_laserscan' type='pointcloud_to_laserscan_node'>
       <remap from="cloud_in" to="$(arg cloud_in)"/>
       <remap from="scan" to="$(arg scan_out)"/>
 <!--      <param name="target_frame" value="$(arg target_frame)"/>-->

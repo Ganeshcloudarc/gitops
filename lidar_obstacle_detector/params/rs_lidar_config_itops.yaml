@@ -1,0 +1,32 @@
+lidar_obstacle_detector:
+  use_pca_box: False
+  use_tracking: False
+
+  voxel_grid_size: 0.2
+  roi_max_x: 70
+  roi_max_y : 30
+  roi_max_z : 1
+
+  roi_min_x: -50
+  roi_min_y: -30
+  roi_min_z: -2
+  # crop box below tuned in YP on 22-Aug to work along with itops.
+  crop_box_max_x: 4.0
+  crop_box_max_y: 2.0
+  crop_box_max_z: 3.5
+
+  crop_box_min_x: -2.5
+  crop_box_min_y: -2.0
+  crop_box_min_z: -0.2
+
+  neighbors : 50
+  standard_deviation : 1
+
+  ground_threshold: 0.4
+
+  cluster_threshold: 0.7
+  cluster_max_size: 5000
+  cluster_min_size: 9
+
+  displacement_threshold: 1.0
+  iou_threshold: 1.0

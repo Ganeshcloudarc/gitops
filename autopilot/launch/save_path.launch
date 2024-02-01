@@ -22,7 +22,8 @@
              <!-- <arg name="3d_lidar" value="$(eval arg('enable_obs_v1') or arg('use_pcl_boxes'))"/> -->
              <arg name="rslidar" value="false"/>
              <arg name="lslidar" value="false"/>
-        </include>
+             <arg name="itops_f25" value="false"/>
+       </include>
      </group>
 
      <group unless="$(eval arg('hardware_in_loop'))">
