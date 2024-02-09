@@ -381,7 +381,7 @@ class VehicleSafety {
       if (elapsed_sec < GPS_FIX_CB_TIMEOUT) {
         if (std::find(gps1_fix_list.begin(), gps1_fix_list.end(), gps1_fix) !=
                 gps1_fix_list.end() &&
-            std::find(gps2_fix_list.begin(), gps2_fix_list.end(), gps2_fix) !=
+            std::find(gps2_fix_list.begin(), gps2_fix_list.end(), gps2_fix) != 
                 gps2_fix_list.end()) {
           stat.summary(OK, "GPS FIX OK");
           // stat.add("BOTH GPS Fix Type", 6);
@@ -390,7 +390,8 @@ class VehicleSafety {
           stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
           stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
           start_time = 0;
-        } else if (gps1_h_acc_data <= gps1_h_acc_th_mm){
+        } else if ((gps1_h_acc_data <= gps1_h_acc_th_mm) && std::find(gps2_fix_list.begin(), gps2_fix_list.end(), gps2_fix) != 
+                gps2_fix_list.end()) {
             stat.summary(OK, "GPS FIX OK");
             stat.add("GPS1 Fix Type", gps1_fix);
             stat.add("GPS2 Fix Type", gps2_fix);
