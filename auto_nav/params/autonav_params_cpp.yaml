@@ -22,6 +22,7 @@ ransac:
   max_iterations : 50
 
 dwa:
+  enable: false
   use_costmap : false
   wheel_base : 2.5
   constant_speed : 1

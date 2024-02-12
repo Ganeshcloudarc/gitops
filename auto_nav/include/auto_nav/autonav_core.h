@@ -77,6 +77,7 @@ class AutoNavCore
         void odomCallback(const nav_msgs::Odometry::ConstPtr& odom);
         void main_loop(ros::NodeHandle);
         void loadParams(ros::NodeHandle);
+        void publish_empty_traj();
         ros::Subscriber scan_sub, local_pointcloud_sub, trajectory_sub, odometry_sub;
         // ros::publisher local_path_pub;
         ros::Publisher local_traj_pub,local_path_pub, center_line_pub, left_line_pub, right_line_pub, path_percent_publisher, front_pose_pub;
@@ -103,6 +104,7 @@ class AutoNavCore
         // bool in_turn_status;
         
         // Parameters
+        bool enable_dwa;
         bool use_costmap_for_dwa, enable_moving_avg_filter, pub_debug_topics, use_previous_line, mission_continue, use_global_path_for_ransac, enable_center_line_collision_checking;
         int moving_avg_filter_window_size, ransac_max_iterations, loop_frequency;
         float row_spacing, tree_width, tree_width_tolerance;
@@ -112,8 +114,8 @@ class AutoNavCore
         dwa_path_len,dwa_path_resolution, dwa_wheel_base, local_traj_length;
         // DwaPathGenerator dwa_path_gen;
         DwaPathGenerator dwa_path_gen;
+       ros::Time last_odom_time, last_localcloud_time, last_scan_time;
        
-
 
         Line center_line;
         Line moving_avg_center_line;

@@ -13,7 +13,7 @@ AutoNavCore::AutoNavCore()
                              dwa_constant_speed, dwa_path_len,
                              dwa_path_resolution);
 
-  if (use_costmap_for_dwa)
+  if (use_costmap_for_dwa and enable_dwa)
     costmap_ros_ = new costmap_2d::Costmap2DROS("/costmap", tf2_buffer);
   // ROS_DEBUG_STREAM(costmap_ros->getGlobalFrameID());
   scan_sub = private_nh.subscribe<sensor_msgs::LaserScan>(
@@ -32,7 +32,7 @@ AutoNavCore::AutoNavCore()
   lanes_marker_pub =
       private_nh.advertise<visualization_msgs::MarkerArray>("lanes", 1, true);
   diagnostis_pub = private_nh.advertise<diagnostic_msgs::DiagnosticArray>(
-      "autonav_diagnostics", 1, true);
+      "_diagnostics", 1, true);
 
   if (pub_debug_topics) {
     center_line_pub = private_nh.advertise<nav_msgs::Path>("center_line", 1);
@@ -103,6 +103,8 @@ void AutoNavCore::loadParams(ros::NodeHandle private_nh) {
                          enable_center_line_collision_checking, false);
 
   // DWA related
+  private_nh.param<bool>("dwa/enable", enable_dwa, false);
+
   private_nh.param<bool>("dwa/use_costmap", use_costmap_for_dwa, true);
   private_nh.param<float>("dwa/constant_speed", dwa_constant_speed, 1);
   private_nh.param<float>("dwa/wheel_base", dwa_wheel_base, 2.5);
@@ -122,17 +124,17 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh) {
   while (ros::ok()) {
     if (curr_local_cloud_data_received and curr_scan_data_received and
         global_traj_data_received and odom_data_received) {
-      ROS_INFO("data received on all sensors");
-      diag_status.summary(OK, "data received on all sensors");
+      ROS_INFO("Data received on all sensors");
+      diag_status.summary(OK, "Data received on all sensors");
       break;
     } else {
-      ROS_WARN_STREAM("NO data received on all sensors");
-      // ROS_WARN_STREAM("curr_local_cloud_data_received" +
-      // curr_local_cloud_data_received );//"  and curr_scan_data_received and
-      // global_traj_data_received and odom_data_received
-      diag_status.summary(ERROR, "NO data received on all sensors");
+      ROS_WARN_STREAM("Data not received on all sensors");
+      diag_status.summary(ERROR, "Data not received on all sensors");
+      diag_status.add("curr_local_cloud_data_received", curr_local_cloud_data_received);
+      diag_status.add("curr_scan_data_received", curr_scan_data_received);
+      diag_status.add("global_traj_data_received", global_traj_data_received);
+      diag_status.add("odom_data_received", odom_data_received);
       publish_diagnostics();
-
       rate.sleep();
       ros::spinOnce();
     }
@@ -144,6 +146,40 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh) {
     marker_arr.markers.clear();
     diag_status.clearSummary();
     diag_status.values.clear();
+    // checking for timeouts from sensors and odometry
+    // Odom, localcloud, laserscan
+    ros::Time current_time = ros::Time::now();
+    ros::Duration time_diff = current_time - last_odom_time;
+    ros::Duration timeoutDuration(1);
+    if (time_diff > timeoutDuration){
+        ROS_ERROR("Time out from odometry(topic : /vehicle/odom)");
+        diag_status.summary(ERROR, "Time out from odometry(topic : /vehicle/odom)");
+        publish_diagnostics();
+        publish_empty_traj();
+        rate.sleep();
+        ros::spinOnce();
+        continue;
+    }
+    time_diff = current_time - last_scan_time;
+    if (time_diff > timeoutDuration){
+      ROS_ERROR("Time out from scan(topic : /laser_scan)");
+      diag_status.summary(ERROR, "Time out from scan(topic : /laser_scan)");
+      publish_diagnostics();
+      publish_empty_traj();
+      rate.sleep();
+      ros::spinOnce();
+      continue;
+    }
+     time_diff = current_time - last_localcloud_time;
+    if (time_diff > timeoutDuration){
+       ROS_ERROR("Time out from local_cloud (topic : /local_cloud_map)");
+      diag_status.summary(ERROR, "Time out from local_cloud (topic : /local_cloud_map)");
+      publish_diagnostics();
+      publish_empty_traj();
+      rate.sleep();
+      ros::spinOnce();
+      continue;
+    }
 
     if (close_index == -1) {
       auto val = traj_helper.find_closest_idx_with_dist_ang_thr(
@@ -895,8 +931,41 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh) {
         vibration_path_pub.publish(vibration_path);
         ROS_DEBUG("vibration path is puslished");
       }
+      diag_status.add("enable_dwa", enable_dwa);
 
       diag_status.add("use_costmap_for_dwa", use_costmap_for_dwa);
+      if (!enable_dwa)
+      {
+         
+          autopilot_msgs::Trajectory line_traj;
+          line_traj.header.frame_id = "map";
+          nav_msgs::Path line_path;
+          line_path.header.frame_id = "map";
+          for(int i = 0; i<  local_traj_length/dwa_path_resolution; i++ )
+          {
+            autopilot_msgs::TrajectoryPoint traj_point;
+            traj_point.pose.position.x =  start_point_center_lane.x + cos(line_heading)*i*dwa_path_resolution;
+            traj_point.pose.position.y =  start_point_center_lane.y + sin(line_heading)*i*dwa_path_resolution;
+            traj_point.pose.orientation = autopilot_utils::get_quaternion_from_yaw(line_heading);
+            traj_point.longitudinal_velocity_mps =  traj_helper.get_trajectory_point_by_index(close_index)
+                .longitudinal_velocity_mps;
+            traj_point.accumulated_distance_m = i*dwa_path_resolution;
+            line_traj.points.push_back(traj_point);
+            geometry_msgs::PoseStamped pst;
+            pst.header.frame_id = "map";
+            pst.pose = traj_point.pose;
+            line_path.poses.push_back(pst);
+          }
+          local_traj_pub.publish(line_traj);
+          local_path_pub.publish(line_path);
+          ROS_INFO("line_traj and line_path are published");
+          diag_status.summary(OK, "line_traj and line_path are published");
+          publish_diagnostics();
+          lanes_marker_pub.publish(marker_arr);
+          loop_rate.sleep();
+          ros::spinOnce();
+          continue;
+        }
 
       // use the dwa path ganerator paths
       std::vector<std::vector<std::vector<double>>> dwa_paths =
@@ -1310,11 +1379,24 @@ void AutoNavCore::localPointcloudsCallback(
     const sensor_msgs::PointCloud2::ConstPtr &data) {
   local_pointcloud = data;
   curr_local_cloud_data_received = true;
+  last_localcloud_time = ros::Time::now();
 }
 
 void AutoNavCore::scanCallback(const sensor_msgs::LaserScan::ConstPtr &scan) {
   curr_scan = scan;
   curr_scan_data_received = true;
+  last_scan_time =   ros::Time::now();
+
+}
+void AutoNavCore::publish_empty_traj(){
+  autopilot_msgs::Trajectory traj;
+  traj.header.frame_id = "map";
+  traj.header.stamp = ros::Time::now();
+  local_traj_pub.publish(traj);
+  nav_msgs::Path path;
+  path.header.frame_id = "map";
+  path.header.stamp = ros::Time::now();
+  local_path_pub.publish(path);
 }
 
 void AutoNavCore::trajectoryCallback(
@@ -1328,6 +1410,7 @@ void AutoNavCore::odomCallback(const nav_msgs::Odometry::ConstPtr &odom) {
   curr_odom = odom;
   odom_data_received = true;
   curr_robot_pose = odom->pose.pose;
+  last_odom_time =  ros::Time::now();
 }
 
 inline void AutoNavCore::publish_diagnostics() {
