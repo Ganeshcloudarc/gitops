@@ -32,7 +32,7 @@ AutoNavCore::AutoNavCore()
   lanes_marker_pub =
       private_nh.advertise<visualization_msgs::MarkerArray>("lanes", 1, true);
   diagnostis_pub = private_nh.advertise<diagnostic_msgs::DiagnosticArray>(
-      "_diagnostics", 1, true);
+      "autonav_diagnostics", 1, true);
 
   if (pub_debug_topics) {
     center_line_pub = private_nh.advertise<nav_msgs::Path>("center_line", 1);
