@@ -95,6 +95,7 @@
     <!-- obstacle stop planner -->
     <group if="$(eval arg('obs_stop_planner'))">
         <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
+        <param name="/trajectory_in" value="/local_gps_trajectory"/>
         <include file="$(find obstacle_stop_planner)/launch/obstacle_stop_planner.launch">
             <arg name="mission_continue" value="$(arg mission_continue)"/>
             <arg name="use_pcl_boxes" value="$(arg use_pcl_boxes)"/>
@@ -116,11 +117,11 @@
     <group if="$(eval arg('enable_centering'))">
         <param name="/patrol/allow_reversing" value="false"/>
         <param name="patrol/enable_cte_based_speed_control" value="false"/>
-         <param name="/patrol/pp_with_pid" value="false"/>
+        <param name="/patrol/pp_with_pid" value="false"/>
 
 
         <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
-        
+        <param name="/trajectory_in" value="/local_gps_trajectory"/>
         <include file="$(find auto_nav)/launch/auto_nav.launch">
             <arg name="cloud_in_for_auto_nav" value="$(arg cloud_in)"/>
             <arg name="mission_continue" value="$(arg mission_continue)"/>
@@ -154,6 +155,7 @@
     <group unless="$(eval arg('enable_centering') or arg('obs_stop_planner'))">
         <!-- <group if="$(eval arg('pp_with_pid'))"> -->
           <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
+          <param name="/trajectory_in" value="/global_gps_trajectory"/>
           <group if="$(eval arg('rviz'))">
                 <node name="rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol.rviz" if = "$(eval arg('rviz'))"/>
           </group>
