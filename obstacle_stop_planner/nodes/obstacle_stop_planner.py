@@ -388,6 +388,8 @@ class ObstacleStopPlanner:
                         traj_point = copy.deepcopy(self._traj_in.points[ind]) 
                         traj_point.longitudinal_velocity_mps = self.robot_min_speed_th
                         trajectory_msg.points.append(traj_point)
+                        start_by_pass_index = self._close_idx 
+                        
                     for ind in range(end_by_pass_index,self._traj_end_index-1): 
                         path_acc_distance = self._traj_in.points[ind].accumulated_distance_m - \
                                             self._traj_in.points[self._close_idx].accumulated_distance_m

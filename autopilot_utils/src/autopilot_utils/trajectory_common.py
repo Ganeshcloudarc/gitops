@@ -93,6 +93,28 @@ class TrajectoryManager:
                 return True, i
         else:
             return False, idx_min
+        
+    
+        
+
+    def target_index(self, robot_pose, close_point_ind,lhd):
+        """
+        search index of target point in the reference path. The following implementation was inspired from
+        http://dyros.snu.ac.kr/wp-content/uploads/2021/02/Ahn2021_Article_AccuratePathTrackingByAdjustin-1.pdf
+        Args:
+            robot_pose:  pose of robot
+            close_point_ind : index of close point to the vehicle
+        Returns:
+            close_point_index,lookahead_distance
+        """
+        close_dis = self._traj_in.points[close_point_ind].accumulated_distance_m
+        for ind in range(close_point_ind, len(self._traj_in.points)):
+            path_acc_distance = self._traj_in.points[ind].accumulated_distance_m - close_dis
+            if path_acc_distance > lhd:
+                return ind, distance_btw_poses(robot_pose, self._traj_in.points[ind].pose)
+            
+        return ind, distance_btw_poses(robot_pose, self._traj_in.points[ind].pose)
+
 
     def find_close_pose_after_index(self, curr_pose, prev_idx, search_distance=10):
         """

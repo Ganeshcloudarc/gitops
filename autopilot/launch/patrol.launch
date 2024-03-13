@@ -11,6 +11,7 @@
     <!-- DO NOT KEEP BOTH obs_stop_planner and enable_centering TO TRUE AT A TIME -->
     <arg name="obs_stop_planner" default="true"/>
     <arg name="enable_centering" default="false"/>
+    <arg name="pure_pursuit_refactor" default="true"/>
 
 
     <arg name="enable_zed_obs" default="true"/>
@@ -24,7 +25,7 @@
     <arg name="enable_itops_f25" default="false"/>
 
     <!-- OBS CONFIG END -->
-    <arg name="pp_with_pid" default="true"/>
+    <arg name="pp_with_pid" default="false"/>
     <arg name="enable_rqt" default="false"/>
     
     <arg name="allow_reversing" default="true"/>
@@ -93,8 +94,17 @@
     <node pkg = "autopilot" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
 
     <!-- obstacle stop planner -->
-    <group if="$(eval arg('obs_stop_planner'))">
-        <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
+    <group if="$(eval arg('obs_stop_planner'))"> 
+        <!-- pure pursuit refactor enabled -->
+        <group if="$(eval arg('pure_pursuit_refactor'))"> 
+            <param name="/trajectory_in" value="/local_gps_trajectory"/>
+            <param name="/trajectory_timeout" value="2"/>
+            <node pkg = "autopilot" type = "path_tracking_pure_pursuit_refactor.py" name = "pure_pursuit_collision_node" output = 'screen' />
+        </group> 
+        <!-- pure pursuit refactor disabled -->
+        <group unless="$(eval arg('pure_pursuit_refactor'))">  
+            <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
+        </group>
         <param name="/trajectory_in" value="/local_gps_trajectory"/>
         <include file="$(find obstacle_stop_planner)/launch/obstacle_stop_planner.launch">
             <arg name="mission_continue" value="$(arg mission_continue)"/>
@@ -107,14 +117,26 @@
             <arg name="enable_itops_f25" value="$(arg enable_itops_f25)"/>
         </include>
         <node name="rviz_obstacle_stop_planner" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol_obstacle_stop_planner.rviz" if = "$(eval arg('rviz'))"/>
-    </group>
-    
+    </group> 
+
     <!-- Auto nav  -->
     <arg name="cloud_in" default="/rslidar_points" if = "$(eval arg('enable_rslidar'))"/>
     <arg name="cloud_in" default="/lslidar_point_cloud" if = "$(eval arg('enable_lslidar'))"/>
     <!-- <arg name="cloud_in" default="/itops_f25/camera/points" unless="$(eval arg('enable_rslidar') or arg('enable_lslidar') and not arg('enable_itops_f25'))"/> -->
 
+    <!-- centering-->
     <group if="$(eval arg('enable_centering'))">
+        <!-- pure pursuit enabled -->
+        <group if ="$(eval arg('pure_pursuit_refactor'))">
+                <param name="/trajectory_in" value="/local_gps_trajectory"/>
+                <param name="/trajectory_timeout" value="2"/> 
+                <node pkg = "autopilot" type = "path_tracking_pure_pursuit_refactor.py" name = "pure_pursuit_collision_node" output = 'screen' />
+        </group>
+        <!-- pure pursuit disabled -->
+        <group unless = "$(eval arg('pure_pursuit_refactor'))">
+                <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
+        </group>
+
         <param name="/patrol/allow_reversing" value="false"/>
         <param name="patrol/enable_cte_based_speed_control" value="false"/>
         <param name="/patrol/pp_with_pid" value="false"/>
@@ -136,7 +158,7 @@
                 /local_trajectory /mavros/gpsstatus/gps1/raw /mavros/gpsstatus/gps2/raw /pilot_status /autonav_core_node/dwa_best_traj /autonav_core_node/front_pose 
                 /pure_pursuit_diagnose /target_pose /tf /tf_static /vehicle/cmd_drive_safe 
                 /vehicle/foot_print /vehicle/gps /vehicle/odom /autonav_core_node/vibration_path " if="$(eval arg('record') and arg('hardware_in_loop'))"/>
-    </group>
+    </group> 
 
     <!-- collision monitor -->
     <group if="$(eval arg('enable_collision_monitor'))">
@@ -151,15 +173,24 @@
 
 
     
-
-    <group unless="$(eval arg('enable_centering') or arg('obs_stop_planner'))">
-        <!-- <group if="$(eval arg('pp_with_pid'))"> -->
-          <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
+    <!--only patrol-->
+    <group unless="$(eval arg('enable_centering') or arg('obs_stop_planner'))"> 
+        <group if="$(eval arg('pure_pursuit_refactor'))"> <!--refactor enabled-->
           <param name="/trajectory_in" value="/global_gps_trajectory"/>
-          <group if="$(eval arg('rviz'))">
+          <param name="/trajectory_timeout" value="0"/> 
+          <node pkg = "autopilot" type = "path_tracking_pure_pursuit_refactor.py" name = "pure_pursuit_node" output = 'screen' />
+        </group> 
+        <group unless="$(eval arg('pure_pursuit_refactor'))">
+            <node pkg = "autopilot" type = "path_tracking_pure_pursuit.py" name = "pure_pursuit_node" output = 'screen' />
+
+        </group>
+          <param name="/trajectory_in" value="/global_gps_trajectory"/>
+        <group if="$(eval arg('rviz'))"> 
                 <node name="rviz_patrol" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol.rviz" if = "$(eval arg('rviz'))"/>
-          </group>
-    </group>
+        </group>
+    </group> 
+
+
 
     <group unless="$(eval arg('enable_centering'))">
         <group if="$(eval arg('pp_with_pid'))">
