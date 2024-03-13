@@ -142,7 +142,7 @@
         <param name="/patrol/pp_with_pid" value="false"/>
 
 
-        <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' />
+        <!-- <node pkg = "autopilot" type = "path_tracking_pure_pursuit_collision.py" name = "pure_pursuit_collision_node" output = 'screen' /> -->
         <param name="/trajectory_in" value="/local_gps_trajectory"/>
         <include file="$(find auto_nav)/launch/auto_nav.launch">
             <arg name="cloud_in_for_auto_nav" value="$(arg cloud_in)"/>
