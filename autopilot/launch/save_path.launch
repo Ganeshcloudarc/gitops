@@ -6,6 +6,7 @@
     <arg name='min_dis' default='0.1'/>
     <arg name="failsafe_enable" default="true"/>
     <arg name="record" default="true"/>
+    <arg name="enable_mapping" default="true"/>
 
 
     <param name='/patrol/gps_topic' value = '/vehicle/gps'/>
@@ -21,7 +22,7 @@
              <arg name="2d_lidar" value="false"/>
              <!-- <arg name="3d_lidar" value="$(eval arg('enable_obs_v1') or arg('use_pcl_boxes'))"/> -->
              <arg name="rslidar" value="false"/>
-             <arg name="lslidar" value="false"/>
+             <arg name="lslidar" value="$(arg enable_mapping)"/>
              <arg name="itops_f25" value="false"/>
        </include>
      </group>
@@ -47,6 +48,15 @@
     </group>
 
     <node name="save_path_bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson_save_path -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points " if="$(eval record)"/>
+        args="record -o $(env HOME)/.bags/boson_save_path -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points|/lslidar_point_cloud|/mapper_node/(.*)" if="$(eval record)"/>
+
+    <group if ="$(eval arg('enable_mapping'))">
+         <include file="$(find kissicp_planner)/launch/mapper.launch"> 
+            <arg name="pointcloud_topic" value="lslidar_point_cloud"/> 
+            <arg name="publish_global_map" value="false"/> 
+            <arg name="visualize" value="false"/>
+            <arg name="target_config_file_name" value="$(arg mission_file)"/>
+        </include>
+    </group>
 
 </launch>
