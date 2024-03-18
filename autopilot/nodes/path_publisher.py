@@ -3,6 +3,7 @@
 try : 
 
     import rospy
+    from geopy.distance import geodesic
     import rospkg
     from nav_msgs.msg import Path
     from geojson import LineString as ls 
@@ -19,9 +20,10 @@ try :
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
     from autopilot_utils.geonav_conversions import xy2ll, ll2xy
     from autopilot_utils.rdp_helper import rdp_calculate, distance__ 
-    from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses, yaw_to_quaternion
+    from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses, yaw_to_quaternion, rotate_yaw_180
     from autopilot_utils.trajectory_helper import trajectory_to_path, trajectory_to_marker
-    from autopilot_utils.trajectory_common import TrajectoryManager
+    from autopilot_utils.trajectory_common import TrajectoryManager 
+    from autopilot_utils.coordinate_helper import dist_btw_coord , check_direction_dot_product, calculate_initial_bearing, check_direction_cross_product
     from fastkml import kml
     from fastkml import geometry
     import geometry_msgs.msg as gmsg
@@ -59,16 +61,18 @@ class GlobalGpsPathPub:
         self.diagnostics_status.hardware_id = 'zekrom_v1'
         self.curve_dist = rospy.get_param("path_publisher/curve_dist",10)
         self.smooth_path = rospy.get_param("path_publisher/smooth_path",False)
+        self.opposite_path = rospy.get_param("path_publisher/opposite_path_forward_motion",True)
+        self.opposite_closest_pt_dis_Thr = rospy.get_param("path_publisher/opposite_closest_pt_dis_Thr",1)
         self.curve_angle = rospy.get_param("path_publisher/rdp_angle",0.09)
         self._traj_manager = TrajectoryManager()
         # parameters for path publisher
         # self.path_res = rospy.get_param("path_publisher/path_resolution",0.1)
         self.max_forward_speed = rospy.get_param('/patrol/max_forward_speed', 1.5)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
-        self.minimum_data_len = rospy.get_param("path_publisher/minimum_json_length",100)
+        self.minimum_data_len = rospy.get_param("path_publisher/minimum_json_length",100) 
         distance_to_slowdown_on_ends = rospy.get_param("/path_publisher/distance_to_slowdown_on_ends", 3)
         self.mission_continue = rospy.get_param("patrol/mission_continue", True) 
-        self.interpolate_with_rtk = rospy.get_param("path_publisher/interpolate_with_rtk",False)
+        self.interpolate_with_rtk = rospy.get_param("path_publisher/interpolate_with_rtk",False) 
         self.interpolate_without_rtk = rospy.get_param("path_publisher/interpolate_without_rtk",False)
         self.max_dis_btw_points = rospy.get_param("path_publisher/max_dis_btw_points", 0.5)
         self.path_resolution = rospy.get_param("path_publisher/path_resolution", 0.1)
@@ -78,7 +82,8 @@ class GlobalGpsPathPub:
         self.max_look_ahead = rospy.get_param("pure_pursuit/max_look_ahead_dis", 6)
         self.avg_lhd = (self.min_look_ahead + self.max_look_ahead) / 2
         self.rear_axle_center_height_from_ground = vehicle_data.dimensions.tyre_radius
-        self.mission_file_dir = mission_file_dir
+        self.mission_file_dir = mission_file_dir 
+        self.error_occured =False
 
         # publishers
         self.global_trajectory_pub = rospy.Publisher('global_gps_trajectory', Trajectory, queue_size=1, latch=True)
@@ -119,6 +124,7 @@ class GlobalGpsPathPub:
         try:
            
             data = json.load(open(self.mission_file_dir))
+
             if (self.smooth_path == True) : 
                 rospy.loginfo("smooth path is true")
                 # reading the json file 
@@ -195,6 +201,7 @@ class GlobalGpsPathPub:
         odom_key = 'odometry'
         coord_key = 'coordinates'
         feature_key = 'features'
+
         if coord_key in data.keys() and odom_key in data.keys():
             rospy.loginfo("odometry values found")
             self.from_odometry(data)
@@ -280,8 +287,7 @@ class GlobalGpsPathPub:
             self.diagnostics_status.add("Error Ocurred",str(error))
             self.publisher_diagnostics() 
             return
-
-
+        
     def set_home_position(self, home_lat, home_long, home_alt=-60):
         geo_point = GeoPointStamped()
         geo_point.position.latitude = home_lat
@@ -392,6 +398,8 @@ class GlobalGpsPathPub:
         self.gps_path_pub.publish(self._traj_manager.to_path())
         self.trajectory_velocity_marker_pub.publish(trajectory_to_marker(traj_msg, self.max_forward_speed))
         rospy.loginfo("PUBLISHED GLOBAL GPS PATH")
+    
+
 
     def from_odometry(self, data): 
         data_keys = data.keys() 
@@ -429,13 +437,17 @@ class GlobalGpsPathPub:
         accumulated_distance = 0
         prev_pose = Pose()             
         max_path_resolution = []
-        
+        min_close_dis =[]
+        reference_yaw = 0
+        closest_distance = 0 
+
         if data_len < self.minimum_data_len: 
             rospy.logerr(f"less than minimum_waypoints {data_len}")
             self.diagnostics_status.summary(ERROR,f"CAUTION - {data_len} Number of Waypoints") 
             self.diagnostics_status.add("LEN-WAYPOINTS",data_len)
             self.publisher_diagnostics() 
             return
+    
         last_index = 0
         for i in range(len(data['coordinates'])):
             # Odom based path
@@ -451,20 +463,22 @@ class GlobalGpsPathPub:
                                             odom_orientation['w'])
             if i == 0:
                 prev_pose = odom_pose
-
+             
             dis = distance_btw_poses(odom_pose, prev_pose)
+
             # linear interpolating the highest path_resolution with parameter   
             if dis >= self.max_dis_btw_points:  
-                # TODo interpolate  
+
                 # if rtk_Status and interplote param is true internal interpolation would occur  
                 if((rtk_status and self.interpolate_with_rtk)or(not rtk_status and self.interpolate_without_rtk)): 
+                   
                     rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
                     internal_path_res = distance_btw_poses(odom_pose,prev_pose)
-                    # rospy.loginfo_once("internal path resolution %s", str(internal_path_res))
                     rospy.logwarn_once("Interpolating the internal path resolution is %s meters", str(internal_path_res))
                     n_points = internal_path_res // self.path_resolution
                     angle = angle_btw_poses(odom_pose,prev_pose)
                     prev_pose_ = prev_pose
+                   
                     for j in range(0, int(n_points)):
                         # odom path
                         px = trajectory_msg.points[-1].pose.position.x
@@ -491,11 +505,12 @@ class GlobalGpsPathPub:
                         traj_pt_msg.index = last_index
                         last_index = last_index + 1
                         traj_pt_msg.accumulated_distance_m = accumulated_distance
-                        trajectory_msg.points.append(traj_pt_msg)
+                        trajectory_msg.points.append(traj_pt_msg) 
                                                   
                 else:
                     rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
                 pass  
+
             
             accumulated_distance = accumulated_distance + dis        
             prev_pose = odom_pose 
@@ -509,19 +524,18 @@ class GlobalGpsPathPub:
             last_index = last_index+1
             traj_pt_msg.accumulated_distance_m = accumulated_distance
             trajectory_msg.points.append(traj_pt_msg)    
-            
-        # connecting the first and last way points
-      
+
+        # connecting the first and last way points 
         if self.mission_continue: 
             distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[0].pose)
             rospy.loginfo("distance between first and last way point %s", str(distance))
-            # if distance > self.avg_lhd:
+            # if distance > self.avg_lhd: 
 
             rospy.logwarn("path's end and start points are %s meters apart , Interpolating them ", str(distance))
             n_points = distance // self.path_resolution
             angle = angle_btw_poses(trajectory_msg.points[0].pose, trajectory_msg.points[-1].pose)
             # print()
-            # print("angle", angle)
+            # print("angle", angle) 
             for j in range(0, int(n_points)):
                 # odom path
                 px = trajectory_msg.points[-1].pose.position.x
@@ -534,7 +548,7 @@ class GlobalGpsPathPub:
                 odom_pose.orientation = yaw_to_quaternion(angle)
                 # Trajectory
                 lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long)
-
+                
                 dis = distance_btw_poses(odom_pose, prev_pose)
                 accumulated_distance = accumulated_distance + dis
                 prev_pose = odom_pose
@@ -551,10 +565,100 @@ class GlobalGpsPathPub:
                 trajectory_msg.points.append(traj_pt_msg)
             # else:
             #     rospy.loginfo("path end and start points are close , no interpolation needed ")
-        else:
+                
+            else: 
+                self.error_occured = True
+                rospy.logerr(f"distance between start and end point : {distance} mtrs, Greator than Threshold : {self.mission_continue_distance_Thr} mtrs")  
+                self.diagnostics_status.summary(ERROR,f"Not interpolating as the {distance} is greator than {self.mission_continue_distance_Thr}") 
+                self.diagnostics_status.add("mission continue",self.mission_continue)
+                self.diagnostics_status.add("mission_continue_distance_Thr ",self.mission_continue_distance_Thr)
+                self.diagnostics_status.add("distance between 1st and last pt",distance)
+                self.publisher_diagnostics() 
+
+
+        else: 
             distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[1].pose)
             rospy.logdebug("distance between first and last way point %s", str(distance))
             rospy.logdebug("Mission continue not selected")
+
+            # opposite_path with forward motion is true and mission continue to false  
+            # reference pose is considered as last point
+            odom_prev = trajectory_msg.points[-1]
+            last_reference_pose = Pose()
+            last_reference_pose.position.x, last_reference_pose.position.y, last_reference_pose.position.z =  odom_prev.pose.position.x, odom_prev.pose.position.y, \
+                                                                            self.rear_axle_center_height_from_ground
+            last_reference_pose.orientation = Quaternion(odom_prev.pose.orientation.x, odom_prev.pose.orientation.y, odom_prev.pose.orientation.z,
+                                                    odom_prev.pose.orientation.w) 
+            reference_yaw = get_yaw(last_reference_pose.orientation) 
+          
+            # parameter set true for opposite path with forward motion 
+            if self.opposite_path == True: 
+                rospy.loginfo("Activating Opposite Path forward motion")  
+
+                # to find the opposite oriented closest point from reverse loops with respect to last trajectory point 
+                for i in range(len(trajectory_msg.points),0,-1): 
+                    odom_now = trajectory_msg.points[i-1] 
+                    current_odom_pose = Pose()
+                    current_odom_pose.position.x, current_odom_pose.position.y, current_odom_pose.position.z = odom_now.pose.position.x, odom_now.pose.position.y, \
+                                                                                    self.rear_axle_center_height_from_ground
+                    current_odom_pose.orientation = Quaternion(odom_now.pose.orientation.x, odom_now.pose.orientation.y, odom_now.pose.orientation.z,
+                                                    odom_now.pose.orientation.w) 
+                    # calc the yaw for the orientation 
+                    check_yaw = get_yaw(current_odom_pose.orientation)   
+                    dot_product = math.cos(reference_yaw) * math.cos(check_yaw) + math.sin(reference_yaw) * math.sin(check_yaw) 
+                    if dot_product < 0 : #dot product is negative to indicates the orientation are facing reversed 
+                        distance = distance_btw_poses(last_reference_pose,current_odom_pose)
+                        if closest_distance == 0: 
+                            closest_distance = distance 
+                        elif distance < closest_distance: 
+                            closest_distance = distance
+                            closest_opp_coord_index = i - 1 
+                if closest_distance <= self.opposite_closest_pt_dis_Thr:
+
+                    # appending the trajectory from closest_opposite_index to start of the path
+                    for i in range(closest_opp_coord_index,0,-1): 
+                        odom_then = trajectory_msg.points[i] 
+                        odom_pose1 = Pose()
+                        odom_pose1.position.x, odom_pose1.position.y, odom_pose1.position.z = odom_then.pose.position.x, odom_then.pose.position.y, \
+                                                                                        self.rear_axle_center_height_from_ground
+                        odom_pose1.orientation = Quaternion(odom_then.pose.orientation.x, odom_then.pose.orientation.y, odom_then.pose.orientation.z,
+                                                        odom_now.pose.orientation.w) 
+                        odom_now = trajectory_msg.points[i-1] 
+                        odom_pose2 = Pose()
+                        odom_pose2.position.x, odom_pose2.position.y, odom_pose2.position.z = odom_now.pose.position.x, odom_now.pose.position.y, \
+                                                                                        self.rear_axle_center_height_from_ground
+                        odom_pose2.orientation = Quaternion(odom_now.pose.orientation.x, odom_now.pose.orientation.y, odom_now.pose.orientation.z,
+                                                        odom_now.pose.orientation.w) 
+                        
+                        close_pt_msg = TrajectoryPoint()
+                        close_pt_msg.pose.position = odom_then.pose.position 
+                        current_yaw = get_yaw(odom_then.pose.orientation)
+                        updated_yaw = rotate_yaw_180(current_yaw)
+                        updated_orientation = yaw_to_quaternion(updated_yaw)
+                        close_pt_msg.pose.orientation = updated_orientation
+                        close_pt_msg.longitudinal_velocity_mps = self.max_forward_speed
+                        close_pt_msg.index = len(trajectory_msg.points)+1
+                        dis = distance_btw_poses(odom_pose1, odom_pose2)
+                        accumulated_distance = accumulated_distance + dis
+                        close_pt_msg.accumulated_distance_m = accumulated_distance
+                        trajectory_msg.points.append(close_pt_msg)
+
+                    # path_publisher_diagnostics publishing true it opposite path forward motion is set true
+                    self.diagnostics_status.summary(OK,f"Activating Opposite Path forward motion : {self.opposite_path}") 
+                    self.diagnostics_status.add("distance of closest_opposite_pt",closest_distance)  
+                    self.diagnostics_status.add("opposite path forward motion",self.opposite_path)
+                    self.diagnostics_status.add("opposite_closest_pt_dis_Thr",self.opposite_closest_pt_dis_Thr)
+                    self.publisher_diagnostics()  
+                else: 
+                    self.error_occured = True
+                    rospy.logerr(f"Cannot Activating Opposite Path forward motion as closest_opposite_pts: {closest_distance}")
+                    self.diagnostics_status.summary(ERROR,f"Cannot Activating Opposite Path forward motion as closest_opposite_pts: {closest_distance}") 
+                    self.diagnostics_status.add("distance of closest_opposite_pt",closest_distance)  
+                    self.diagnostics_status.add("opposite path forward motion",self.opposite_path)
+                    self.diagnostics_status.add("opposite_closest_pt_dis_Thr",self.opposite_closest_pt_dis_Thr)
+                    self.publisher_diagnostics()  
+
+
 
         traj_length = len(trajectory_msg.points)
         # velocity profile
@@ -566,7 +670,6 @@ class GlobalGpsPathPub:
                 if path_acc_distance > self.avg_lhd:
                     break
             look_ahead = path_acc_distance
-
             slope = angle_btw_poses(trajectory_msg.points[lhd_index].pose, traj_point.pose)
             alpha = slope - get_yaw(traj_point.pose.orientation)
             delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), look_ahead)
@@ -592,9 +695,10 @@ class GlobalGpsPathPub:
         self.global_trajectory_pub.publish(trajectory_msg) 
         rospy.loginfo("global_trajectory_published") 
         rospy.loginfo('Details of ' + str(i) + " are published from file " + str(mission_file))  
-        self.diagnostics_status.summary(OK,f"Happily published  {rospy.get_name()}") 
-        self.diagnostics_status.add("Length ",len(data['coordinates']))  
-        self.publisher_diagnostics() 
+        if self.error_occured == False:
+            self.diagnostics_status.summary(OK,f"Happily published  {rospy.get_name()}") 
+            self.diagnostics_status.add("Length ",len(data['coordinates']))  
+            self.publisher_diagnostics() 
 
       
     def target_index(self, robot_pose, close_point_ind): 

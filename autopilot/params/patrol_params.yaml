@@ -1,4 +1,6 @@
 path_publisher:
+  opposite_path_forward_motion : True #reverse the path in vehicle forward motion - mission_continue to be false to enable it(req: fish tail save_path)
+  opposite_closest_pt_dis_Thr : 1 #in mtr, distance btw last pts and any point in a path
   max_dis_btw_points : 0.5 # meters
   distance_to_slowdown_on_ends : 3
   minimum_json_length : 100

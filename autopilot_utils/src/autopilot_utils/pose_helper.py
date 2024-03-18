@@ -56,6 +56,18 @@ def yaw_to_quaternion(yaw):
     quat = Quaternion(quat[0], quat[1], quat[2], quat[3])
     return quat
 
+def rotate_yaw_180(yaw):
+    # Ensure yaw is between 0 and 2*pi
+    yaw = yaw % (2 * math.pi)
+    
+    # Calculate the new yaw angle by adding pi radians (180 degrees)
+    new_yaw = yaw + math.pi
+    
+    # Ensure the new_yaw is between 0 and 2*pi
+    new_yaw = new_yaw % (2 * math.pi)
+    
+    return new_yaw
+
 
 def angle_btw_poses(pose1, pose2):
     """
