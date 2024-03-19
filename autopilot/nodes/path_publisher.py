@@ -58,7 +58,8 @@ class GlobalGpsPathPub:
         self.diagnostics_status= DiagnosticStatusWrapper() 
         self.diagnostics_array = DiagnosticArray() 
         self.diagnostics_status.name = rospy.get_name()
-        self.diagnostics_status.hardware_id = 'zekrom_v1'
+        self.diagnostics_status.hardware_id = 'zekrom_v1' 
+        self.mission_continue_dist_thr = rospy.get_param("path_publisher/mission_continue_dist_thr",4)
         self.curve_dist = rospy.get_param("path_publisher/curve_dist",10)
         self.smooth_path = rospy.get_param("path_publisher/smooth_path",False)
         self.opposite_path = rospy.get_param("path_publisher/opposite_path_forward_motion",True)
@@ -527,57 +528,83 @@ class GlobalGpsPathPub:
 
         # connecting the first and last way points 
         if self.mission_continue: 
-            distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[0].pose)
-            rospy.loginfo("distance between first and last way point %s", str(distance))
-            # if distance > self.avg_lhd: 
+            distance_btw_2end_pts = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[0].pose) 
+            rospy.loginfo("distance between first and last way point %s", str(distance_btw_2end_pts)) 
+            
+            # trajectory pose of last index
+            traj_last = trajectory_msg.points[-1]
+            traj_last_pose = Pose()
+            traj_last_pose.orientation = Quaternion(traj_last.pose.orientation.x, traj_last.pose.orientation.y, traj_last.pose.orientation.z,
+                                                    traj_last.pose.orientation.w) 
+            # yaw of trajectory last point
+            traj_last_yaw = get_yaw(traj_last_pose.orientation)
 
-            rospy.logwarn("path's end and start points are %s meters apart , Interpolating them ", str(distance))
-            n_points = distance // self.path_resolution
-            angle = angle_btw_poses(trajectory_msg.points[0].pose, trajectory_msg.points[-1].pose)
-            # print()
-            # print("angle", angle) 
-            for j in range(0, int(n_points)):
-                # odom path
-                px = trajectory_msg.points[-1].pose.position.x
-                py = trajectory_msg.points[-1].pose.position.y
-                px_updated = px + self.path_resolution * math.cos(angle)
-                py_updated = py + self.path_resolution * math.sin(angle)
-                odom_pose = Pose()
-                odom_pose.position.x, odom_pose.position.y, odom_pose.position.z = px_updated, py_updated, \
-                                                                                    self.rear_axle_center_height_from_ground
-                odom_pose.orientation = yaw_to_quaternion(angle)
-                # Trajectory
-                lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long)
-                
-                dis = distance_btw_poses(odom_pose, prev_pose)
-                accumulated_distance = accumulated_distance + dis
-                prev_pose = odom_pose
-                # Trajectory msg filling
-                traj_pt_msg = TrajectoryPoint()
-                traj_pt_msg.pose = odom_pose
+            # trajectory pose of first index  
+            traj_first = trajectory_msg.points[0]
+            traj_first_pose = Pose()
+            traj_first_pose.orientation = Quaternion(traj_first.pose.orientation.x, traj_first.pose.orientation.y, traj_first.pose.orientation.z,
+                                                    traj_first.pose.orientation.w) 
+            # yaw of trajectory first point
+            traj_first_yaw = get_yaw(traj_first_pose.orientation)   
 
-                traj_pt_msg.gps_pose.position.latitude = lat
-                traj_pt_msg.gps_pose.position.longitude = lng
-                # traj_pt_msg.longitudinal_velocity_mps =
-                traj_pt_msg.index = last_index
-                last_index = last_index +1
-                traj_pt_msg.accumulated_distance_m = accumulated_distance
-                trajectory_msg.points.append(traj_pt_msg)
-            # else:
-            #     rospy.loginfo("path end and start points are close , no interpolation needed ")
+            # dot product of trajectory first and last yaw 
+            dot_product_first_nd_last_point =  math.cos(traj_first_yaw) * math.cos(traj_last_yaw) + math.sin(traj_first_yaw) * math.sin(traj_last_yaw)  
+            if dot_product_first_nd_last_point > 0: 
+                direction_btw_2end_pts = "forward"
+            else: 
+                direction_btw_2end_pts = "reversed"
+
+            # when the dot_product is positive to indicate that orientation are faced forward (same direction)
+            if distance_btw_2end_pts < self.mission_continue_dist_thr and dot_product_first_nd_last_point > 0: 
+               
+                rospy.logwarn(f"path's end and start points are {str(distance_btw_2end_pts)} meters apart , {direction_btw_2end_pts} orientation , hence Interpolating them ")
+                n_points = distance_btw_2end_pts // self.path_resolution
+                angle = angle_btw_poses(trajectory_msg.points[0].pose, trajectory_msg.points[-1].pose)
+                # print()
+                # print("angle", angle)
+                for j in range(0, int(n_points)):
+                    # odom path
+                    px = trajectory_msg.points[-1].pose.position.x
+                    py = trajectory_msg.points[-1].pose.position.y
+                    px_updated = px + self.path_resolution * math.cos(angle)
+                    py_updated = py + self.path_resolution * math.sin(angle)
+                    odom_pose = Pose()
+                    odom_pose.position.x, odom_pose.position.y, odom_pose.position.z = px_updated, py_updated, \
+                                                                                        self.rear_axle_center_height_from_ground
+                    odom_pose.orientation = yaw_to_quaternion(angle)
+                    # Trajectory
+                    lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long)
+
+                    dis = distance_btw_poses(odom_pose, prev_pose)
+                    accumulated_distance = accumulated_distance + dis
+                    prev_pose = odom_pose
+                    # Trajectory msg filling
+                    traj_pt_msg = TrajectoryPoint()
+                    traj_pt_msg.pose = odom_pose
+
+                    traj_pt_msg.gps_pose.position.latitude = lat
+                    traj_pt_msg.gps_pose.position.longitude = lng
+                    # traj_pt_msg.longitudinal_velocity_mps =
+                    traj_pt_msg.index = last_index
+                    last_index = last_index +1
+                    traj_pt_msg.accumulated_distance_m = accumulated_distance
+                    trajectory_msg.points.append(traj_pt_msg) 
+
+              
                 
             else: 
+                rospy.logwarn(f"distance_btw_end_pts: {distance_btw_2end_pts} | orientation_btw_end_pts: {dot_product_first_nd_last_point},{direction_btw_2end_pts}, interpolation failed") 
                 self.error_occured = True
-                rospy.logerr(f"distance between start and end point : {distance} mtrs, Greator than Threshold : {self.mission_continue_distance_Thr} mtrs")  
-                self.diagnostics_status.summary(ERROR,f"Not interpolating as the {distance} is greator than {self.mission_continue_distance_Thr}") 
+                rospy.logerr(f"distance between start and end point : {distance_btw_2end_pts} mtrs, Greator than Threshold : {self.mission_continue_dist_thr} mtrs")  
+                self.diagnostics_status.summary(WARN,f"Not interpolating as the {distance_btw_2end_pts} is greator than {self.mission_continue_dist_thr}") 
                 self.diagnostics_status.add("mission continue",self.mission_continue)
-                self.diagnostics_status.add("mission_continue_distance_Thr ",self.mission_continue_distance_Thr)
-                self.diagnostics_status.add("distance between 1st and last pt",distance)
+                self.diagnostics_status.add("mission_continue_distance_Thr ",self.mission_continue_dist_thr)
+                self.diagnostics_status.add("distance between 1st and last pt",distance_btw_2end_pts)
                 self.publisher_diagnostics() 
 
 
         else: 
-            distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[1].pose)
+            distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[0].pose)
             rospy.logdebug("distance between first and last way point %s", str(distance))
             rospy.logdebug("Mission continue not selected")
 
