@@ -15,8 +15,8 @@ path_publisher:
   curve_angle : 0.09 #curve detects at angle 0.01 to 0.35 (tune increase it for too much curves)
 
 patrol:
-  enable_auxillary_commands : False #to activate horn indicator from autopilot
-  enable_turning_horn : False #to activate horn during turnings 
+  enable_auxillary_commands : True #to activate horn indicator from autopilot
+  enable_turning_horn : True #to activate horn during turnings 
   path_topic           : "odom_path"
   cmd_topic            : "/pure_pursuit/cmd_drive"
   pilot_cmd_in         : "/vehicle/cmd_drive_safe"

@@ -13,7 +13,7 @@ np.float = np.float64
 import ros_numpy
 from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper
 from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray, KeyValue
-from pilot.msg import vehicle_stop_command
+from pilot_msgs.msg import vehicle_stop_command
 
 OK = DiagnosticStatus.OK
 ERROR = DiagnosticStatus.ERROR
@@ -166,7 +166,9 @@ class CollisionMonitor:
                 if rospy.Time.now().secs - source.last_update_time() > self.souce_timeout:
                     time_out_status = True
                     rospy.logwarn(f"No update on sensor source : {source.topic_name}")
-                    self.diagnose.add(f"time out from {source.topic_name}", rospy.Time.now().secs - source.last_update_time())
+                    self.diagnose.summary(ERROR, "Front lidar error")
+                    self.diagnose.add("Time out from sensor_source", source.topic_name)
+                    self.diagnose.add("Timeout" , rospy.Time.now().secs - source.last_update_time())
                 points = source.get_data()
                 count = 0
                 if points is not None:
