@@ -91,12 +91,12 @@ class VehicleSafety {
       nh.param("/vehicle_safety/CTE_THR_AT_CURVE", CTE_THR_AT_CURVE);
   bool emergency_stop = false;
   int TRACKING_CONTROLLER_TIMEOUT = 1;
-  int GPS_FIX_CB_TIMEOUT = 1; //timout in sec to check gps callback
+  int GPS_FIX_CB_TIMEOUT = 1;  // timout in sec to check gps callback
   float prev_coordinates_lat, prev_coordinates_long;
   float curr_coordinates_lat = 0, curr_coordinates_long = 0;
   double gps_accuracy = -1, sensor_accuracy_value, GPS_ACC_IDEAL, GPS_ACC_THR;
   int calc_heading = 0;
-  int gps1_fix, gps2_fix, gps1_h_acc_data,gps1_h_acc_th_mm;
+  int gps1_fix, gps2_fix, gps1_h_acc_data, gps1_h_acc_th_mm;
   float position_covariance;
   long start_time_gps, start_time;
   long gps_lost_time, gps_start_time;
@@ -113,8 +113,10 @@ class VehicleSafety {
   bool use_geo_fence = nh.param("/vehicle_safety/use_geo_fence", use_geo_fence);
   bool use_inner_geo_fence =
       nh.param("/vehicle_safety/use_inner_geo_fence", use_inner_geo_fence);
-  float steering_diff_th = nh.param("/vehicle_safety/STEER_DIFF_TH", steering_diff_th);
-  float steering_stuck_time_th = nh.param("/vehicle_safety/STEER_STUCK_TIME_TH", steering_stuck_time_th);
+  float steering_diff_th =
+      nh.param("/vehicle_safety/STEER_DIFF_TH", steering_diff_th);
+  float steering_stuck_time_th =
+      nh.param("/vehicle_safety/STEER_STUCK_TIME_TH", steering_stuck_time_th);
   bool is_save_path = nh.param("/vehicle_safety/is_save_path", is_save_path);
   int gps1_h_acc_th = nh.param("/vehicle_safety/GPS1_H_ACC_TH", gps1_h_acc_th);
   bool is_inside_geo_fence;
@@ -191,13 +193,12 @@ class VehicleSafety {
     cov_value = msg.position_covariance;
   }
 
-  int return_diagnostic_summary(){
-    //function to return diagnostic summary type(WARN/ERROR) based on param 
-    if (is_save_path){
+  int return_diagnostic_summary() {
+    // function to return diagnostic summary type(WARN/ERROR) based on param
+    if (is_save_path) {
       // ROS_WARN_STREAM("CTE :::: WARN " << is_save_path);
       return WARN;
-    }
-    else{
+    } else {
       // ROS_WARN_STREAM("CTE ::: ERROR " << is_save_path);
       return ERROR;
     }
@@ -334,14 +335,15 @@ class VehicleSafety {
         isWithinNoGoZone(no_go_zone_coords_xmlrpc, lat, lon);
     // ROS_WARN_STREAM(" NoGoZone: " << is_with_in_no_go_zone );
 
-    ROS_WARN_STREAM_THROTTLE(10,"Geofence: " << is_inside_geo_fence
-                                 << " NoGoZone: " << is_with_in_no_go_zone);
+    ROS_WARN_STREAM_THROTTLE(
+        10, "Geofence: " << is_inside_geo_fence
+                         << " NoGoZone: " << is_with_in_no_go_zone);
     reset_geo_fence = 1;
   }
 
   void gps_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat) {
     std::vector<int> default_value = {6};
-    std::vector<int> gps1_fix_list,gps2_fix_list;
+    std::vector<int> gps1_fix_list, gps2_fix_list;
     ros::param::param<std::vector<int>>("/vehicle_safety/GPS1_FIX_TH",
                                         gps1_fix_list, default_value);
     ros::param::param<std::vector<int>>("/vehicle_safety/GPS2_FIX_TH",
@@ -355,7 +357,7 @@ class VehicleSafety {
 
     int val;
     auto start = std::chrono::system_clock::now();
-    
+
     gps_accuracy = sensor_accuracy(cov_value);
 
     if (time_on_gps_fix_cb != ros::Time(0)) {
@@ -369,69 +371,66 @@ class VehicleSafety {
             stat.add("GPS ACCURACY LOW", gps_accuracy);
           }
         }
-      } else { 
-        stat.add("GPS ACCURACY NONE", gps_accuracy); 
-      } 
-       
-      ros::Duration elapsed  = ros::Time::now() - time_on_gps_fix_cb;
-      double elapsed_sec = elapsed.toSec(); //local variable
-      gps1_h_acc_th_mm = gps1_h_acc_th*10; //input data is cm --> mm(gps1_h_acc_data)
-      // ROS_WARN_STREAM("ROS TIME : " << time_on_gps_fix_cb << " ELAPSED : " << elapsed_sec << " Elapsed " << elapsed);
-      
+      } else {
+        stat.add("GPS ACCURACY NONE", gps_accuracy);
+      }
+
+      ros::Duration elapsed = ros::Time::now() - time_on_gps_fix_cb;
+      double elapsed_sec = elapsed.toSec();  // local variable
+      gps1_h_acc_th_mm =
+          gps1_h_acc_th * 10;  // input data is cm --> mm(gps1_h_acc_data)
+      // ROS_WARN_STREAM("ROS TIME : " << time_on_gps_fix_cb << " ELAPSED : " <<
+      // elapsed_sec << " Elapsed " << elapsed);
+      bool gps1_has_fix_type =
+          std::find(gps1_fix_list.begin(), gps1_fix_list.end(), gps1_fix) !=
+          gps1_fix_list.end();
+      bool gps2_has_fix_type =
+          std::find(gps2_fix_list.begin(), gps2_fix_list.end(), gps2_fix) !=
+          gps2_fix_list.end();
+
+      // ROS_DEBUG_STREAM("gps1_has_fix_type " << gps1_has_fix_type
+      //                                      << " gps2_has_fix_type "
+      //                                      << gps2_has_fix_type);
+
       if (elapsed_sec < GPS_FIX_CB_TIMEOUT) {
-        if (std::find(gps1_fix_list.begin(), gps1_fix_list.end(), gps1_fix) !=
-                gps1_fix_list.end() &&
-            std::find(gps2_fix_list.begin(), gps2_fix_list.end(), gps2_fix) != 
-                gps2_fix_list.end()) {
+        if (gps1_has_fix_type && gps2_has_fix_type) {
           stat.summary(OK, "GPS FIX OK");
           // stat.add("BOTH GPS Fix Type", 6);
-          stat.add("GPS1 Fix Type", gps1_fix);
-          stat.add("GPS2 Fix Type", gps2_fix);
-          stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
-          stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
           start_time = 0;
-        } else if ((gps1_h_acc_data <= gps1_h_acc_th_mm) && std::find(gps2_fix_list.begin(), gps2_fix_list.end(), gps2_fix) != 
-                gps2_fix_list.end()) {
+        } else if (gps1_h_acc_data <= gps1_h_acc_th_mm) {
+          if (gps2_has_fix_type) {
             stat.summary(OK, "GPS FIX OK");
-            stat.add("GPS1 Fix Type", gps1_fix);
-            stat.add("GPS2 Fix Type", gps2_fix);
-            stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
-            stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
-            stat.add("GPS1 H_ACC", gps1_h_acc_data);
-            stat.add("GPS1 H_ACC_THRESHOLD", gps1_h_acc_th_mm);
             start_time = 0;
+          } else {
+            stat.summary(ERROR, "GPS 2 LOST.");
+          }
         } else if (gps1_fix == 5 && gps2_fix == 6) {
-          
           if (start_time == 0) {
-            start_time = time(0);  
+            start_time = time(0);
           }
           if ((time(0) - start_time) > GPS_FIX_THR) {
-            stat.summary(ERROR, "ERROR: GPS FIX LOST TIMEOUT. GPS 1: " + std::to_string(gps1_fix) + ", GPS 2: " + std::to_string(gps2_fix));
-            stat.add("GPS1 Fix Type", gps1_fix); 
-            stat.add("GPS2 Fix Type", gps2_fix);
-            stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
-            stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
+            stat.summary(ERROR, "GPS 1 FIX LOST");
           } else {
-            stat.summary(WARN, "WARN: GPS FIX LOST"); 
-            stat.add("GPS1 Fix Type", gps1_fix);
-            stat.add("GPS2 Fix Type", gps2_fix);
-            stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
-            stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
+            stat.summary(WARN, "WARN: GPS 1 FIX LOST");
           }
+        } else if (!(gps1_has_fix_type) && gps2_has_fix_type) {
+          stat.summary(ERROR, "GPS 1 LOST.");
         } else {
-          stat.summary(ERROR, "ERROR: GPS FIX LOST. GPS 1: " + std::to_string(gps1_fix) + ", GPS 2: " + std::to_string(gps2_fix));
-          stat.add("GPS1 Fix Type", gps1_fix);
-          stat.add("GPS2 Fix Type", gps2_fix);
-          stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
-          stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
+          stat.summary(ERROR, "GPS LOST.");
         }
       } else {
-      stat.summaryf(ERROR, "No update on GPS Tracking from last: %f secs",
-                    elapsed_sec);
-    }
-  } else {
+        stat.summaryf(ERROR, "No update on GPS data from last: %f secs",
+                      elapsed_sec);
+      }
+    } else {
       stat.summary(ERROR, "Waiting for GPS Callback Data");
     }
+    stat.add("GPS1 Fix Type", gps1_fix);
+    stat.add("GPS2 Fix Type", gps2_fix);
+    stat.add("GPS1_FIX_THRESHOLD", gps1_fix_list_str);
+    stat.add("GPS2_FIX_THRESHOLD", gps2_fix_list_str);
+    stat.add("GPS1 H_ACC", gps1_h_acc_data);
+    stat.add("GPS1 H_ACC_THRESHOLD", gps1_h_acc_th_mm);
   }
 
   void cte_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat) {
@@ -441,23 +440,23 @@ class VehicleSafety {
     if (time_on_tracking_cb != ros::Time(0)) {
       if (elapsed_sec < TRACKING_CONTROLLER_TIMEOUT) {
         // if (flag1 == 1) {
-          if (pp_diagnose_data.level == ERROR) {
-            stat.summary(ERROR, pp_diagnose_data.message);
-          } else if (pp_diagnose_data.level == WARN) {
-            stat.summary(WARN, pp_diagnose_data.message);
-            stat.add("CTE Value", pp_diagnose_data.cte);
-            stat.add("CTE_THR", CTE_THR);
-          }
+        if (pp_diagnose_data.level == ERROR) {
+          stat.summary(ERROR, pp_diagnose_data.message);
+        } else if (pp_diagnose_data.level == WARN) {
+          stat.summary(WARN, pp_diagnose_data.message);
+          stat.add("CTE Value", pp_diagnose_data.cte);
+          stat.add("CTE_THR", CTE_THR);
+        }
 
-          else {
-            if (abs(pp_diagnose_data.cte) > CTE_THR) {
-              stat.summary(ERROR, "HIGH CTE");
-            } else {
-              stat.summary(OK, "CTE OK");
-            }
-            stat.add("CTE Value", abs(pp_diagnose_data.cte));
-            stat.add("CTE_THR", CTE_THR);
+        else {
+          if (abs(pp_diagnose_data.cte) > CTE_THR) {
+            stat.summary(ERROR, "HIGH CTE");
+          } else {
+            stat.summary(OK, "CTE OK");
           }
+          stat.add("CTE Value", abs(pp_diagnose_data.cte));
+          stat.add("CTE_THR", CTE_THR);
+        }
         //   error_counter_for_tracking_controller = 0;
         // }
 
@@ -477,11 +476,13 @@ class VehicleSafety {
       }
 
       else {
-        stat.summaryf(
-            return_diagnostic_summary(), "No update on Tracking Controller from last : %f secs", elapsed_sec);
+        stat.summaryf(return_diagnostic_summary(),
+                      "No update on Tracking Controller from last : %f secs",
+                      elapsed_sec);
       }
     } else {
-      stat.summary(return_diagnostic_summary(), "Waiting for Tracking Controller diagnose");
+      stat.summary(return_diagnostic_summary(),
+                   "Waiting for Tracking Controller diagnose");
     }
 
     // flag1 = 0;
@@ -676,40 +677,39 @@ class VehicleSafety {
   }
 
   void can_steering_diagnostics(
-        diagnostic_updater::DiagnosticStatusWrapper &stat) {
-      
-      if (current_steering_angle == 0) {
-        stat.summary(STALE, "No Steering Data");
+      diagnostic_updater::DiagnosticStatusWrapper &stat) {
+    if (current_steering_angle == 0) {
+      stat.summary(STALE, "No Steering Data");
+    }
+    // In below logic, If demanded angle is zero, there is something from
+    // tracking algorithm but not the steering issue.
+    if (abs(demand_steering_angle - current_steering_angle) >
+            steering_diff_th &&
+        demand_steering_angle != 0) {
+      if (steering_error_start_time == 0) {
+        steering_error_start_time = std::time(nullptr);
       }
-      // In below logic, If demanded angle is zero, there is something from tracking algorithm but not the steering issue.
-      if (abs(demand_steering_angle - current_steering_angle) >
-              steering_diff_th &&
-          demand_steering_angle != 0) {
-        if (steering_error_start_time == 0) {
-          steering_error_start_time = std::time(nullptr);
-        }
-        if (std::time(nullptr) - steering_error_start_time >
-            steering_stuck_time_th) {
-          
-          is_steering_stuck = true;
-        } else {
-          is_steering_stuck = false;
-        }
+      if (std::time(nullptr) - steering_error_start_time >
+          steering_stuck_time_th) {
+        is_steering_stuck = true;
       } else {
-        steering_error_start_time = 0;
         is_steering_stuck = false;
       }
-      if (is_steering_stuck) {
-        stat.summary(ERROR, "Steering Stuck");
-      } else {
-        stat.summary(OK, "Steering OK");
-      }
-      stat.add("Demand Steering Angle", demand_steering_angle);
-      stat.add("Current Steering Angle", current_steering_angle);
-
-      //TODO @iam-vishnu: Continuosly monitor for timeout of steering data.
+    } else {
+      steering_error_start_time = 0;
+      is_steering_stuck = false;
     }
-    
+    if (is_steering_stuck) {
+      stat.summary(ERROR, "Steering Stuck");
+    } else {
+      stat.summary(OK, "Steering OK");
+    }
+    stat.add("Demand Steering Angle", demand_steering_angle);
+    stat.add("Current Steering Angle", current_steering_angle);
+
+    // TODO @iam-vishnu: Continuosly monitor for timeout of steering data.
+  }
+
   void can_batt_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat) {
     std::string log_msg, stat_summ_msg;
     int stat_summ_stat;
