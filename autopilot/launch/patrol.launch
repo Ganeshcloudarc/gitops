@@ -162,13 +162,15 @@
 
     <!-- collision monitor -->
     <group if="$(eval arg('enable_collision_monitor'))">
-        <include file="$(find pointcloud_to_laserscan_launcher)/launch/pointcloud_to_laserscan.launch">
-            <arg name="cloud_in" value="$(arg cloud_in)"/>
-            <arg name="scan_out" value="lidar_laser_scan"/>
-            <arg name="config_file" value="lidar_collision_monitor_p2c.yaml"/>
-        </include>
-        <include file="$(find collision_monitor)/launch/collision_monitor.launch">
-        </include>
+        <group if="$(eval arg('enable_rslidar') or arg('enable_lslidar'))">
+            <include file="$(find pointcloud_to_laserscan_launcher)/launch/pointcloud_to_laserscan.launch">
+                <arg name="cloud_in" value="$(arg cloud_in)"/>
+                <arg name="scan_out" value="lidar_laser_scan"/>
+                <arg name="config_file" value="lidar_collision_monitor_p2c.yaml"/>
+            </include>
+            <include file="$(find collision_monitor)/launch/collision_monitor.launch">
+            </include>
+        </group>
     </group>
 
 
