@@ -302,7 +302,19 @@ class PurePursuitController:
                             self.controller_diagnose_pub.publish(diagnostic_msg)
                             self.send_ack_msg(0, 0, 0)
                             rate.sleep()
-                            break
+                            break   
+                        
+                    else: 
+                        rospy.logwarn("mission continue :" + (self.mission_continue) + " mission_count " + self.count_mission_repeat)
+                        diagnostic_msg = ControllerDiagnose()
+                        diagnostic_msg.level = diagnostic_msg.WARN
+                        diagnostic_msg.message = "mission repeats of :" + str(self.mission_trips) + " are completed"
+                        self.controller_diagnose_pub.publish(diagnostic_msg)
+                        self.send_ack_msg(0, 0, 0)
+                        rate.sleep()
+                        break 
+
+                    
             else:
                 # path_percent for the local_gps_trajectory 
                 path_percent = self.path_percentage
