@@ -5,10 +5,11 @@
     <arg name="mission_file" default="default.json"/>
     <arg name='min_dis' default='0.1'/>
     <arg name="failsafe_enable" default="true"/>
-    <arg name="record" default="true"/>
+    <arg name="record" default="true"/> <!--bag file record-->
+    <arg name="record_waypoints_on_rtk_loss" default="false"/>
     <arg name="enable_mapping" default="true"/>
 
-
+    <param name="/save_path/save_on_rtkloss" value="$(arg record_waypoints_on_rtk_loss)"/>
     <param name='/patrol/gps_topic' value = '/vehicle/gps'/>
     <param name='/patrol/imu_topic' value = '/mavros/imu/data'/>
     <param name='/patrol/odom_topic' value = '/vehicle/odom'/>

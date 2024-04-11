@@ -73,6 +73,7 @@ class SaveWayPoints:
         self.time_at_gps = None
         self.wait_time_limit = 1
         self.RTK_fail_status  = None
+        self.SAVE_ON_RTKLOSS = rospy.get_param('/save_path/save_on_rtkloss', True)
 
         
 
@@ -81,6 +82,7 @@ class SaveWayPoints:
         gps_topic = rospy.get_param('/patrol/gps_topic', "/mavros/global_position/global")
         imu_topic = rospy.get_param('/patrol/imu_topic', "/mavros/imu/data")
         odom_topic = rospy.get_param('/patrol/odom_topic', "/mavros/global_position/local")
+        
         data = None
         # TODO
         # wait for odom
@@ -151,6 +153,7 @@ class SaveWayPoints:
             if "GPS" in field.name:
                 if field.level == ERROR:
                     self.RTK_fail_status = True
+                    self.RTK_Status=False
                 else:
                     self.RTK_fail_status = False
     def main_loop(self):
@@ -158,7 +161,7 @@ class SaveWayPoints:
         r = rospy.Rate(50)
         try:
             while not rospy.is_shutdown():
-                if not self.RTK_fail_status:
+                if not self.RTK_fail_status or self.SAVE_ON_RTKLOSS:
                     if self.is_first_point:
                         if self.gps_data_msg and self.odom_data and self.imu_data:
                             # TODO
