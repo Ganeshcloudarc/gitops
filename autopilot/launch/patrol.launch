@@ -12,6 +12,7 @@
     <arg name="obs_stop_planner" default="true"/>
     <arg name="enable_centering" default="false"/>
     <arg name="pure_pursuit_refactor" default="true"/>
+    <arg name="run_halt_at_place" default="true"/>  <!-- Argument to Run the Pause and continue Feature-->
 
 
     <arg name="enable_zed_obs" default="true"/>
@@ -92,7 +93,13 @@
     <node pkg = "autopilot" type = "odom_path_plotter.py" name = "odom_path_plotter_node">
         <param name="max_list_append" value="300" />
     </node>
+
     <node pkg = "autopilot" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
+    
+    <group if="$(eval arg('run_halt_at_place'))">
+        <node pkg="autopilot" type="halt_place.py" name="halt_at_place" output='screen'/>
+    </group>
+
 
     <!-- obstacle stop planner -->
     <group if="$(eval arg('obs_stop_planner'))"> 
