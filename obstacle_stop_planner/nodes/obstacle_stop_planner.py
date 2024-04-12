@@ -422,8 +422,8 @@ class ObstacleStopPlanner:
             if self.use_obs_v1: 
                 try: 
                     kd_tree = KDTree(self.laser_np_2d, leaf_size=2)
-                except: 
-                    rospy.logerr("Could not fill KDtree")
+                except Exception as e: 
+                    rospy.logerr_throttle(10,"Could not fill KDtree, {}".format(e))
                     rate.sleep()
                     continue 
             
@@ -782,7 +782,7 @@ class ObstacleStopPlanner:
             self.laser_np_3d = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(tf_points, remove_nans=False)
             self.laser_np_2d = np.delete(self.laser_np_3d, -1, axis=1)
             if len(self.laser_np_2d.tolist()) == 0:
-                self.laser_np_2d = np.array([100, 100])
+                self.laser_np_2d = np.array([[100, 100],[100,100]])
             self.scan_data_received = True 
         else:
             self.scan_data_received = False 

@@ -15,6 +15,7 @@
 
 
     <arg name="enable_zed_obs" default="true"/>
+    <arg name="enable_zed_based_v1" default="false"/> <!-- Note: Only effects if enable_zed_obs is true. Lidar Based V1 won't work if zed based v1 is True-->
     <arg name="enable_obs_v1" default="true"/>
     <arg name="use_pcl_boxes" default="true"/>
 
@@ -115,6 +116,7 @@
             <arg name="lslidar" value="$(arg enable_lslidar)"/>
            
             <arg name="enable_itops_f25" value="$(arg enable_itops_f25)"/>
+            <arg name="enable_zed_based_v1" value="$(arg enable_zed_based_v1)"/>
         </include>
         <node name="rviz_obstacle_stop_planner" pkg="rviz" type="rviz" args="-d $(find autopilot)/rviz/patrol_obstacle_stop_planner.rviz" if = "$(eval arg('rviz'))"/>
     </group> 

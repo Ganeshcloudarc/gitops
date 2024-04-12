@@ -5,6 +5,7 @@
     
     <!-- SENSORS -->
     <arg name="enable_zed_obs" default="true"/>
+    <arg name="enable_zed_based_v1" default="false"/>
     <arg name="rslidar" default="true"/>
     <arg name="lslidar" default="false"/>
     <arg name="enable_itops_f25" default="true"/>
@@ -102,7 +103,16 @@
     </include> -->
 
     <rosparam command="load" file="$(find obstacle_stop_planner)/params/obstacle_stop_planner.yaml"/>
-    <param name="obstacle_stop_planner/scan_in" value="laser_scan"/>
+    
+    <!-- "$(eval arg('record') and arg('hardware_in_loop'))" -->
+    <group if="$(eval arg('enable_zed_obs') and arg('enable_zed_based_v1'))">
+        <param name="obstacle_stop_planner/scan_in" value="/zed2i/zed_node/zed_laser_scan"/>
+    </group>
+
+    <group unless="$(eval arg('enable_zed_obs') and arg('enable_zed_based_v1'))">
+        <param name="obstacle_stop_planner/scan_in" value="laser_scan"/>
+    </group>
+    
     <param name="/obstacle_stop_planner/use_zed_object_detection" value="$(arg enable_zed_obs)"/>
 
 
