@@ -29,7 +29,7 @@ class FailSafeAutoPilot
         
     FailSafeAutoPilot()
     {
-        stop_cmd_publisher = fs.advertise<pilot_msgs::vehicle_stop_command>("/vehicle/stop_command", 1,this);
+        stop_cmd_publisher = fs.advertise<pilot_msgs::vehicle_stop_command>("/vehicle/break_command", 1,this);
         pilot_msgs::vehicle_stop_command vehicle_stop_command_msg;
         if (use_vehicle_safety)
         {
