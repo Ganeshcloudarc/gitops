@@ -49,7 +49,7 @@
     </group>
 
     <node name="save_path_bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson_save_path -a -x /zed2i/(.*)|/carla/(.*)|/rslidar_points|/lslidar_point_cloud|/mapper_node/(.*)" if="$(eval record)"/>
+        args="record -o $(env HOME)/.bags/boson_save_path -a -x /zed2i/(?!(.*)info)(.*)(left|right|rgb|depth|stereo|confidence|point|disparity|temperature)(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud|/itops_f25/(.*)|/cloud_concatenated|/mapper_node/(.*)" if="$(eval record)"/>
 
     <group if ="$(eval arg('enable_mapping'))">
          <include file="$(find kissicp_planner)/launch/mapper.launch"> 
