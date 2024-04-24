@@ -187,6 +187,7 @@ class PurePursuitController:
                 diagnostic_msg.stamp = rospy.Time.now()
                 self.controller_diagnose_pub.publish(diagnostic_msg)
                 self.send_ack_msg(0, 0, 0)
+                rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
                 rate.sleep()
                 continue  
             
@@ -205,6 +206,7 @@ class PurePursuitController:
                 diagnostic_msg.stamp = rospy.Time.now()
                 self.controller_diagnose_pub.publish(diagnostic_msg)
                 self.send_ack_msg(0, 0, 1)
+                rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(1))
                 rate.sleep()
                 continue
 
@@ -217,6 +219,7 @@ class PurePursuitController:
                     diagnostic_msg.stamp = rospy.Time.now()
                     self.controller_diagnose_pub.publish(diagnostic_msg)
                     self.send_ack_msg(0, 0, 0)
+                    rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
                     rate.sleep()
                     continue
             
@@ -240,6 +243,7 @@ class PurePursuitController:
                     self.close_point_index = None
                     rospy.logerr(reason)
                     self.send_ack_msg(0, 0, 0) 
+                    rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
                     rate.sleep() 
                     continue    
                 else:
@@ -272,6 +276,7 @@ class PurePursuitController:
                             self.controller_diagnose_pub.publish(diagnostic_msg)
                         
                             self.send_ack_msg(0, 0, 0)
+                            rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
                             rospy.logwarn('Mission completed and restarting the plan' + str(
                                 self.count_mission_repeat))
                             rospy.loginfo("waiting for %s", str(self.wait_time_at_ends))
@@ -287,6 +292,7 @@ class PurePursuitController:
                                 self.mission_trips) + " waiting for : " + str(self.wait_time_at_ends) + " secs"
                             self.controller_diagnose_pub.publish(diagnostic_msg)
                             self.send_ack_msg(0, 0, 0)
+                            rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
                             rospy.logwarn('completed mission  %s and target is %s', self.count_mission_repeat,
                                         self.mission_trips)
                             rospy.loginfo("waiting for %s", str(self.wait_time_at_ends))
@@ -301,6 +307,7 @@ class PurePursuitController:
                             diagnostic_msg.message = "mission repeats of :" + str(self.mission_trips) + " are completed"
                             self.controller_diagnose_pub.publish(diagnostic_msg)
                             self.send_ack_msg(0, 0, 0)
+                            rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
                             rate.sleep()
                             break   
                         
@@ -311,6 +318,7 @@ class PurePursuitController:
                         diagnostic_msg.message = "mission repeats of :" + str(self.mission_trips) + " are completed"
                         self.controller_diagnose_pub.publish(diagnostic_msg)
                         self.send_ack_msg(0, 0, 0)
+                        rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
                         rate.sleep()
                         break 
 
@@ -328,6 +336,7 @@ class PurePursuitController:
                     diagnostic_msg.stamp = rospy.Time.now()
                     self.controller_diagnose_pub.publish(diagnostic_msg)
                     self.send_ack_msg(0, 0, 0)
+                    rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
                     rate.sleep()
                     continue 
 
@@ -427,6 +436,7 @@ class PurePursuitController:
             if dot_vector >= 0:
                 self.is_reverse = False
                 rospy.loginfo_throttle(10, "Forward")
+                stop_on_command = False
             elif dot_vector < 0:
                 if self.allow_reversing: # safety check to stop on reverse conditions when allow_reversing is set to false.
                     self.is_reverse = True 
@@ -459,14 +469,16 @@ class PurePursuitController:
             if stop_on_command:
                 speed = 0
                 log_tracking_message = "allow_reversing flag not set. Stopping the Robot"
-                rospy.logerr_throttle(10, "allow_reversing flag not set. Stopping the Robot")
+                rospy.logerr_throttle(1, "allow_reversing flag not set. Stopping the Robot")
                 self.send_ack_msg(steering_angle, speed, 1)
+                rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(1))
             elif self.is_reverse:
                 if adjusted_speed < self.min_backward_speed and adjusted_speed > 0:
                     adjusted_speed = self.min_backward_speed
                 speed = -min(adjusted_speed, self.max_backward_speed) # To avoid max speed from path_publisher.
                 log_tracking_message = f'Tracking path in Reverse with speed {speed}'
                 self.send_ack_msg(steering_angle, speed, 0)
+                rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
             else:
                 if adjusted_speed < self.min_forward_speed and adjusted_speed > 0:
                     speed = self.min_forward_speed
@@ -476,9 +488,11 @@ class PurePursuitController:
                 # stop vehicle is speed is negative when is_reverse is false.(just a safety check)
                 if speed <= 0:
                     self.send_ack_msg(steering_angle, speed, 1)
+                    rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(1))
                 else:
                     self.send_ack_msg(steering_angle, speed, 0)
-            rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
+                    rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(steering_angle), str(speed), str(0))
+            
             rospy.loginfo('lhd: %s, alpha: %s , robot_speed: %s ', str(lhd), str(alpha), str(self.robot_speed))
             
             
