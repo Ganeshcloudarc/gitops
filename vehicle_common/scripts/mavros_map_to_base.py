@@ -13,10 +13,12 @@ try:
     from vehicle_common.vehicle_config import vehicle_data
     from pyproj import Geod
     from sensor_msgs.msg import NavSatFix
+    from autopilot_utils.pose_helper import yaw_to_quaternion
 except ImportError as error:
     print("No module named:", error)
 
 # parameters
+enable_2d_mode = rospy.get_param('enable_2d_mode', True)
 wheel_base = rospy.get_param('/vehicle/dimensions/wheel_base', 1.82)
 front_axle_to_fcu_position = rospy.get_param('/vehicle/fcu/position', [0.4, 0, 0])
 front_axle_to_fcu_orientation = rospy.get_param('/vehicle/fcu/orientation', [0, 0, 0])
@@ -72,12 +74,19 @@ def odom_callback(data):
     tf_msg.transform.translation.x = x_pos
     tf_msg.transform.translation.y = y_pos
     tf_msg.transform.translation.z = rear_axle_center_height_from_ground  # making z zero
-    tf_msg.transform.rotation = data.pose.pose.orientation
+    
+    if enable_2d_mode:
+        orientation_from_yaw = yaw_to_quaternion(yaw)
+    else:
+        orientation_from_yaw = data.pose.pose.orientation
+
+    tf_msg.transform.rotation = orientation_from_yaw
     tf_broad_caster.sendTransform(tf_msg)
     rospy.logdebug("transform sent")
     if send_odom:
         odom_msg = Odometry()
         odom_msg = data
+        odom_msg.pose.pose.orientation = orientation_from_yaw
         odom_msg.pose.pose.position.x = x_pos
         odom_msg.pose.pose.position.y = y_pos
         odom_msg.pose.pose.position.z = rear_axle_center_height_from_ground

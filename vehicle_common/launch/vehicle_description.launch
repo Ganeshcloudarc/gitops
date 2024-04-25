@@ -3,6 +3,7 @@
     <arg name="footprint_pub" default="true"/>
     <arg name="odom_pub" default="true"/>
     <arg name="gps_pub" default="true"/>
+    <arg name="enable_2d_mode" default="true"/>
 
     <param name ="/base_frame" value ="base_link"/>
     <param name ='/odometry_in' value ="/mavros/global_position/local" />
@@ -14,6 +15,7 @@
     <param name="/gps_out" value="/vehicle/gps"/>
     <param name="/footprint_out" value="/vehicle/foot_print" />
     <param name="vehicle_type" value="$(arg vehicle_type)"/>
+    <param name="enable_2d_mode" value="$(arg enable_2d_mode)"/>
 
     <group if="$(eval vehicle_type == 'half_cabin')">
         <arg name="config_param_file" default="$(find vehicle_common)/params/half_cabin_config.yaml"/>
