@@ -94,7 +94,7 @@ class SaveWayPoints:
                 rospy.loginfo("Waiting for " + str(gps_topic))
             if data:
                 rospy.Subscriber(gps_topic, NavSatFix, self.gps_callback)
-                rospy.Subscriber(imu_topic, Imu, self.imu_callback)
+                # rospy.Subscriber(imu_topic, Imu, self.imu_callback)
                 rospy.Subscriber(odom_topic, Odometry, self.odom_callback)
                 failsafe_enable = rospy.get_param("/save_path/failsafe_enable", True) 
                 if failsafe_enable:
@@ -117,9 +117,9 @@ class SaveWayPoints:
         line_string = {}
         line_string["type"] = "LineString"
         line_string["coordinates"] = self.final_waypoints_list
-        line_string['imu'] = self.imu_list
+        # line_string['imu'] = self.imu_list
         line_string['odometry'] = self.odometry_list
-        line_string['gps_coordinates'] = self.gps_list
+        # line_string['gps_coordinates'] = self.gps_list
         line_string['Is_RTK_Good']=self.RTK_Status
 
         # Rename the mission file if the RTK status is False
@@ -163,7 +163,7 @@ class SaveWayPoints:
             while not rospy.is_shutdown():
                 if not self.RTK_fail_status or self.SAVE_ON_RTKLOSS:
                     if self.is_first_point:
-                        if self.gps_data_msg and self.odom_data and self.imu_data:
+                        if self.gps_data_msg and self.odom_data: # and self.imu_data:
                             # TODO
                             #  Depending upon the accuracy(covariance of gps) of the first gps location we need to decide on
                             #  recording points if gps_data_msg.position_covariance[0]
@@ -172,12 +172,12 @@ class SaveWayPoints:
                                         str(self.gps_data_msg.longitude), str(self.gps_data_msg.latitude),
                                         str(self.gps_data_msg.altitude), str(self.gps_data_msg.position_covariance))
                             self.final_waypoints_list.append([self.gps_data_msg.longitude, self.gps_data_msg.latitude])
-                            self.imu_list.append(self.imu_data)
+                            # self.imu_list.append(self.imu_data)
                             odom_msg = Odometry()
                             odom_msg.pose.pose.orientation = self.odom_data_msg.pose.pose.orientation
                             self.odometry_list.append(
                                 message_converter.convert_ros_message_to_dictionary(odom_msg))  # change it to self.odom_msg
-                            self.gps_list.append(self.gps_data)
+                            # self.gps_list.append(self.gps_data)
                             self.prev_long = self.gps_data_msg.longitude
                             self.prev_lat = self.gps_data_msg.latitude
                             geo_point = GeoPointStamped()
@@ -215,9 +215,9 @@ class SaveWayPoints:
                                 len(self.final_waypoints_list)) + "  ", end="\t")
                             # print(len(self.final_waypoints_list))
                             self.final_waypoints_list.append([self.gps_data_msg.longitude, self.gps_data_msg.latitude])
-                            self.imu_list.append(self.imu_data)
+                            # self.imu_list.append(self.imu_data)
                             self.odometry_list.append(self.odom_data)
-                            self.gps_list.append(self.gps_data)
+                            # self.gps_list.append(self.gps_data)
                             self.prev_long = self.gps_data_msg.longitude
                             self.prev_lat = self.gps_data_msg.latitude
                         else:

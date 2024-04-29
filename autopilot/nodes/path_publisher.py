@@ -408,8 +408,7 @@ class GlobalGpsPathPub:
         data_len = len(data['coordinates'])  
         odom_key_name = "odometry" 
         gps_key_name = "coordinates" 
-        gps_coord_key_name = "gps_coordinates"
-        if gps_key_name in data_keys and odom_key_name in data_keys and gps_coord_key_name in data_keys :
+        if gps_key_name in data_keys and odom_key_name in data_keys:
             rospy.loginfo("gps coordinates and Odometry fields are  in  mission file")
         else:
             rospy.logwarn("No gps coordinates and Odometry fields are  in  mission file")
@@ -423,7 +422,7 @@ class GlobalGpsPathPub:
         # Setting home position for mavros node
         home_lat = data['coordinates'][0][1]
         home_long = data['coordinates'][0][0]
-        home_alt = data['gps_coordinates'][0]['altitude'] 
+        home_alt = -60 # data['gps_coordinates'][0]['altitude'] 
         home_position = self.set_home_position(home_lat, home_long, home_alt)
         rospy.loginfo('Origin point set')
         time.sleep(0.5)
