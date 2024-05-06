@@ -1,0 +1,14 @@
+target_frame : zed2i_left_camera_frame
+min_height  : -0.2 # any object above 0.3 from ground
+max_height  : 0.5 # vehicle width is assumed to be 1.5
+#angle_min   : -3.1415926536
+#angle_max   : 3.1415926536
+angle_min   : -1.5707963267948966
+angle_max   : 1.5707963267948966
+angle_increment : 0.0087 #  common incement angle
+#angle_increment : 0.002 # working as 2d point cloud.
+scan_time : 0.3333
+range_min : 0.45
+range_max : 30
+concurrency_level : 1
+use_inf : false
