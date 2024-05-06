@@ -7,6 +7,7 @@
     <arg name="failsafe_enable" default="true"/>
     <arg name="record" default="true"/> <!--bag file record-->
     <arg name="record_waypoints_on_rtk_loss" default="false"/>
+    <arg name="use_save_path_v2" default="false"/>
     <arg name="enable_mapping" default="true"/>
 
     <param name="/save_path/save_on_rtkloss" value="$(arg record_waypoints_on_rtk_loss)"/>
@@ -38,7 +39,14 @@
     <param name="/save_path/mission_file" value="$(arg mission_file)"/>
     <param name="/save_path/min_dis_between_waypoints" value="$(arg min_dis)"/>
     <param name="/save_path/failsafe_enable" value="$(arg failsafe_enable)"/>
-    <node pkg="autopilot" type="record_waypoints_json.py" name="waypoints_recorder_node" output='screen' />
+    
+    <group if="$(eval arg('use_save_path_v2'))">
+        <node pkg="autopilot" type="record_waypoints_json_v2.py" name="waypoints_recorder_node_v2" output='screen' />
+    </group>
+
+    <group unless="$(eval arg('use_save_path_v2'))">
+        <node pkg="autopilot" type="record_waypoints_json.py" name="waypoints_recorder_node" output='screen' />
+    </group>
 
     <group if="$(eval arg('failsafe_enable'))">
         <include file="$(find vehicle_safety_cpp)/launch/vehicle_safety_cpp.launch"> 
