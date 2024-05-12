@@ -34,9 +34,9 @@ base_link:   # center of the rear axle.
     yaw: 0.0
 
   zed_camera: # center of the rear axle to zed camera 
-    x: 2.8
+    x: 3.02075
     y: 0.0
-    z: 0.5
+    z: 0.9524
     roll: 0.0
     pitch: 0.0
     yaw: 0.0
@@ -50,9 +50,9 @@ base_link:   # center of the rear axle.
     yaw: 0.0
   
   lslidar: # center of the rear axle to rslidar(3d lidar)
-    x: 2.8
+    x: 3.140
     y: 0.0
-    z: 0.2
+    z: 0.4635
     roll: 0.0
     pitch: 0.0
     yaw: 0.0
@@ -65,10 +65,10 @@ base_link:   # center of the rear axle.
     pitch: 0.0
     yaw: 0.0
   
-  itops_f25: # center of the rear axle to itops_f25 (2d lidar )
-    x: -0.8 # -0.3 for reverse # 2.8 for forward
+  itops_f25: # center of the rear axle to itops_f25 (rear lidar )
+    x: -0.6165 # -0.3 for reverse # 2.8 for forward
     y: 0.0
-    z: 0.4
+    z: 0.4155
     roll: 0.0
     pitch: 0.0
     yaw: -3.141 # 0.0 # -3.141 for reverse
