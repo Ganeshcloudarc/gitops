@@ -314,7 +314,7 @@ class PurePursuitController:
                             break   
                         
                     else: 
-                        rospy.logwarn("mission continue :" + (self.mission_continue) + " mission_count " + self.count_mission_repeat)
+                        rospy.logwarn(f"mission continue :{self.mission_continue}, mission_count:{self.count_mission_repeat}")
                         diagnostic_msg = ControllerDiagnose()
                         diagnostic_msg.level = diagnostic_msg.WARN
                         diagnostic_msg.message = "mission repeats of :" + str(self.mission_trips) + " are completed"
