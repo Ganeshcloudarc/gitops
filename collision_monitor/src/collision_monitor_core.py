@@ -200,7 +200,7 @@ class CollisionMonitor:
                 vehicle_stop_msg.status = False
                 vehicle_stop_msg.message =  "No collision points Found"
                 self.diagnose.add("total collision_points_count", collision_points_count)
-                rospy.logwarn("No collision")
+                rospy.loginfo("No collision")
 
             self.diagnostics_arr.status = []
             self.diagnostics_arr.status.append(self.diagnose)
