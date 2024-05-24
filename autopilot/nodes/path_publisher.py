@@ -71,7 +71,8 @@ class GlobalGpsPathPub:
         self.max_forward_speed = rospy.get_param('/patrol/max_forward_speed', 1.5)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
         self.minimum_data_len = rospy.get_param("path_publisher/minimum_json_length",100) 
-        self.distance_to_slowdown_on_ends = rospy.get_param("/path_publisher/distance_to_slowdown_on_ends", 3)
+        self.distance_to_slowdown_on_ends = rospy.get_param("/path_publisher/distance_to_slowdown_on_ends", 3) 
+        self.distance_to_slowstart_on_start = rospy.get_param("/path_publisher/distance_to_slowstart_on_start",3)
         self.mission_continue = rospy.get_param("patrol/mission_continue", True) 
         self.interpolate_with_rtk = rospy.get_param("path_publisher/interpolate_with_rtk",False) 
         self.interpolate_without_rtk = rospy.get_param("path_publisher/interpolate_without_rtk",False)
@@ -714,18 +715,27 @@ class GlobalGpsPathPub:
                 #                                                     vehicle_data.motion_limits.max_steering_angle],
                 #                                                     [self.max_forward_speed,
                 #                                                     self.min_forward_speed])  
+        
         # slowing down at end of trajectory
-        for i, traj_point in enumerate(trajectory_msg.points): 
-            for slow_end_index in range(traj_length - 1, i, -1):
-                slow_end_acc_distance =  trajectory_msg.points[traj_length-1].accumulated_distance_m - trajectory_msg.points[slow_end_index].accumulated_distance_m
-                if (slow_end_acc_distance) > self.distance_to_slowdown_on_ends:   
-                    rospy.loginfo(f"slow down {slow_end_acc_distance} > Threshold {self.distance_to_slowdown_on_ends}")
-                    found = True  
-                    break
-            if found:
-                break   
-        for i in range(slow_end_index, traj_length-1): 
-            trajectory_msg.points[i].longitudinal_velocity_mps = self.min_forward_speed 
+        for slow_end_index in range(traj_length - 1, 0, -1):
+            slow_end_acc_distance =  trajectory_msg.points[traj_length-1].accumulated_distance_m - trajectory_msg.points[slow_end_index].accumulated_distance_m
+            if (slow_end_acc_distance) > self.distance_to_slowdown_on_ends:   
+                break 
+        # to find slow start index  at start of trajectory
+        for slow_start_index in range(0,traj_length - 1): 
+            slow_start_acc_distance =  trajectory_msg.points[slow_start_index].accumulated_distance_m - trajectory_msg.points[0].accumulated_distance_m 
+            if (slow_start_acc_distance) > self.distance_to_slowstart_on_start:   
+                break 
+        #gradually decrease the speed to min at end of traj
+        for i in range(traj_length-1,slow_end_index,-1):  
+            tmp_dist = abs(trajectory_msg.points[traj_length-1].accumulated_distance_m -
+                                            trajectory_msg.points[i].accumulated_distance_m) 
+            trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist,[0,self.distance_to_slowdown_on_ends],[self.min_forward_speed,self.max_forward_speed])  
+        #gradually increase the speed to max at start of traj
+        for i in range(slow_start_index,0,-1):  
+            tmp_dist = abs(trajectory_msg.points[slow_start_index].accumulated_distance_m -
+                                            trajectory_msg.points[i].accumulated_distance_m) 
+            trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist,[0,self.distance_to_slowstart_on_start],[self.min_forward_speed,self.max_forward_speed])  
 
         marker_arr = trajectory_to_marker(trajectory_msg, self.max_forward_speed)
         self.trajectory_velocity_marker_pub.publish(marker_arr)
