@@ -4,7 +4,8 @@ from std_msgs.msg import String
 import geometry_msgs.msg as gmsg
 from autopilot_utils.geonav_conversions import *
 from geographic_msgs.msg import GeoPointStamped
-from vehicle_safety_cpp.srv import trigger,triggerResponse  
+from vehicle_safety_cpp.srv import trigger,triggerResponse 
+
 #srv on trigger on the updated coordinates in publishment
 
 
@@ -38,21 +39,31 @@ class geoFencePub:
         'altitude': data.position.altitude
         }
         rospy.logdebug("home position data received %s",
-                    str(self.home_gps_location)) 
+                    str(self.home_gps_location))  
+        if rospy.has_param('/vehicle_safety/geo_fence_coordinates'): 
+            self.geo_fence_coordinates = rospy.get_param('vehicle_safety/geo_fence_coordinates') 
+
+
         self.publish_geo_fence()
 
     #service call no updating the no_go_zone_coordinates 
-    def service_request(self,req): 
-        
+    def service_request_no_go_zone(self,req):
         if rospy.has_param('/vehicle_safety/no_go_zone_coordinates'):
             self.no_go_geo_fence_coordinates = rospy.get_param('/vehicle_safety/no_go_zone_coordinates')
-            rospy.loginfo("updating the new params in geofence") 
+            rospy.loginfo("updating the new params in no_gozone geofence") 
             self.publish_geo_fence() 
             rospy.loginfo("updated")
-            return triggerResponse(response = 1)
-            
+            rospy.loginfo("updated") 
+            return triggerResponse()
         
-        
+    def service_request_geofence(self,req):
+        if rospy.has_param('/vehicle_safety/geo_fence_coordinates'):
+            self.no_go_geo_fence_coordinates = rospy.get_param('/vehicle_safety/geo_fence_coordinates')
+            rospy.loginfo("updating the new params in geofence coord") 
+            self.publish_geo_fence() 
+            rospy.loginfo("updated") 
+            return triggerResponse()  
+
 
     def publish_geo_fence(self):
         
@@ -88,8 +99,9 @@ class geoFencePub:
                 rospy.logdebug("Published No Go Zone")
 
     def funcall(self):  
-        rospy.logdebug("service started :)") 
-        rospy.Service('no_go_geo_fence_coordinates',trigger,self.service_request)
+        rospy.logdebug("service started") 
+        rospy.Service('no_go_geo_fence_coordinates',trigger,self.service_request_no_go_zone) 
+        rospy.Service('geo_fence_coordinates',trigger,self.service_request_geofence)
 
 
 

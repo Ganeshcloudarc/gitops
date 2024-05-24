@@ -42,9 +42,9 @@ base_link:   # center of the rear axle.
     yaw: 0.0
 
   rslidar: # center of the rear axle to rslidar(3d lidar)
-    x: 2.8
+    x: 3.140
     y: 0.0
-    z: 0.2
+    z: 0.4635
     roll: 0.0
     pitch: 0.0
     yaw: 0.0

@@ -17,6 +17,7 @@ path_publisher:
 patrol:
   enable_auxillary_commands : True #to activate horn indicator from autopilot
   enable_turning_horn : True #to activate horn during turnings 
+  enable_reverse_horn : False #to activate single horn when it starts to reverse from autopilot
   path_topic           : "odom_path"
   cmd_topic            : "/pure_pursuit/cmd_drive"
   pilot_cmd_in         : "/vehicle/cmd_drive_safe"

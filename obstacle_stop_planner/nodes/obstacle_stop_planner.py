@@ -345,7 +345,8 @@ class ObstacleStopPlanner:
                 rospy.loginfo(' Mission count %s ', self.count_mission_repeat)
                 self.mission_count_pub.publish(self.count_mission_repeat)
                 if self.mission_continue:
-                    self._close_idx = 1
+                    self._close_idx = 1 
+                    rospy.set_param("/obstacle_stop_planner/by_pass_dist", 0)
                     self.diagnostics_publisher.summary(OK,"Mission complete ") 
                     self.diagnostics_publisher.add("Mission Repeat ",self.count_mission_repeat) 
                     self.publish(self.diagnostics_publisher)
@@ -354,7 +355,8 @@ class ObstacleStopPlanner:
                 else:
                     # self.send_ack_msg(0, 0, 0)
                     rate.sleep()
-                    break
+                    break 
+            
             # bypass_mode
             prev_processed_ind = self._close_idx
             obstacle_found = False
@@ -383,14 +385,14 @@ class ObstacleStopPlanner:
                     # fixes the end bypass index and publishes till the bypass dist 
                 else:
                     # fill traj msg till end_bypass_index
-                    for ind in range(start_by_pass_index, end_by_pass_index):
+                    for ind in range(start_by_pass_index, end_by_pass_index +1):
                         # trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[ind]))
                         traj_point = copy.deepcopy(self._traj_in.points[ind]) 
                         traj_point.longitudinal_velocity_mps = self.robot_min_speed_th
                         trajectory_msg.points.append(traj_point)
                         start_by_pass_index = self._close_idx 
                         
-                    for ind in range(end_by_pass_index,self._traj_end_index-1): 
+                    for ind in range(end_by_pass_index ,self._traj_end_index-1): 
                         path_acc_distance = self._traj_in.points[ind].accumulated_distance_m - \
                                             self._traj_in.points[self._close_idx].accumulated_distance_m
 
@@ -398,7 +400,7 @@ class ObstacleStopPlanner:
                             break
                         # trajectory_msg.points.append(copy.deepcopy(self._traj_in.points[ind]))
                         traj_point = copy.deepcopy(self._traj_in.points[ind]) 
-                        traj_point.longitudinal_velocity_mps = self.robot_min_speed_th
+                        traj_point.longitudinal_velocity_mps = 0.0
                         trajectory_msg.points.append(traj_point)
                         # as caution vehicle will bypass with minimum speed 
                 rospy.loginfo(f"start_by_pass_index : {start_by_pass_index},end_by_pass_index : {end_by_pass_index} ")
@@ -417,6 +419,11 @@ class ObstacleStopPlanner:
                 prev_by_pass_dist = self.by_pass_dist
                 rate.sleep()
                 continue
+            else:
+                start_by_pass_index = None
+                end_by_pass_index = None
+                prev_by_pass_dist = None
+
 
 
             if self.use_obs_v1: 

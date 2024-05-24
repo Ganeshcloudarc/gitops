@@ -12,7 +12,8 @@
     <arg name="obs_stop_planner" default="true"/>
     <arg name="enable_centering" default="false"/>
     <arg name="pure_pursuit_refactor" default="true"/>
-    <arg name="run_halt_at_place" default="true"/>  <!-- Argument to Run the Pause and continue Feature-->
+
+    <arg name="enable_waypoint_operations" default="true"/>  <!-- Argument to allow Waypoint Actions to execute-->
 
 
     <arg name="enable_zed_obs" default="true"/>
@@ -96,8 +97,9 @@
 
     <node pkg = "autopilot" type = "markers_visualization.py" name = "visualization_marker_pure_pursuit_node" />
     
-    <group if="$(eval arg('run_halt_at_place'))">
-        <node pkg="autopilot" type="halt_place.py" name="halt_at_place" output='screen'/>
+    <group if="$(eval arg('enable_waypoint_operations'))">
+        <param name="/waypoint_operation_threshold_distance" value="1"/>
+        <node pkg="autopilot" type="waypoint_operations.py" name="route_planner_action" output='screen'/>
     </group>
 
 
