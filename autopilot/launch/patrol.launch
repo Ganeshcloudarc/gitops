@@ -1,6 +1,7 @@
 <launch>
     <arg name="hardware_in_loop" default="true" doc="false to software in loop"/>
     <arg name="vehicle_type" default="half_cabin" doc="It can be either half_cabin or porter"/>
+    <arg name="enable_anello_gps" default="false"/>
 
     <arg name="mission_file" default="default.json"/>
     <arg name="mission_continue" default="true"/>
@@ -73,6 +74,7 @@
             <arg name="rslidar" value="$(arg enable_rslidar)"/>
             <arg name="lslidar" value="$(arg enable_lslidar)"/>
             <arg name="itops_f25" value="$(arg enable_itops_f25)"/>
+            <arg name="enable_anello_gps" value="$(arg enable_anello_gps)"/>
        </include>
     </group>
 
