@@ -12,6 +12,7 @@
     <arg name="lslidar" default="true"/>
     <arg name="lslidar_ip" default="192.168.1.200"/>
     <arg name="itops_f25" default="true"/>
+    <arg name="enable_anello_gps" default="false"/>
 
 
     <include file="$(find pilot)/launch/all_pilot.launch" if ="$(eval arg('vcu_up'))"/>
@@ -20,6 +21,7 @@
     </include>
     <include file="$(find vehicle_common)/launch/vehicle_description.launch">
         <arg name="vehicle_type" value="$(arg vehicle_type)"/>
+        <arg name="anello_gps" value="$(arg enable_anello_gps)"/>
     </include>
     <include file="$(find zed_wrapper)/launch/zed2i.launch" if = "$(eval arg('zed_camera'))"/>
     <include file="$(find slamware_ros_sdk)/launch/scan_pub_no_tf.launch" if = "$(eval arg('2d_lidar'))" >
@@ -30,5 +32,6 @@
         <arg name="device_ip" value="$(arg lslidar_ip)" />
     </include>
     <include file="$(find itops_f25)/launch/camera.launch" if = "$(eval arg('itops_f25'))"/>
+    <include file="$(find anello_ros_driver)/launch/anello_ros_driver.launch" if="$(eval enable_anello_gps)"/>
 
 </launch>
