@@ -732,10 +732,10 @@ class GlobalGpsPathPub:
                                             trajectory_msg.points[i].accumulated_distance_m) 
             trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist,[0,self.distance_to_slowdown_on_ends],[self.min_forward_speed,self.max_forward_speed])  
         #gradually increase the speed to max at start of traj
-        for i in range(slow_start_index,0,-1):  
+        for i in range(0,slow_start_index):  
             tmp_dist = abs(trajectory_msg.points[slow_start_index].accumulated_distance_m -
                                             trajectory_msg.points[i].accumulated_distance_m) 
-            trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist,[0,self.distance_to_slowstart_on_start],[self.min_forward_speed,self.max_forward_speed])  
+            trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist,[0,self.distance_to_slowstart_on_start],[self.max_forward_speed,self.min_forward_speed])  
 
         marker_arr = trajectory_to_marker(trajectory_msg, self.max_forward_speed)
         self.trajectory_velocity_marker_pub.publish(marker_arr)
