@@ -32,5 +32,6 @@
         <arg name="device_ip" value="$(arg lslidar_ip)" />
     </include>
     <include file="$(find itops_f25)/launch/camera.launch" if = "$(eval arg('itops_f25'))"/>
+    <include file="$(find anello_ros_driver)/launch/anello_ros_driver.launch" if="$(eval enable_anello_gps)"/>
 
 </launch>
