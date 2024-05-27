@@ -64,7 +64,8 @@ class PurePursuitController:
         self.robot_state = None
         self.trajectory_data = None
         self.updated_traj_time = time.time()
-        self.turn_horn = False       
+        self.turn_horn = False   
+        self.reverse_horn = False    
         self._traj_manager = TrajectoryManager()
         self.trajectory_updated = False 
         self.path_percentage = -1 
@@ -87,6 +88,7 @@ class PurePursuitController:
         # ros parameters
         self.enable_auxillary_commands = rospy.get_param("/patrol/enable_auxillary_commands",True)
         self.enable_turning_horn = rospy.get_param("/patrol/enable_turning_horn",True)
+        self.enable_reverse_horn = rospy.get_param("/patrol/enable_reverse_horn",True)
         self.radius_threshold = rospy.get_param("/patrol/radius_threshold",15)
         self.max_speed = rospy.get_param("/patrol/max_forward_speed", 1.8) # default value of max speed is max forward speed.
         self.max_forward_speed = rospy.get_param("/patrol/max_forward_speed", 1.8)
@@ -113,7 +115,7 @@ class PurePursuitController:
         cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
 
         # Publishers
-        self.turn_publisher = rospy.Publisher("/auxillary_functions_publisher",auxillary_commands,queue_size=1)
+        self.auxillary_function_publisher = rospy.Publisher("/auxillary_functions_publisher",auxillary_commands,queue_size=1)
         self.turn_pose_pub = rospy.Publisher('/turn_pose',PoseStamped,queue_size=2)
         self.ackermann_publisher = rospy.Publisher(cmd_topic, AckermannDrive, queue_size=10) 
         self.target_pose_pub = rospy.Publisher('/target_pose', PoseStamped, queue_size=2)
@@ -312,7 +314,7 @@ class PurePursuitController:
                             break   
                         
                     else: 
-                        rospy.logwarn("mission continue :" + (self.mission_continue) + " mission_count " + self.count_mission_repeat)
+                        rospy.logwarn(f"mission continue :{self.mission_continue}, mission_count:{self.count_mission_repeat}")
                         diagnostic_msg = ControllerDiagnose()
                         diagnostic_msg.level = diagnostic_msg.WARN
                         diagnostic_msg.message = "mission repeats of :" + str(self.mission_trips) + " are completed"
@@ -381,24 +383,24 @@ class PurePursuitController:
 
             # initialising auxillary commands to be false at initial
             if self.enable_auxillary_commands: 
-                self.turn_command_data = auxillary_commands()
+                self.auxillary_commands_data = auxillary_commands()
                 
                 if circum_rad < self.radius_threshold: 
                         rospy.logwarn("turn detected")  
                         #publishes horn when this parameter is enabled 
                         if self.enable_turning_horn and not self.turn_horn: 
-                            self.turn_command_data.horn = True 
+                            self.auxillary_commands_data.horn = True 
                             self.turn_horn = True 
                         elif self.enable_turning_horn and self.turn_horn: 
-                            self.turn_command_data.horn = False
+                            self.auxillary_commands_data.horn = False
                        
 
                         #publishes right and left turns
                         if turn_cross > 0:  
-                            self.turn_command_data.right_indicator = True  
+                            self.auxillary_commands_data.right_indicator = True  
                             rospy.loginfo("right")  
                         elif turn_cross < 0: 
-                            self.turn_command_data.left_indicator = True  
+                            self.auxillary_commands_data.left_indicator = True  
                             rospy.loginfo("left")
                         else: 
                             rospy.loginfo("on path")
@@ -408,7 +410,7 @@ class PurePursuitController:
                     
                 # horn command from obsp
                 if self.obs_horn and not obstacle_horn:  
-                    self.turn_command_data.horn = True
+                    self.auxillary_commands_data.horn = True
                     obstacle_horn = True
 
                 elif self.obs_horn == False: 
@@ -416,10 +418,6 @@ class PurePursuitController:
                 else: 
                     pass
 
-
-                self.turn_publisher.publish(self.turn_command_data)
-
-        
             cross_product = self.calculate_cross_product(robot_position, nearest_point, lookahead_point)
             if cross_product > 0:
                 result = "right"
@@ -435,18 +433,33 @@ class PurePursuitController:
 
             if dot_vector >= 0:
                 self.is_reverse = False
-                rospy.loginfo_throttle(10, "Forward")
+                rospy.loginfo_throttle(10, "Forward") 
                 stop_on_command = False
+                self.reverse_horn = False
             elif dot_vector < 0:
                 if self.allow_reversing: # safety check to stop on reverse conditions when allow_reversing is set to false.
                     self.is_reverse = True 
                     self.angle_Thr = 180
-                    rospy.loginfo_throttle(10, "Reverse")
+                    rospy.loginfo_throttle(10, "Reverse") 
+                    
+                    # horn once at reversing start
+                    if self.enable_auxillary_commands: 
+                        if self.enable_reverse_horn and not self.reverse_horn: 
+                            self.auxillary_commands_data.horn = True
+                            rospy.logwarn("reverse horn activated here")
+                            self.reverse_horn = True 
+                        elif self.enable_reverse_horn and self.reverse_horn: 
+                            self.auxillary_commands_data.horn = False
+                       
+                
                 else:
                     self.is_reverse = False
                     stop_on_command = True
             else:
-                pass
+                pass 
+            # publish all the auxillary_commands related stuffs
+            self.auxillary_function_publisher.publish(self.auxillary_commands_data)
+           
             #  pure pusuit contoller
             target_point_angle = angle_btw_poses(target_pose_msg.pose, robot_pose)
             alpha = -(target_point_angle - get_yaw(robot_pose.orientation))

@@ -15,10 +15,10 @@ find_package(catkin REQUIRED COMPONENTS
   # vehicle_stop_command
   # pilot
 )
-add_message_files(
-  FILES
-  val.msg
-)
+# add_message_files(
+#   FILES
+  
+# )
 add_service_files( 
    FILES 
    trigger.srv

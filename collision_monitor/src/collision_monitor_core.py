@@ -111,8 +111,8 @@ class CollisionMonitor:
 
         self.pub_poly = rospy.Publisher("collision_monitor_polygon", PolygonStamped, queue_size=1, latch=True)
         self.diagnostics_pub = rospy.Publisher("/collision_monitor_diagnostics", DiagnosticArray, queue_size=1)
-        self.pilot_stop_command_pub = rospy.Publisher("/vehicle/break_command", vehicle_stop_command, queue_size=1)
-        self.diagnostics_arr = DiagnosticArray()
+        self.pilot_stop_command_pub = rospy.Publisher("/vehicle/break_command", vehicle_stop_command, queue_size=1) 
+        self.diagnostics_arr = DiagnosticArray() 
         self.diagnostics_arr.header.frame_id = self.robot_base_frame
         self.diagnose = DiagnosticStatusWrapper()
         self.diagnose.name = rospy.get_name()
@@ -179,18 +179,28 @@ class CollisionMonitor:
                 collision_points_count += count
                 self.diagnose.add(source.topic_name+":  collision_points_count ", count)
             rospy.loginfo(f"total : collision_points_count : {collision_points_count}")
-            if collision_points_count > self.min_points or time_out_status:
-                self.diagnose.summary(ERROR, "Collision Found near the vehicle")
-                vehicle_stop_msg.status = True
-                vehicle_stop_msg.message =  "Collision Found near the vehicle"
+            if collision_points_count > self.min_points or time_out_status: 
+
+                # stopping vehicle_stop_command when bypass dist is non zero
+                self.by_pass_dist = rospy.get_param("/obstacle_stop_planner/by_pass_dist", 0) 
+                if self.by_pass_dist != 0: 
+                    vehicle_stop_msg.status = False
+                    vehicle_stop_msg.message =  "Bypassing Collision Found" 
+                    self.diagnose.summary(ERROR, "Collision Found near the vehicle, Bypassing") 
+                else: 
+                    vehicle_stop_msg.status = True
+                    vehicle_stop_msg.message =  "Collision Found near the vehicle"
+                    self.diagnose.summary(ERROR, "Collision Found near the vehicle, Stopping") 
+                
+                
                 self.diagnose.add("total collision_points_count", collision_points_count)
                 rospy.logwarn("Collision Found")
             else:
                 self.diagnose.summary(OK, "No collision points Found")
                 vehicle_stop_msg.status = False
-                vehicle_stop_msg.message =  "Collision Found near the vehicle"
+                vehicle_stop_msg.message =  "No collision points Found"
                 self.diagnose.add("total collision_points_count", collision_points_count)
-                rospy.logwarn("No collision")
+                rospy.loginfo("No collision")
 
             self.diagnostics_arr.status = []
             self.diagnostics_arr.status.append(self.diagnose)
