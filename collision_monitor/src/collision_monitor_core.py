@@ -14,7 +14,7 @@ import ros_numpy
 from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper
 from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray, KeyValue
 from pilot_msgs.msg import vehicle_stop_command
-
+from ackermann_msgs.msg import AckermannDrive
 OK = DiagnosticStatus.OK
 ERROR = DiagnosticStatus.ERROR
 WARN = DiagnosticStatus.WARN
@@ -112,6 +112,9 @@ class CollisionMonitor:
         self.pub_poly = rospy.Publisher("collision_monitor_polygon", PolygonStamped, queue_size=1, latch=True)
         self.diagnostics_pub = rospy.Publisher("/collision_monitor_diagnostics", DiagnosticArray, queue_size=1)
         self.pilot_stop_command_pub = rospy.Publisher("/vehicle/break_command", vehicle_stop_command, queue_size=1) 
+        rospy.Subscriber('/vehicle/cmd_drive_safe',AckermannDrive, self.vehicle_cmd_drive_cb)
+        self.steering_angle = None
+        self.polygon_points_rotated = None
         self.diagnostics_arr = DiagnosticArray() 
         self.diagnostics_arr.header.frame_id = self.robot_base_frame
         self.diagnose = DiagnosticStatusWrapper()
@@ -155,7 +158,16 @@ class CollisionMonitor:
         vehicle_stop_msg = vehicle_stop_command()
         vehicle_stop_msg.node = rospy.get_name()
         while not rospy.is_shutdown():
-           
+            steering_angle_based_collision_check = rospy.get_param("~collision_monitor/steering_angle_based_collision_check", False)
+            if steering_angle_based_collision_check:
+                collision_polygon = self.vehicle_foot_print(rotated_polygon=steering_angle_based_collision_check)
+                self.polygon_st = PolygonStamped()
+                self.polygon_st.header.frame_id = self.robot_base_frame
+                self.polygon_st.polygon = collision_polygon
+                self.pub_poly.publish(self.polygon_st)
+                rospy.loginfo("Polygon published")
+                self.polygon_check = PolygonCheck(collision_polygon)
+
             collision_points_count = 0
             self.diagnose.clearSummary()
             self.diagnose.values = []
@@ -228,14 +240,39 @@ class CollisionMonitor:
                 obj = CommonCallback(topic_name, PointCloud2)
             self.observation_details.append(obj)
 
-    def vehicle_foot_print(self):
+    def vehicle_foot_print(self, rotated_polygon=False):
         pl = Polygon()
-        for i in range(0, len(self.polygon_points)):
-            point = Point()
-            point.x = self.polygon_points[i][0]
-            point.y = self.polygon_points[i][1]
-            pl.points.append(point)
+        if not rotated_polygon:
+            for i in range(0, len(self.polygon_points)):
+                point = Point()
+                point.x = self.polygon_points[i][0]
+                point.y = self.polygon_points[i][1]
+                pl.points.append(point)
+        else:
+            try:
+                pl = Polygon()
+                self.polygon_points_rotated = self.rotate_polygon(self.polygon_points, self.steering_angle)
+                for i in range(0, len(self.polygon_points_rotated)):
+                    point = Point()
+                    point.x = self.polygon_points_rotated[i][0]
+                    point.y = self.polygon_points_rotated[i][1]
+                    pl.points.append(point)
+            except Exception as e:
+                rospy.logdebug(e)
         return pl
+
+    def rotate_point(self,x, y, theta):
+        theta_rad = np.deg2rad(theta)
+        cos_theta = np.cos(theta_rad)
+        sin_theta = np.sin(theta_rad)
+        return x * cos_theta - y * sin_theta, x * sin_theta + y * cos_theta
+
+    # Function to rotate a polygon by an angle theta
+    def rotate_polygon(self, polygon, theta):
+        return [self.rotate_point(x, y, -theta) for x, y in polygon]
+
+    def vehicle_cmd_drive_cb(self, data):
+        self.steering_angle = data.steering_angle
 
 
 if __name__ == "__main__":
