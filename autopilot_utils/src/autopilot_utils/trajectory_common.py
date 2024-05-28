@@ -89,8 +89,12 @@ class TrajectoryManager:
             dis = distance_btw_poses(curr_pose, traj_point.pose)
             yaw_diff = normalize_angle(curr_yaw - get_yaw(traj_point.pose.orientation))
             # rospy.logdebug(f"dis : {dis}, yaw_diff : {math.degrees(yaw_diff)}")
-            if dis < dist_thr and abs(math.degrees(yaw_diff)) < angle_thr:
-                return True, i
+            if dis < dist_thr and abs(math.degrees(yaw_diff)) < angle_thr and dis < dist_min:
+                # return True, i
+                idx_min = i
+                dist_min = dis
+        if idx_min != -1:
+            return True, idx_min
         else:
             return False, idx_min
         
