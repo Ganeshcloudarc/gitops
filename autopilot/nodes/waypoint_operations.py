@@ -268,7 +268,7 @@ class WayPointOperation:
                                     rospy.loginfo_throttle(10,"No Close Points Found for Waypoint Actions")
             except Exception as e:
                 rospy.logerr("An error occurred in main logic of waypoint Operation: %s", traceback.format_exc())
-                rospy.sleep(0.1)
+            rospy.sleep(0.1)
 
     def calculate_distance(self, coord1, coord2):
         """
