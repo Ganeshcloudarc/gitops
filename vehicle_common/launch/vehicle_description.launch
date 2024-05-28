@@ -3,6 +3,7 @@
     <arg name="footprint_pub" default="true"/>
     <arg name="odom_pub" default="true"/>
     <arg name="gps_pub" default="true"/>
+    <arg name="anello_gps" default="false"/>
     <arg name="enable_2d_mode" default="true"/>
 
     <param name ="/base_frame" value ="base_link"/>
@@ -15,6 +16,12 @@
     <param name="/gps_out" value="/vehicle/gps"/>
     <param name="/footprint_out" value="/vehicle/foot_print" />
     <param name="vehicle_type" value="$(arg vehicle_type)"/>
+
+    <group if="$(eval anello_gps)">
+      <node pkg = "vehicle_common" type = "anello_gps_transform_node.py" name="anello_gps_transform_node" />
+      <param name ='/odometry_in' value ="/anello_ins/global_position/local" />
+      <param name="/gps_in" value ="/anello_ins/global_position/global"/>
+    </group>
     <param name="enable_2d_mode" value="$(arg enable_2d_mode)"/>
 
     <group if="$(eval vehicle_type == 'half_cabin')">
