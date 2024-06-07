@@ -7,7 +7,8 @@
     <arg name="mission_continue" default="true"/>
     <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
     <arg name ='rviz' default = 'true'/>
-    <arg name="record" default="true"/>
+    <arg name="record" default="false"/>
+    <arg name="record_minimal" default ="true"/>
     <arg name="failsafe_enable_cpp" default="true"/>
     <!-- DO NOT KEEP BOTH obs_stop_planner and enable_centering TO TRUE AT A TIME -->
     <arg name="obs_stop_planner" default="true"/>
@@ -218,6 +219,19 @@
                 args="record -o $(env HOME)/.bags/boson_$(arg mission_file) -a -x /zed2i/(?!(.*)info)(.*)(left|right|rgb|depth|stereo|confidence|point|disparity|temperature)(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud|/itops_f25/(.*)|/cloud_concatenated" if="$(eval arg('record') and arg('hardware_in_loop'))"/>
         </group>
     </group>
+
+    <!-- if mininal bag recorder is enabled-->
+
+    
+
+    <group if="$(eval arg('record_minimal') and arg('hardware_in_loop'))">
+        <include file="$(find autopilot)/launch/minimal_bag_recorder.launch">
+            <arg name="mission_file" default="$(arg mission_file)"/>
+        </include>
+    </group>
+    
+
+
     <!-- <include file="$(find vehicle_common)/launch/vehicle_description.launch"> </include> -->
     <group if="$(eval arg('failsafe_enable_cpp'))">
         <include file="$(find autopilot)/launch/failsafe_manager.launch">

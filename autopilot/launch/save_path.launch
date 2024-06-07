@@ -5,7 +5,8 @@
     <arg name="mission_file" default="default.json"/>
     <arg name='min_dis' default='0.1'/>
     <arg name="failsafe_enable" default="true"/>
-    <arg name="record" default="true"/> <!--bag file record-->
+    <arg name="record" default="false"/> <!--bag file record-->
+    <arg name="record_minimal" default ="true"/>
     <arg name="record_waypoints_on_rtk_loss" default="false"/>
     <arg name="use_save_path_v2" default="false"/>
     <arg name="enable_mapping" default="true"/>
@@ -60,6 +61,8 @@
 
     <node name="save_path_bag_record" pkg="rosbag" type="record"
         args="record -o $(env HOME)/.bags/boson_save_path -a -x /zed2i/(?!(.*)info)(.*)(left|right|rgb|depth|stereo|confidence|point|disparity|temperature)(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud|/itops_f25/(.*)|/cloud_concatenated|/mapper_node/(.*)" if="$(eval record)"/>
+    
+    <include file="$(find autopilot)/launch/minimal_bag_recorder.launch" if="$(eval record_minimal)"/>
 
     <group if ="$(eval arg('enable_mapping'))">
          <include file="$(find kissicp_planner)/launch/mapper.launch"> 
