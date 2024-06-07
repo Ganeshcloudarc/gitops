@@ -25,75 +25,39 @@
     <param name="/pcl_bbox_topic" value="/filtered_detector/jsk_bboxes"/>
     <param name="enable_zed_obs" value="$(arg enable_zed_obs)"/>
 
-
     <group if="$(eval arg('enable_itops_f25'))">
-        <!-- IF Itops and RS/LSLidar, send the merged cloud to nodes -->
-        <group if="$(eval arg('lslidar') or arg('rslidar'))">
-            <!-- Launch Cloud Concatenator Here. -->
-            <include file="$(find pointcloud_concatenate)/launch/concat.launch">
-                <arg name="cloud_in1" value="/itops_f25/camera/points"/>
-                <!--enable below cloud_in2 for simulation with itops -->
-                <!-- <arg name="cloud_in2" value="/zed2i/zed_node/point_cloud/cloud_registered" if="$(eval arg('rslidar'))"/>  -->
-                <arg name="cloud_in2" value="/rslidar_points" if="$(eval arg('rslidar'))"/>
-                <arg name="cloud_in2" value="/lslidar_point_cloud" if="$(eval arg('lslidar'))"/>
-                <arg name="target_frame" value="base_link"/>
-            </include>
-            <!-- Launch pointcloud to laser scan -->
-            <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
-                <arg name="cloud_in" value="/obstacle_detector/object_cloud"/>
-                <arg name="node_name" value="concatenated_pointcloud_to_laserscan_node"/>
-                <arg name="config_file" value="$(arg cloud_to_scan_config_360)"/>
-                <!-- <arg name="target_frame" value="base_link"/> -->
-            </include>
-            <!-- launch lidar obstacle detector -->
-            <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
-                <arg name="points_in"  value="/cloud_concatenated"/>
-                <arg name="bbox_target_frame" value="base_link"/>
-                <arg name="config_file" value="rs_lidar_config_itops.yaml"/>
-                <arg name="rviz" value="false"/>
-            </include>
-        </group>
-        <!-- If only Itops and not LS/RSLidar, turn only Itops -->
-        <group unless="$(eval arg('lslidar') or arg('rslidar'))">
-            <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
-                <arg name="cloud_in" value="/itops_f25/camera/points"/>
-                <arg name="node_name" value="itops_f25_pointcloud_to_laserscan_node"/>
-                <arg name="config_file" value="$(arg cloud_to_scan_config_360)"/>
-                <!-- <arg name="target_frame" value="base_link"/> -->
-            </include>
-            <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
-                <arg name="points_in"  value="/itops_f25/camera/points"/>
-                <arg name="bbox_target_frame" value="base_link"/>
-                <arg name="rviz" value="false"/>
-            </include>
-        </group>
+        <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
+            <arg name="cloud_in" value="/itops_f25/camera/points"/>
+            <arg name="node_name" value="itops_f25_pointcloud_to_laserscan_node"/>
+            <arg name="config_file" value="itops_cloud_to_laser_360_params.yaml"/>
+            <arg name="scan_out" value="/itops_laser_scan"/>
+            <!-- <arg name="target_frame" value="base_link"/> -->
+        </include>
     </group>
 
-    <!-- If no Itops, launch 3d lidars individually -->
-    <group unless="$(eval arg('enable_itops_f25'))">
-        <group if="$(eval arg('rslidar'))">
-            <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
-                <arg name="rviz" value="false"/>
-            </include>
-            <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
-                <arg name="cloud_in" value="$(arg pointcloud_to_laserscan_cloud_in)"/>
-                <arg name="config_file" value="$(arg cloud_to_scan_config)"/>
-            </include>
-        </group>
-        
-        <group if="$(eval arg('lslidar'))">
-            <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
-                <arg name="rviz" value="false"/>
-                <arg name="points_in" value="lslidar_point_cloud"/>
-                <arg name="bbox_target_frame" value="map"/>
-            </include>
-            <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
-                <arg name="cloud_in" value="$(arg pointcloud_to_laserscan_cloud_in)"/>
-                <arg name="config_file" value="$(arg cloud_to_scan_config)"/>
-                <arg name="node_name" value="lslidar_pointcloud_to_laserscan_node"/>
-            </include>
-        </group>
+    <group if="$(eval arg('rslidar'))">
+        <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+            <arg name="rviz" value="false"/>
+        </include>
+        <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
+            <arg name="cloud_in" value="$(arg pointcloud_to_laserscan_cloud_in)"/>
+            <arg name="config_file" value="$(arg cloud_to_scan_config)"/>
+        </include>
     </group>
+    
+    <group if="$(eval arg('lslidar'))">
+        <include file="$(find lidar_obstacle_detector)/launch/obstacle_detect.launch">
+            <arg name="rviz" value="false"/>
+            <arg name="points_in" value="lslidar_point_cloud"/>
+            <arg name="bbox_target_frame" value="map"/>
+        </include>
+        <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
+            <arg name="cloud_in" value="$(arg pointcloud_to_laserscan_cloud_in)"/>
+            <arg name="config_file" value="$(arg cloud_to_scan_config)"/>
+            <arg name="node_name" value="lslidar_pointcloud_to_laserscan_node"/>
+        </include>
+    </group>
+
    
 
     <!-- <include file="$(find obstacle_stop_planner)/launch/pointcloud_to_laserscan.launch">
@@ -110,7 +74,32 @@
     </group>
 
     <group unless="$(eval arg('enable_zed_obs') and arg('enable_zed_based_v1'))">
-        <param name="obstacle_stop_planner/scan_in" value="laser_scan"/>
+        <group if="$(eval arg('enable_itops_f25'))">
+            <group if="$(eval arg('lslidar') or arg('rslidar'))">
+
+                <!-- Merge Laser scan -->
+                <node pkg="ira_laser_tools" name="laserscan_multi_merger" type="laserscan_multi_merger" output="screen">
+                    <param name="destination_frame" value="base_link"/>
+                    <param name="cloud_destination_topic" value="/merged_cloud"/>
+                    <param name="scan_destination_topic" value="/scan_multi"/>
+                    <param name="laserscan_topics" value ="/itops_laser_scan /laser_scan" /> <!-- LIST OF THE LASER SCAN TOPICS TO SUBSCRIBE -->
+                    <param name="angle_min" value="-3.1415926536"/>
+                    <param name="angle_max" value="3.1415926536"/>
+                    <param name="angle_increment" value="0.0058"/>
+                    <param name="scan_time" value="0.0333333"/>
+                    <param name="range_min" value="0.30"/>
+                    <param name="range_max" value="50.0"/>
+                </node>
+                <param name="obstacle_stop_planner/scan_in" value="/scan_multi"/>
+            </group>
+
+            <group unless="$(eval arg('lslidar') or arg('rslidar'))">
+                <param name="obstacle_stop_planner/scan_in" value="/itops_laser_scan"/>
+            </group>
+        </group>
+        <group unless="$(eval arg('enable_itops_f25'))">
+            <param name="obstacle_stop_planner/scan_in" value="laser_scan"/>
+        </group>
     </group>
     
     <param name="/obstacle_stop_planner/use_zed_object_detection" value="$(arg enable_zed_obs)"/>

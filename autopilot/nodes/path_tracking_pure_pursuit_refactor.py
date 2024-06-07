@@ -112,7 +112,9 @@ class PurePursuitController:
         self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.search_point_distance = 5 
-        self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True) 
+        self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
+        if self.allow_reversing:
+            self.angle_Thr = 180
         self.enable_cte_based_speed_control = rospy.get_param("/patrol/enable_cte_based_speed_control", False)
         cmd_topic = rospy.get_param("patrol/pilot_cmd_in", "/vehicle/cmd_drive_safe")
 
