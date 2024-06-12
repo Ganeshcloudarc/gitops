@@ -1,16 +1,12 @@
 <launch>
     <arg name="mission_file" default="default.json"/>
-
-
     <node pkg="rosbag" type="record" name="minimal_bag_recorder_node" output="screen"
     
-        args="record -o $(env HOME)/.bags/minimal_$(arg mission_file) /tf /tf_static /rosout /vehicle/odom 
+        args="record -o $(env HOME)/.bags/minimal_$(arg mission_file) -e /tf /tf_static /rosout /vehicle/odom 
         /vehicle/gps /vehicle/cmd_drive_safe /vehicle/stop_command /vehicle/break_command 
         /mavros/gpsstatus/gps1/raw /mavros/gpsstatus/gps2/raw /pilot_status  /hmi_bridge_from_obc 
         /pilot_status /pilot_diagnostics /obstacle_stop_planner_diagnostics /vehicle_safety_diagnostics 
         /pure_pursuit_diagnose /close_pose /target_pose /global_gps_path /global_gps_trajectory 
         /local_gps_path /local_gps_trajectory /auxillary_functions_publisher /mission_count 
-        /osp_path_percentage /vehicle_info /vehicle/foot_print /global_gps_path/is_curve"
-    
-    />
+        /osp_path_percentage /vehicle_info /vehicle/foot_print /global_gps_path/is_curve /zed2i/(.*)info(.*) (.*)odom(.*)" />
 </launch>
