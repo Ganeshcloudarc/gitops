@@ -53,7 +53,7 @@
 
     <param name="/patrol/allow_reversing" value="$(arg allow_reversing)"/>
     <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
-    <param name="/patrol/mission_continue" value ="$(arg mission_continue)"/>
+    <param name="/mission_continue" value ="$(arg mission_continue)"/>
     <param name="/patrol/mission_trips" value ="$(arg mission_trips)"/>
     <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
     <rosparam command="load" file="$(find boson_hmi)/params/modified_hmi_param.yaml"/>

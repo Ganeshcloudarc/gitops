@@ -3,7 +3,7 @@
     <arg name="cloud_in_for_auto_nav" default="/lslidar_point_cloud"/>
     <arg name="mission_continue" default="false"/>
     <arg name="enable_cloud_mapping" default="true"/>
-    <param name="/patrol/mission_continue" value ="$(arg mission_continue)"/>
+    <param name="/mission_continue" value ="$(arg mission_continue)"/>
 
 
     <include file="$(find auto_nav)/launch/pointcloud_to_laserscan.launch" >
@@ -32,10 +32,3 @@
     </include>
 
 </launch>
-
-
-
-
-
-
-

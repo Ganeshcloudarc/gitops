@@ -22,7 +22,7 @@
     <arg name="cloud_to_scan_config" default="cloud_to_laser_180_params.yaml"/>
     <arg name="cloud_to_scan_config_360" default="cloud_to_laser_360_params.yaml"/>
     <arg name="lidar_obstacle_detector_config" default="rs_lidar_config.yaml"/>
-    <param name = "/obstacle_stop_planner/mission_continue" value = "$(arg mission_continue)"/>
+    <param name = "/mission_continue" value = "$(arg mission_continue)"/>
     <param name="use_pcl_boxes" value="$(arg use_pcl_boxes)"/>
     <param name="/pcl_bbox_topic" value="/filtered_detector/jsk_bboxes"/>
     <param name="enable_zed_obs" value="$(arg enable_zed_obs)"/>

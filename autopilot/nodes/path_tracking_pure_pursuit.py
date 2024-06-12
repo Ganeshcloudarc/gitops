@@ -98,7 +98,7 @@ class PurePursuitController:
         gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/local")
         self.robot_base_frame = rospy.get_param("robot_base_frame", "ego_vehicle")
         self.wait_time_at_ends = rospy.get_param("/patrol/wait_time_on_mission_complete", 10)
-        self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
+        self.mission_continue = rospy.get_param("/mission_continue", False)
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.search_point_distance = 5
         self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
@@ -259,6 +259,8 @@ class PurePursuitController:
                 diagnostic_msg.level = diagnostic_msg.OK
                 diagnostic_msg.message = 'Mission count  ' + str(self.count_mission_repeat)
                 self.controller_diagnose_pub.publish(diagnostic_msg)
+                
+                self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
                 if self.mission_continue:
                     if self.mission_trips == 0:
                         diagnostic_msg = ControllerDiagnose()

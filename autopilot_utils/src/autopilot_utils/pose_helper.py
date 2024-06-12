@@ -137,6 +137,21 @@ def rectangle_form_pose(robo_x,robo_y, x_size, y_size):
 
 
 
+def calc_cte(pose, position):
+    """ calulcate perp distance between pose(line ) and positio"""
+    yaw = get_yaw(pose.orientation)
+    
+    target_point = np.array([position[0], position[1]])
+    # print(f"yaw: { yaw}")
+    # print(" x: {} y: {} ", pose.position.x, pose.position.y)
+    # print(" x: {} y: {} ", pose.position.x + math.cos(yaw), pose.position.y + math.sin(yaw))
+    point1 = np.array([ pose.position.x, pose.position.y])
+    point2 = np.array([pose.position.x + math.cos(yaw), pose.position.y + math.sin(yaw)])
+
+    distance = np.cross(point2 - point1, point1 - target_point) / np.linalg.norm(
+                    point2 - point1)
+    return distance
+
 
 if __name__ == "__main__":
     yaw = 3
@@ -145,3 +160,6 @@ if __name__ == "__main__":
     yaw_updated = get_yaw(quat)
     print("yaw", yaw)
     print("yaw_updated", yaw_updated)
+
+
+    # calc_ctc()

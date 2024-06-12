@@ -128,7 +128,7 @@ class ObstacleStopPlanner:
         self._vis_collision_points = rospy.get_param("/obstacle_stop_planner/vis_collision_points", True)
         self._vis_trajectory_rviz = rospy.get_param("/obstacle_stop_planner/vis_trajectory_rviz", True)
         self._robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
-        self.mission_continue = rospy.get_param("/obstacle_stop_planner/mission_continue", True)
+        self.mission_continue = rospy.get_param("/mission_continue", True)
         self._time_to_wait_at_ends = rospy.get_param("patrol/wait_time_on_mission_complete", 20)
         self._min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self._max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
@@ -301,7 +301,7 @@ class ObstacleStopPlanner:
             # check for the close index on the trajectory
             if self._close_idx is None:
                 angle_th = 90
-                found, index = self._traj_manager.find_closest_idx_with_dist_ang_thr(self.robot_pose,
+                found, index = self._traj_manager.find_first_closest_idx_with_dist_ang_thr(self.robot_pose,
                                                                                      self._max_look_ahead_dis, angle_th)
                 if found:
                     self._close_idx = index
@@ -344,6 +344,7 @@ class ObstacleStopPlanner:
                 self.count_mission_repeat += 1
                 rospy.loginfo(' Mission count %s ', self.count_mission_repeat)
                 self.mission_count_pub.publish(self.count_mission_repeat)
+                self.mission_continue = rospy.get_param("/mission_continue", False)
                 if self.mission_continue:
                     self._close_idx = 1 
                     rospy.set_param("/obstacle_stop_planner/by_pass_dist", 0)
@@ -353,6 +354,9 @@ class ObstacleStopPlanner:
                     time.sleep(self._time_to_wait_at_ends)
                     continue
                 else:
+                    self.diagnostics_publisher.summary(ERROR,"Mission Completed") 
+                    self.diagnostics_publisher.add("Mission Repeat ",self.count_mission_repeat) 
+                    self.publish(self.diagnostics_publisher)
                     # self.send_ack_msg(0, 0, 0)
                     rate.sleep()
                     break 
@@ -414,7 +418,7 @@ class ObstacleStopPlanner:
                 if self._close_idx > end_by_pass_index:
                     rospy.set_param("/obstacle_stop_planner/by_pass_dist", 0)
                     end_by_pass_index = None
-                    start_by_pass_index = None
+                    start_by_pass_index = None 
                     prev_by_pass_dist = None 
                 prev_by_pass_dist = self.by_pass_dist
                 rate.sleep()
@@ -716,7 +720,7 @@ class ObstacleStopPlanner:
             print("robot_speed", self.robot_speed)
             print(f"time taken for a loop is: {time.time() - loop_start_time} ")
             # print("len of local traj", len(traj_out.points))
-            print("collision_index", collision_index)
+            print("collision_index", collision_index) 
 
             self.publish_velocity_marker(trajectory_msg) 
             rate.sleep() 

@@ -74,7 +74,7 @@ AutoNavCore::AutoNavCore()
 void AutoNavCore::loadParams(ros::NodeHandle private_nh) {
 
   private_nh.param<int>("loop_frequency", loop_frequency, 10);
-  private_nh.param<bool>("mission_continue", mission_continue, true);
+  private_nh.param<bool>("/mission_continue", mission_continue, true);
 
   private_nh.param<bool>("enable_moving_avg_filter", enable_moving_avg_filter,
                          true);
@@ -217,6 +217,7 @@ void AutoNavCore::main_loop(ros::NodeHandle private_nh) {
     if (path_percent_val.data > 95.0 and
         distanceBetweenPoses(curr_robot_pose, global_traj.points.back().pose) <
             row_spacing) {
+      private_nh.param<bool>("/mission_continue", mission_continue, true);
       if (mission_continue) {
         ROS_INFO("mission completed");
         ROS_INFO("Restarting the mission");

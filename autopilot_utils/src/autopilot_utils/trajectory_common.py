@@ -67,6 +67,36 @@ class TrajectoryManager:
         else:
             raise Exception("invalid index or out of bound")
 
+    def find_first_closest_idx_with_dist_ang_thr(self, curr_pose, dist_thr, angle_thr):
+        """
+        Finds the closest point on trajectory within a distance threshold and angle threshold, returns true and
+        index if one exists.
+        Params:
+            curr_pose : pose to which want to find close point
+            dist_thr :
+            angle_thr :
+        Returns:
+            Found, index (true/false, Int)
+        """
+        dist_min = sys.maxsize
+        idx_min = -1
+        curr_yaw = get_yaw(curr_pose.orientation)
+        if self._traj_in is None:
+            return False, idx_min
+        for i in range(0, self._traj_len):
+            traj_point = self._traj_in.points[i]
+            dis = distance_btw_poses(curr_pose, traj_point.pose)
+            yaw_diff = normalize_angle(curr_yaw - get_yaw(traj_point.pose.orientation))
+            # rospy.logdebug(f"dis : {dis}, yaw_diff : {math.degrees(yaw_diff)}")
+            if dis < dist_thr and abs(math.degrees(yaw_diff)) < angle_thr:
+                return True, i
+                # idx_min = i
+                # dist_min = dis
+       
+        return False, idx_min
+        
+        
+
 
     def find_closest_idx_with_dist_ang_thr(self, curr_pose, dist_thr, angle_thr):
         """

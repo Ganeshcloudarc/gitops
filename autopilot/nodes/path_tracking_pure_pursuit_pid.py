@@ -77,7 +77,7 @@ class PurePursuitController:
         gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/local")
         self.robot_base_frame = rospy.get_param("robot_base_frame", "base_link")
         self.wait_time_at_ends = rospy.get_param("/patrol/wait_time_on_mission_complete", 10)
-        self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
+        self.mission_continue = rospy.get_param("/mission_continue", False)
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.search_point_distance = 5
         failsafe_enable = rospy.get_param("/patrol/failsafe_enable", True)

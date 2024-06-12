@@ -31,7 +31,7 @@ try:
     # autopilot related imports
     from autopilot_utils.trajectory_common import TrajectoryManager
     from autopilot_utils.tf_helper import current_robot_pose, convert_point, transform_cloud
-    from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses, normalize_angle
+    from autopilot_utils.pose_helper import distance_btw_poses, get_yaw, angle_btw_poses, normalize_angle, calc_cte
     from vehicle_common.vehicle_config import vehicle_data
     from autopilot_msgs.msg import Trajectory, TrajectoryPoint
     from autopilot_msgs.msg import ControllerDiagnose, FloatKeyValue
@@ -73,7 +73,6 @@ class PurePursuitController:
         self.angle_Thr = 90
         self.lhd_offset_thr = 0.2 #fix to not get lhd is less than min lookahead distance
 
-
         #PID parameters
         self.cte = 0
         self.sum_cte = 0
@@ -109,7 +108,7 @@ class PurePursuitController:
         gps_topic = rospy.get_param("/patrol/gps_topic", "/mavros/global_position/local")
         self.robot_base_frame = rospy.get_param("robot_base_frame", "ego_vehicle")
         self.wait_time_at_ends = rospy.get_param("/patrol/wait_time_on_mission_complete", 10)
-        self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
+        self.mission_continue = rospy.get_param("/mission_continue", False)
         self.mission_trips = rospy.get_param("/patrol/mission_trips", 0)
         self.search_point_distance = 5 
         self.allow_reversing = rospy.get_param("/patrol/allow_reversing", True)
@@ -205,7 +204,7 @@ class PurePursuitController:
 
             # replace the timeout of input trajectory
             if self._traj_manager.get_len() == 0 :
-                rospy.logerr("Received empty trajectory, Breaking the vehicle")
+                rospy.logerr("Received empty trajectory, Breaking the vehicle") 
                 diagnostic_msg = ControllerDiagnose()
                 diagnostic_msg.level = diagnostic_msg.ERROR
                 diagnostic_msg.message = "Received empty trajectory, Breaking the vehicle"
@@ -217,18 +216,31 @@ class PurePursuitController:
                 continue
 
             if self.trajectory_time_out != 0:
-                if(time.time()- self.updated_traj_time ) > self.trajectory_time_out: 
-                    rospy.logwarn("No update on the trajectory from last %s seconds ",str(time.time() - self.updated_traj_time))
-                    diagnostic_msg = ControllerDiagnose()
-                    diagnostic_msg.level = diagnostic_msg.ERROR
-                    diagnostic_msg.message = "No update on the trajectory from last %s seconds " + str(time.time() - self.updated_traj_time)
-                    diagnostic_msg.stamp = rospy.Time.now()
-                    self.controller_diagnose_pub.publish(diagnostic_msg)
-                    self.send_ack_msg(0, 0, 0)
-                    rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
-                    rate.sleep()
-                    continue
-            
+                self.mission_continue = rospy.get_param("/mission_continue") 
+                if(time.time()- self.updated_traj_time ) > self.trajectory_time_out:  
+                    if self.mission_continue:
+                        rospy.logwarn("No update on the trajectory from last %s seconds ",str(time.time() - self.updated_traj_time))
+                        diagnostic_msg = ControllerDiagnose()
+                        diagnostic_msg.level = diagnostic_msg.ERROR
+                        diagnostic_msg.message = "No update on the trajectory from last %s seconds " + str(time.time() - self.updated_traj_time)
+                        diagnostic_msg.stamp = rospy.Time.now()
+                        self.controller_diagnose_pub.publish(diagnostic_msg)
+                        self.send_ack_msg(0, 0, 0)
+                        rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
+                        rate.sleep()
+                        continue
+                    else:
+                        rospy.logwarn("No update on the trajectory from last %s seconds and mission continue is false ",str(time.time() - self.updated_traj_time))
+                        diagnostic_msg = ControllerDiagnose()
+                        diagnostic_msg.level = diagnostic_msg.WARN
+                        diagnostic_msg.message = "No update on the trajectory and mission continue is false"
+                        diagnostic_msg.stamp = rospy.Time.now()
+                        self.controller_diagnose_pub.publish(diagnostic_msg)
+                        self.send_ack_msg(0, 0, 0)
+                        rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
+                        rate.sleep()
+                        break
+        
             # once after finding the closest index it finds close pose after index
             if self.close_point_index != None: 
                 self.close_point_index = self._traj_manager.find_close_pose_after_index(robot_pose,self.close_point_index,
@@ -236,7 +248,7 @@ class PurePursuitController:
                
             else: 
                 # initially when trajectory cb is received 
-                close_plt_found , close_point_ind = self._traj_manager.find_closest_idx_with_dist_ang_thr(
+                close_plt_found , close_point_ind = self._traj_manager.find_first_closest_idx_with_dist_ang_thr(
                         robot_pose,self.max_look_ahead_dis,self.angle_Thr)
                 
                 # close point check 
@@ -272,7 +284,8 @@ class PurePursuitController:
                     diagnostic_msg.level = diagnostic_msg.OK
                     diagnostic_msg.message = 'Mission count  ' + str(self.count_mission_repeat)
                     self.controller_diagnose_pub.publish(diagnostic_msg)
-            
+                
+                    self.mission_continue = rospy.get_param("/mission_continue", False)
                     if self.mission_continue:
                         if self.mission_trips == 0:
                             diagnostic_msg = ControllerDiagnose()
@@ -320,10 +333,10 @@ class PurePursuitController:
                     else: 
                         rospy.logwarn(f"mission continue :{self.mission_continue}, mission_count:{self.count_mission_repeat}")
                         diagnostic_msg = ControllerDiagnose()
-                        diagnostic_msg.level = diagnostic_msg.WARN
-                        diagnostic_msg.message = "mission repeats of :" + str(self.mission_trips) + " are completed"
+                        diagnostic_msg.level = diagnostic_msg.ERROR
+                        diagnostic_msg.message = "Mission Completed"
                         self.controller_diagnose_pub.publish(diagnostic_msg)
-                        self.send_ack_msg(0, 0, 0)
+                        self.send_ack_msg(0, 0, 1)
                         rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
                         rate.sleep()
                         break 
@@ -350,17 +363,11 @@ class PurePursuitController:
             #Publishing close and target poses.   
             close_pose_msg.pose  = self._traj_manager.get_traj_point(self.close_point_index).pose
             target_pose_msg.pose = self._traj_manager.get_traj_point(target_point_ind).pose
+            turn_pose_msg.pose = self._traj_manager.get_traj_point(turn_ind).pose
+            self.turn_pose_pub.publish(turn_pose_msg)
             self.close_pose_pub.publish(close_pose_msg)
             self.target_pose_pub.publish(target_pose_msg)
             close_dis = distance_btw_poses(robot_pose, close_pose_msg.pose)
-            
-            # turn_index
-            if 0 <= turn_ind < len(self.trajectory_data.points): 
-                turn_pose_msg.pose = self.trajectory_data.points[turn_ind].pose 
-                self.turn_pose_pub.publish(turn_pose_msg) 
-            else:
-                turn_pose_msg.pose = self.trajectory_data.points[-1].pose 
-                self.turn_pose_pub.publish(turn_pose_msg) 
             
             # robot_position = (3, 3)
             robot_position = (robot_pose.position.x,robot_pose.position.y) 
@@ -430,7 +437,7 @@ class PurePursuitController:
                 result = "Left"
             else:
                 result = "on path"
-            self.cte = close_dis
+            self.cte = calc_cte(close_pose_msg.pose, robot_position)
             rospy.logdebug(f'Robot is {result} of the path.')
             
             dot_vector = self.find_dot_product(robot_pose, target_pose_msg)
@@ -521,7 +528,7 @@ class PurePursuitController:
             diagnostic_msg.message = log_tracking_message # "Tracking path"
             diagnostic_msg.stamp = rospy.Time.now()
             diagnostic_msg.look_ahead = lhd
-            diagnostic_msg.cte = close_dis
+            diagnostic_msg.cte = self.cte
             diagnostic_msg.longitudinal_velocity_mps = speed
             diagnostic_msg.steering_angle = steering_angle
             diagnostic_msg.lateral_velocity_dps = steering_angle - prev_steering_angle / time.time() - prev_time
@@ -536,7 +543,9 @@ class PurePursuitController:
                 k3 = FloatKeyValue("path_completed_percentage", round(path_percent, 3))
             else: 
                 k3 = FloatKeyValue("Path_completed_percentage",0) 
-            diagnostic_msg.values.extend([k1, k2, k3])
+            k4 = FloatKeyValue("Old CTE", close_dis)
+            
+            diagnostic_msg.values.extend([k1, k2, k3, k4])
             self.controller_diagnose_pub.publish(diagnostic_msg) 
             prev_steering_angle = steering_angle
             prev_time = time.time() 
@@ -711,4 +720,3 @@ if __name__ == "__main__":
     rospy.init_node('Pure_pursuit_controller_node')
     pure_pursuit = PurePursuitController()
     rospy.spin()
-
