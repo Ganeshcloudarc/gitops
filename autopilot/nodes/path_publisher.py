@@ -85,6 +85,7 @@ class GlobalGpsPathPub:
         self.avg_lhd = (self.min_look_ahead + self.max_look_ahead) / 2
         self.rear_axle_center_height_from_ground = vehicle_data.dimensions.tyre_radius
         self.mission_file_dir = mission_file_dir 
+        self.turn_interpolate = None
         self.error_occured =False
 
         # publishers
@@ -450,12 +451,28 @@ class GlobalGpsPathPub:
             self.publisher_diagnostics() 
             return
     
-        last_index = 0
-        for i in range(len(data['coordinates'])):
-            # Odom based path
+        last_index = 0 
+
+        # using rdp find the list of x,y turn coordinates 
+        turn_xy_list =[]
+        for i in range(len(data['coordinates'])): 
+            pose_position = data['odometry'][i]['pose']['pose']['position']
+            pose_orientation = data['odometry'][i]['pose']['pose']['orientation']
+            pose = Pose() 
+            pose.position.x, pose.position.y, pose.position.z = pose_position['x'],pose_position['y'], self.rear_axle_center_height_from_ground 
+            pose.orientation = Quaternion(pose_orientation['x'],pose_orientation['y'],pose_orientation['z'],pose_orientation['w'])
+            turn_xy_list.append([pose.position.x,pose.position.y])
+        
+        rdp_thr = np.pi*0.02
+        curve_points=[] 
+        curve_points = rdp_calculate(turn_xy_list,rdp_thr) 
+       
+
+        for i in range(len(data['coordinates'])): 
+            # Odom based path 
             lon, lat = data['coordinates'][i][0], data['coordinates'][i][1]
             odom_position = data['odometry'][i]['pose']['pose']['position']
-            # print("odom position",odom_position)
+            # print("odom position",odom_position) 
             odom_orientation = data['odometry'][i]['pose']['pose']['orientation']
             
             odom_pose = Pose()
@@ -465,56 +482,62 @@ class GlobalGpsPathPub:
                                             odom_orientation['w'])
             if i == 0:
                 prev_pose = odom_pose
-             
-            dis = distance_btw_poses(odom_pose, prev_pose)
 
+            dis_btw_2_pose = distance_btw_poses(odom_pose, prev_pose)  
+          
             # linear interpolating the highest path_resolution with parameter   
-            if dis >= self.max_dis_btw_points:  
+            if dis_btw_2_pose >= self.max_dis_btw_points:   
+                
+                # check whether the points are found at curve points 
+                if not([odom_pose.position.x,odom_pose.position.y] in curve_points or [prev_pose.position.x,prev_pose.position.y] in curve_points): 
 
-                # if rtk_Status and interplote param is true internal interpolation would occur  
-                if((rtk_status and self.interpolate_with_rtk)or(not rtk_status and self.interpolate_without_rtk)): 
+                    # if rtk_Status and interplote param is true internal interpolation would occur  
+                    if((rtk_status and self.interpolate_with_rtk)or(not rtk_status and self.interpolate_without_rtk)): 
+                        
+                        rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
+                        internal_path_res = distance_btw_poses(odom_pose,prev_pose)
+                        # rospy.loginfo_once("internal path resolution %s", str(internal_path_res))
+                        rospy.logwarn_once("Interpolating the internal path resolution is %s meters", str(internal_path_res))
+                        n_points = internal_path_res // self.path_resolution
+                        angle = angle_btw_poses(odom_pose,prev_pose)
+                        prev_pose_ = prev_pose
+                        for j in range(0, int(n_points)-1):
+                            # odom path
+                            px = trajectory_msg.points[-1].pose.position.x
+                            py = trajectory_msg.points[-1].pose.position.y
+                            px_updated = px + self.path_resolution * math.cos(angle)
+                            py_updated = py + self.path_resolution * math.sin(angle)
+                            odom_pose_ = Pose()
+                            odom_pose_.position.x, odom_pose_.position.y, odom_pose_.position.z = px_updated, py_updated, \
+                                                                                                self.rear_axle_center_height_from_ground
+                            odom_pose_.orientation = yaw_to_quaternion(angle)
+                            # Trajectory 
+                            lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long) 
+
+                            dis_btw_2_pose = distance_btw_poses(odom_pose_, prev_pose_)
+                            accumulated_distance = accumulated_distance + dis_btw_2_pose
+                            prev_pose_ = odom_pose_
+
+                            # Trajectory msg filling
+                            traj_pt_msg = TrajectoryPoint()
+                            traj_pt_msg.pose = odom_pose_
+                            traj_pt_msg.gps_pose.position.latitude = lat
+                            traj_pt_msg.gps_pose.position.longitude = lon
+                            # traj_pt_msg.longitudinal_velocity_mps =
+                            traj_pt_msg.index = last_index
+                            last_index = last_index + 1
+                            traj_pt_msg.accumulated_distance_m = accumulated_distance
+                            trajectory_msg.points.append(traj_pt_msg)
+                                                    
+                    else:
+                        rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
+                else: 
+                    rospy.logerr_once(f"Points missing at turnings, Distance between points: {dis_btw_2_pose}, cannot interpolate")  
+                    self.turn_distance = dis_btw_2_pose
+                    self.turn_interpolate = True
                    
-                    rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
-                    internal_path_res = distance_btw_poses(odom_pose,prev_pose)
-                    rospy.logwarn_once("Interpolating the internal path resolution is %s meters", str(internal_path_res))
-                    n_points = internal_path_res // self.path_resolution
-                    angle = angle_btw_poses(odom_pose,prev_pose)
-                    prev_pose_ = prev_pose
-                   
-                    for j in range(0, int(n_points)):
-                        # odom path
-                        px = trajectory_msg.points[-1].pose.position.x
-                        py = trajectory_msg.points[-1].pose.position.y
-                        px_updated = px + self.path_resolution * math.cos(angle)
-                        py_updated = py + self.path_resolution * math.sin(angle)
-                        odom_pose_ = Pose()
-                        odom_pose_.position.x, odom_pose_.position.y, odom_pose_.position.z = px_updated, py_updated, \
-                                                                                            self.rear_axle_center_height_from_ground
-                        odom_pose_.orientation = yaw_to_quaternion(angle)
-                        # Trajectory 
-                        lat, lng = xy2ll(px_updated, py_updated, home_lat, home_long) 
-
-                        dis = distance_btw_poses(odom_pose_, prev_pose_)
-                        accumulated_distance = accumulated_distance + dis
-                        prev_pose_ = odom_pose_
-
-                        # Trajectory msg filling
-                        traj_pt_msg = TrajectoryPoint()
-                        traj_pt_msg.pose = odom_pose_
-                        traj_pt_msg.gps_pose.position.latitude = lat
-                        traj_pt_msg.gps_pose.position.longitude = lon
-                        # traj_pt_msg.longitudinal_velocity_mps =
-                        traj_pt_msg.index = last_index
-                        last_index = last_index + 1
-                        traj_pt_msg.accumulated_distance_m = accumulated_distance
-                        trajectory_msg.points.append(traj_pt_msg) 
-                                                  
-                else:
-                    rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
-                pass  
-
             
-            accumulated_distance = accumulated_distance + dis        
+            accumulated_distance = accumulated_distance + dis_btw_2_pose        
             prev_pose = odom_pose 
             # Trajectory msg filling
             traj_pt_msg = TrajectoryPoint() 
@@ -611,6 +634,7 @@ class GlobalGpsPathPub:
             
                 
             else:
+                rospy.logwarn(f"distance_btw_end_pts: {round(distance_btw_2end_pts)}/{self.mission_continue_dist_thr}-Dist_Th | orientation_btw_end_pts: {round(dot_product_first_nd_last_point)}-{direction_btw_2end_pts} | ends_connected-dot_pro {round(dot_pro)}, interpolation failed") 
                 self.error_occured = True
                 rospy.set_param("/mission_continue", False)  
                 if last_pt_ahead_start_pt:  
@@ -776,11 +800,12 @@ class GlobalGpsPathPub:
         self.gps_path_pub.publish(path) 
         self.global_trajectory_pub.publish(trajectory_msg) 
         rospy.loginfo("global_trajectory_published") 
-        rospy.loginfo('Details of ' + str(i) + " are published from file " + str(mission_file))  
-        if self.error_occured == False:
+        if self.turn_interpolate == True: 
+            self.diagnostics_status.summary(ERROR,f"Points missing at turnings, Distance between turn_points: {self.turn_distance}, cautious to interpolate {rospy.get_name()}")  
+        elif self.error_occured == False:  
             self.diagnostics_status.summary(OK,f"Happily published  {rospy.get_name()}") 
-            self.diagnostics_status.add("Length ",len(data['coordinates']))  
-            self.publisher_diagnostics() 
+        self.diagnostics_status.add("Length ",len(data['coordinates']))  
+        self.publisher_diagnostics() 
 
       
     def target_index(self, robot_pose, close_point_ind): 
