@@ -83,7 +83,7 @@ class ObstacleStopPlanner:
 
     def __init__(self):
        
-        self.publisher = rospy.Publisher("/obstacle_stop_planner_diagnostics", DiagnosticArray, queue_size=1,latch= True) 
+        self.osp_publisher = rospy.Publisher("/obstacle_stop_planner_diagnostics", DiagnosticArray, queue_size=1,latch= True) 
         self.diagnostics_publisher = DiagnosticStatusWrapper() 
         self.diagnostics_publisher.name = rospy.get_name()
         self.diagnostics_publisher.hardware_id = 'zekrom_v1'
@@ -100,7 +100,8 @@ class ObstacleStopPlanner:
         # self.index_old = None
 
         self.laser_data_in_time = None
-        self.zed_data_in_time = None
+        self.zed_data_in_time = None 
+        self.obstacle_found_from_ZED  = None 
         self.scan_data_received = None
         self.bboxes = None
         self.pc_np = None
@@ -133,10 +134,10 @@ class ObstacleStopPlanner:
         self._min_look_ahead_dis = rospy.get_param("/pure_pursuit/min_look_ahead_dis", 3)
         self._max_look_ahead_dis = rospy.get_param("/pure_pursuit/max_look_ahead_dis", 6)
         self._TIME_OUT_FROM_LASER = 2  # in secs
-        self._TIME_OUT_FROM_ODOM = 2
-        self._TIME_OUT_FROM_ZED = 2
-        self.vehicle_stop_init_time_for_obs = None
-        self.stop_threshold_time_for_obs = rospy.get_param("/obstacle_stop_planner/stop_threshold_time_for_obs", 5)
+        self._TIME_OUT_FROM_ODOM = 2                                                            
+        self._TIME_OUT_FROM_ZED = 2  
+        self.vehicle_stop_init_time_for_obs = None  
+        self.stop_threshold_time_for_obs = rospy.get_param("/obstacle_stop_planner/stop_threshold_time_for_obs", 5) 
         # TODO consider vehicle diagonal to check for collision detection radius
         # distance within below value to laser point would make collision.
         self._radius_to_search = vehicle_data.dimensions.overall_width / 2 + radial_off_set_to_vehicle_width
@@ -194,7 +195,7 @@ class ObstacleStopPlanner:
         diagnostics = DiagnosticArray() 
         diagnostics.status.append(diagnostics_publisher) 
         diagnostics.header.stamp = rospy.Time.now() 
-        self.publisher.publish(diagnostics)
+        self.osp_publisher.publish(diagnostics)
         
     def do_initial_sensor_check(self):
 
@@ -363,13 +364,15 @@ class ObstacleStopPlanner:
             
             # bypass_mode
             prev_processed_ind = self._close_idx
-            obstacle_found = False
+            obstacle_found_zed = False 
+            obstacle_found_v1 = False 
+            obstacle_found_v2 = False 
             trajectory_msg = Trajectory()
             trajectory_msg.header.frame_id = "map"
             trajectory_msg.home_position = self._traj_in.home_position
 
             self.by_pass_dist = rospy.get_param("/obstacle_stop_planner/by_pass_dist", 0)
-            rospy.logwarn(f"self.by_pass_dist: {self.by_pass_dist}")
+            rospy.logwarn_throttle(1,f"self.by_pass_dist: {self.by_pass_dist}")
             # bypass mode is true
             if self.by_pass_dist != 0: 
                 
@@ -443,7 +446,8 @@ class ObstacleStopPlanner:
             1. Ganerate few circles along the foot print of the vehicle.
             2. check for collisions using all the sensor inputs
             """
-            # print("self._traj_in.points", self._traj_in.points[self._close_idx].longitudinal_velocity_mps)
+            # print("self._traj_in.points", self._traj_in.points[self._close_idx].longitudinal_velocity_mps) 
+
             if self.robot_level_collision_check_enable:
                 # debug
                 obs_found = False
@@ -463,7 +467,7 @@ class ObstacleStopPlanner:
                             rospy.logwarn_throttle(1, f'Obstacle found on Laser scan (V1)')
                             collision_points_arr = points
                             self.publish_points(collision_points_arr)
-                            break
+                            break 
 
                 if self.use_pcl_boxes:
                     rospy.logdebug_once("RUNNING OBS V2")
@@ -473,10 +477,10 @@ class ObstacleStopPlanner:
                                 close_bbx_id, close_dis = self.find_close_object(self.bboxes,
                                                                                  [center[0],
                                                                                   center[1]])
-                                # self.publish_bbox(self.bboxes.boxes[close_bbx_id])
+                                # self.publish_bbox(self.bboxes.boxes[close_bbx_id]) 
                                 if close_dis < radius_to_search_near_robot:
                                     rospy.logwarn_throttle(1, f'Obstacle found on BBoxes')
-                                    self.bbox_pub.publish(self.bboxes.boxes[close_bbx_id])
+                                    self.bbox_pub.publish(self.bboxes.boxes[close_bbx_id]) 
                                     obs_found = True
                                     break
                                 else:
@@ -486,14 +490,17 @@ class ObstacleStopPlanner:
                 if self.use_zed_detections:
                     rospy.logdebug_once("RUNNING ZED")
                     for center in circles_array:
-                        close_obj_from_zed = self.find_close_object_zed(self.zed_objects, center)
-                        # rospy.logerr(f'------------ZED OBS DIST -----------------{close_obj_from_zed}')
+                        # check to neglect the nan position detected via zed camera
+                        close_obj_zed_idx, close_obj_from_zed = self.find_close_object_zed(self.zed_objects, center)
+                        # rospy.logerr(f'------------ZED OBS DIST -----------------{close_obj_from_zed}') 
                         if close_obj_from_zed < radius_to_search_near_robot:
-                            rospy.logwarn_throttle(1, 'Obstacle found on Camera')
+                            rospy.logwarn_throttle(1, 'Obstacle found on Camera')  
+                            self.obstacle_found_from_ZED = self.zed_objects.objects[close_obj_zed_idx].label
                             obs_found = True
-                            break
+                            break 
+
                         else:
-                            pass
+                            pass 
 
                 if obs_found:
                     if self._close_idx + 100 < self._traj_end_index:
@@ -509,14 +516,17 @@ class ObstacleStopPlanner:
                     self.local_traj_publisher.publish(trajectory_msg)
                     self.publish_velocity_marker(trajectory_msg)
                     rospy.logwarn("Obstacle found near Vehicle, Stopping the vehicle")
-                    rospy.loginfo("Collision points are published")
+                    rospy.loginfo("Collision points are published") 
                     self.diagnostics_publisher.summary(ERROR,"ROBOT LEVEL COLLISION CHECK") 
-                    self.diagnostics_publisher.add(f"OBSTACLE FOUND WITHIN {self.length_offset} m",self.length_offset) 
+                    self.diagnostics_publisher.add(f"OBSTACLE FOUND WITHIN {self.length_offset} m",self.length_offset)   
+                    if self.use_zed_detections and self.obstacle_found_from_ZED:
+                        self.diagnostics_publisher.add("ZED Collision Object",self.obstacle_found_from_ZED) 
                     self.publish(self.diagnostics_publisher)
                     rate.sleep() 
                     continue
                 else: 
                     rospy.loginfo("No Obstacle found near Vehicle")
+            
             for ind in range(self._close_idx, self._traj_end_index):
                 path_acc_distance = self._traj_in.points[ind].accumulated_distance_m - \
                                     self._traj_in.points[self._close_idx].accumulated_distance_m
@@ -530,41 +540,52 @@ class ObstacleStopPlanner:
                         self._traj_in.points[prev_processed_ind].accumulated_distance_m > self._radius_to_search / 2:
 
                     path_pose = self._traj_in.points[ind].pose
-                    if self.use_zed_detections:
+                    if self.use_zed_detections: 
                         rospy.logdebug_once("RUNNING ZED") 
                         
                         if self.zed_objects is not None:
-                            close_obj_from_zed = self.find_close_object_zed(self.zed_objects, [path_pose.position.x,
-                                                                                               path_pose.position.y])
+                            # to neglect the obstacle found with posiiion nan
+                            close_obj_zed_idx, close_obj_from_zed = self.find_close_object_zed(self.zed_objects, [path_pose.position.x,
+                                                                                            path_pose.position.y])                                 
                             # rospy.logerr(f'------------ZED OBS DIST -----------------{close_obj_from_zed}')
                             try:
-
                                 if close_obj_from_zed < self._radius_to_search:
                                     rospy.logerr_throttle(10,
-                                                          f'------------Obstacle found on Camera -----------------{close_obj_from_zed}')
-                                    obstacle_found = True
+                                                        f'------------Obstacle found on Camera -----------------{close_obj_from_zed}')  
+                                    obstacle_found_zed = True 
+                                    self.diagnostics_publisher.add("Zed_detection",self.use_zed_detections)
+                                    self.diagnostics_publisher.add("ZED-obstacle_width_distance_from_path",close_obj_from_zed) 
+                                    self.diagnostics_publisher.add("Object_found_ZED",self.zed_objects.objects[close_obj_zed_idx].label)
                                     break
                                 else:
                                     pass
                             except TypeError as t:
                                 rospy.logerr_throttle(10, "empty data from zed") 
                         else:
-                            rospy.logerr_throttle(2, "empty data from zed")
+                            rospy.logerr_throttle(2, "empty data from zed") 
                           
                     if self.use_obs_v1:
+    
                         rospy.logdebug_once("RUNNING OBS V1")
                         
                         pose_xy = np.array([[path_pose.position.x, path_pose.position.y]])  # , path_pose.position.z]])
                         try:
                             collision_points = kd_tree.query_radius(pose_xy, r=self._radius_to_search)
-                            prev_processed_ind = ind 
+                            prev_processed_ind = ind  
                             
                         except Exception as error:
-                            rospy.logwarn(f"could not query KD tree,{error}")
-                           
+                            rospy.logwarn(f"could not query KD tree,{error}") 
+
                         if len(list(collision_points[0])) > 0:
-                            obstacle_found = True
-                            break
+                            obstacle_found_v1 = True   
+                            collision_point_index = list(collision_points[0])[0]
+                            if 0 <= collision_point_index < len(self.laser_np_3d):
+                                collision_points_x_y = self.laser_np_3d[collision_point_index][0], self.laser_np_3d[collision_point_index][1]
+                                self.diagnostics_publisher.add("V1_detection",self.use_obs_v1)
+                                self.diagnostics_publisher.add("V1-obstacle_width_distance_from_path",math.dist(pose_xy[0],collision_points_x_y))
+                                break  
+
+                        
                     if self.use_pcl_boxes:
                         rospy.logdebug_once("RUNNING OBS V2")
                         if len(self.bboxes.boxes) > 0:
@@ -572,12 +593,13 @@ class ObstacleStopPlanner:
                             try:
                                 close_bbx_id, close_dis = self.find_close_object(self.bboxes,
                                                                                  [path_pose.position.x,
-                                                                                  path_pose.position.y])
-                                # self.publish_bbox(self.bboxes.boxes[close_bbx_id])
-                                
+                                                                                  path_pose.position.y]) 
+                                # self.publish_bbox(self.bboxes.boxes[close_bbx_id]) 
                                 if close_dis < self._radius_to_search:
-                                    obstacle_found = True
-                                    self.bbox_pub.publish(self.bboxes.boxes[close_bbx_id])
+                                    obstacle_found_v2 = True 
+                                    self.bbox_pub.publish(self.bboxes.boxes[close_bbx_id]) 
+                                    self.diagnostics_publisher.add("V2_detection",self.use_pcl_boxes)
+                                    self.diagnostics_publisher.add("V2-obstacle_width_distance_from_path",close_dis)
                                     break
                                 else:
                                     pass 
@@ -587,15 +609,17 @@ class ObstacleStopPlanner:
             collision_index = ind
             collision_points = list(collision_points[0])
             # print("collision index",collision_index)
-            print("self.index_old after loop", self._close_idx)
-            if obstacle_found:
+            print("self.index_old after loop", self._close_idx) 
+                    
+            obstacle_found = [obstacle_found_zed, obstacle_found_v1, obstacle_found_v2]
+            if any(obstacle_found): 
                 
                 dis_to_obstacle = abs(self._traj_in.points[collision_index].accumulated_distance_m -
                                       self._traj_in.points[self._close_idx].accumulated_distance_m)
                 # print(dis_to_obstacle)
                 dis_from_front_to_obs = abs(self._traj_in.points[collision_index].accumulated_distance_m -
                                             self._traj_in.points[front_tip_idx].accumulated_distance_m)
-                rospy.logwarn(f"obstacle found at {dis_to_obstacle} meters ") 
+                rospy.logwarn(f"obstacle found at {dis_to_obstacle} < hard stop {self._stop_line_buffer + self._base_to_front}")
                 
                 # if obstacle distance is less than _stop_line_buffer -> hard stop 
                 if dis_to_obstacle < self._stop_line_buffer + self._base_to_front: 
@@ -603,9 +627,10 @@ class ObstacleStopPlanner:
                     # TODO apply break directly to pilot
                     horn = 1 # to publish the obstacle found details to collision.py for horn via autopilot auxillary command 
                     rospy.logwarn("obstacle is very close, applying hard breaking")
-                    self.diagnostics_publisher.summary(ERROR,"OBSTACLE IS VERY CLOSE ")
-                    self.diagnostics_publisher.add("APPLYING BREAK ",True) 
-                    self.diagnostics_publisher.add("OBSTALCE FOUND AT ",dis_to_obstacle)
+                    self.diagnostics_publisher.summary(ERROR,"OBSTACLE FOUND")  
+                    self.diagnostics_publisher.add("Applying Brake",any(obstacle_found)) 
+                    self.diagnostics_publisher.add("Obstacle Found At",dis_to_obstacle)                      
+                    self.diagnostics_publisher.add("Radius search distance Threshold",self._radius_to_search)
                     self.publish(self.diagnostics_publisher)
                     self.vehicle_stop_init_time_for_obs = time.time()
                     for i in range(self._close_idx, collision_index + 1):
@@ -644,7 +669,7 @@ class ObstacleStopPlanner:
                             # traj_out.points.append(traj_point)
                             trajectory_msg.points.append(traj_point) 
                         # stp to slow - speed is gradual slow
-                        for i in range(stop_index, slow_stop_index,-1): 
+                        for i in range(stop_index+1, slow_stop_index,-1): 
                             tmp_dist = abs(self._traj_in.points[stop_index].accumulated_distance_m -
                                             self._traj_in.points[i].accumulated_distance_m)
                             updt_spd = np.interp(tmp_dist,[0,self.slow_line_buffer],[self.robot_min_speed_th,self.robot_max_speed_th]) 
@@ -652,7 +677,7 @@ class ObstacleStopPlanner:
                             traj_point.longitudinal_velocity_mps = min(updt_spd, self._traj_in.points[i].longitudinal_velocity_mps )
                             trajectory_msg.points.append(traj_point)
                         
-                            rospy.logwarn(" found an obstacle, vehicle will slow down ")
+                            rospy.logwarn_throttle(1,"found an obstacle, vehicle will slow down ")
                         # slow to clo - speed is max spd
                         for i in range(slow_stop_index, self._close_idx,-1): 
                             traj_point = copy.deepcopy(self._traj_in.points[i])   
@@ -734,55 +759,62 @@ class ObstacleStopPlanner:
         self.robot_head_pose.position.x = data.pose.pose.position.x + self._base_to_front * np.cos(pose_heading)
         self.robot_head_pose.position.y = data.pose.pose.position.y + self._base_to_front * np.sin(pose_heading)
         self.robot_head_pose.position.z = data.pose.pose.position.z
-        self.robot_head_pose.orientation = data.pose.pose.orientation
+        self.robot_head_pose.orientation = data.pose.pose.orientation 
+    
+    def remove_zed_obs_nan_position(self,data):   
+        updated_zed_data = ObjectsStamped() 
+        updated_zed_data.header = data.header
+        if data is not None:
+            if len(data.objects)!=0:
+                for val in data.objects:  
+                    if any(not math.isnan(x) for x in val.position):
+                        updated_zed_data.objects.append(val)
+            return updated_zed_data 
+        else: 
+            return None
 
     def zed_objects_callback(self, data):
         start = time.time()
         # self.zed_data_in_time = time.time()
-        data_in_map_frame = None
+        data_in_map_frame = None 
+        data = self.remove_zed_obs_nan_position(data)
         if data.header.frame_id == "map":
             data_in_map_frame = data
         else: 
             data_in_map_frame = transform_zed_objects(data, "map")
-            
+   
         # transform_zed_objects() fn returns None on TF Error
         if data_in_map_frame is not None:
             self.zed_data_in_time = time.time() # start time only when no tf error
             self.transformed_zed_objects_publisher.publish(data_in_map_frame)
-            self.zed_objects = data_in_map_frame
+            self.zed_objects = data_in_map_frame  
         rospy.logdebug(f"time taken for zed objects callback: {time.time() - start} ")
+
 
     def find_close_object_zed(self, objects, point):
         zed_obs_dis_data = []
-        zed_obs_dis_data_min = None
         '''
         the axes are defined according to the ROS standard: X Forward, Y LEFT, Z UP, so the distance of an object from the camera is on the X axis.
         The position of the object is the centroid of the positions off all the 3D points that compose the object itself.
         In case of partial object detection the centroid is calculated according to the visible data, if the tracking is active and the partial object matches an previously seen object, the centroid position is "smoothed".
         '''
         for object in objects.objects:
-            dis = math.hypot(point[0] - object.position[0], point[1] - object.position[1])
+            dis_list = []
+            dis = math.hypot(point[0] - object.position[0], point[1] - object.position[1]) 
+            dis_list.append(dis)
             '''
             if center point(xyz) distance is less than threshold directly pass the distance
             else check for corners too for redundancy of Obs.
             '''
-            if dis < self._radius_to_search:
-                zed_obs_dis_data.append(dis)
-            else:
-                for corners in object.bounding_box_3d.corners:
-                    dis = math.hypot(point[0] - corners.kp[0], point[1] - corners.kp[1])
-                    zed_obs_dis_data.append(dis)
-        try:
-            if len(zed_obs_dis_data) > 0:
-                zed_obs_dis_data_min = np.argmin(zed_obs_dis_data)
-        except Exception as e:
-            rospy.logerr(f'Exception from find_close_obj_zed {e}')
-
-        self.objects_number = len(objects.objects)
-        if zed_obs_dis_data_min is not None:
-            return zed_obs_dis_data[zed_obs_dis_data_min]
+            for corners in object.bounding_box_3d.corners:
+                dis = math.hypot(point[0] - corners.kp[0], point[1] - corners.kp[1]) 
+                dis_list.append(dis)     
+            zed_obs_dis_data.append(min(dis_list))
+        if len(zed_obs_dis_data) > 0:
+            min_dis_index = np.argmin(zed_obs_dis_data)
+            return min_dis_index, zed_obs_dis_data[min_dis_index]
         else:
-            return float('inf')
+            return -1, float('inf')
 
     def scan_callback(self, data):
         start = time.time()

@@ -435,7 +435,7 @@ class GlobalGpsPathPub:
         trajectory_msg.header.stamp = rospy.Time.now()
         trajectory_msg.home_position.position = home_position
 
-        # Filling the Trajectory_msg 
+        # Filling the Trajectory_msg  
         closest_opp_coord_index = 0
         accumulated_distance = 0
         prev_pose = Pose()             
