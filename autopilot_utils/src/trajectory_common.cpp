@@ -1,12 +1,23 @@
 #include "autopilot_utils/trajectory_common.h"
 
-namespace autopilot_utils {
+namespace autopilot_utils{
 
 TrajectoryHelper::TrajectoryHelper() {}
 
 int TrajectoryHelper::getLength() { return traj.points.size(); }
+
 autopilot_msgs::TrajectoryPoint
 TrajectoryHelper::get_trajectory_point_by_index(int index) {
+  /**
+   * Returns the trajectory point at the given index.
+   * Parameters:
+   *     ind (int): The index of the trajectory point.
+   * Returns:
+   *     traj_point (autopilot_msgs/TrajectoryPoint): The trajectory point at
+   * the given index. Raises: std::out_of_range: If the index is invalid or out
+   * of bounds.
+   */
+
   if (index >= 0 && index < traj.points.size())
     return traj.points[index];
   else {
@@ -48,68 +59,70 @@ double TrajectoryHelper::getCircumRadius(int ind, int index_lim = 10) {
   }
 }
 
-void TrajectoryHelper::setTrajectory(
-    const autopilot_msgs::Trajectory &trajectory) {
+void TrajectoryHelper::setTrajectory(const autopilot_msgs::Trajectory &trajectory) {
   traj = trajectory;
 }
 
-//  std::tuple<bool, int>
-//  TrajectoryHelper::find_closest_idx_with_dist_ang_thr(geometry_msgs::Pose
-//  robot_pose, double distance_th, double angle_th)
-// {
-//     double dist_min = 1000000000;
-//     int idx_min = -1;
-//     double robot_yaw = tf::getYaw(robot_pose.orientation);
-
-//     for(int i = 0; i < traj.points.size(); i++)
-//     {
-//         double dis = sqrt(pow(robot_pose.position.x -
-//         traj.points[i].pose.position.x, 2) +
-//                         pow(robot_pose.position.y -
-//                         traj.points[i].pose.position.y,2));
-
-//         double  curr_yaw = tf::getYaw( traj.points[i].pose.orientation);
-//         if (dis <distance_th  and abs(normalizeAngle(curr_yaw) -
-//         normalizeAngle(robot_yaw)) < angle_th)
-//         {
-//             return std::make_tuple(true, i);
-//         }
-
-//     }
-//     return std::make_tuple(false, -1);
-
-// }
-
 std::pair<bool, int32_t> TrajectoryHelper::find_closest_idx_with_dist_ang_thr(
-    const geometry_msgs::Pose &robot_pose, double distance_th,
-    double angle_th) {
+    const geometry_msgs::Pose& robot_pose, double distance_th, double angle_th) {
+  // Initialize variables to store the minimum squared distance and the
+  // corresponding index
   double dist_squared_min = std::numeric_limits<double>::max();
   int32_t idx_min = -1;
+
+  // Calculate the squared distance threshold
   double square_dist = distance_th * distance_th;
+
+  // Iterate through each point in the trajectory
   for (int32_t i = 0; i < static_cast<int32_t>(traj.points.size()); ++i) {
+    // Calculate the squared distance between the robot pose and the current
+    // trajectory point
     const double ds =
         calcDistSquared2D(traj.points.at(i).pose.position, robot_pose.position);
+
+    // Check if the squared distance exceeds the distance threshold
     if (ds > square_dist)
-      continue;
+      continue; // Skip this point and move to the next one
+
+    // Calculate the yaw angles of the robot pose and the trajectory point
     double yaw_pose = tf::getYaw(robot_pose.orientation);
     double yaw_ps = tf::getYaw(traj.points.at(i).pose.orientation);
-    double yaw_diff = normalizeAngle(yaw_pose - yaw_ps);
-    if (std::fabs(yaw_diff) > angle_th)
-      continue;
 
+    // Calculate the difference in yaw angles, normalizing the result
+    double yaw_diff = normalizeAngle(yaw_pose - yaw_ps);
+
+    // Check if the absolute value of the yaw difference exceeds the angle
+    // threshold
+    if (std::fabs(yaw_diff) > angle_th)
+      continue; // Skip this point and move to the next one
+
+    // Update the minimum squared distance and corresponding index if the
+    // current point is closer
     if (ds < dist_squared_min) {
       dist_squared_min = ds;
       idx_min = i;
     }
   }
+
+  // Return a pair indicating whether a valid index was found and the index
+  // itself
   return (idx_min >= 0) ? std::make_pair(true, idx_min)
                         : std::make_pair(false, idx_min);
 }
 
-int TrajectoryHelper::find_close_pose_after_index(
-    const geometry_msgs::Pose &curr_pose, int prev_idx,
-    double search_distance) {
-  double dist_min = 1000000000;
+int TrajectoryHelper::find_close_pose_after_index(const geometry_msgs::Pose& curr_pose,
+                                                  int prev_idx,
+                                                  double search_distance) {
+  /**
+   * Returns the closest index from the previous index.
+   * Parameters:
+   *     curr_pose (geometry_msgs/Pose): The current pose.
+   *     prev_idx (int): The index to start the search from.
+   *     search_distance (double): The distance to search from the previous
+   * index. Returns: close_index (int): The index of the closest pose to the
+   * current pose from the previous index.
+   */
+  double dist_min = std::numeric_limits<double>::max();
   int idx_min = prev_idx;
   if (prev_idx >= traj.points.size()) {
     return traj.points.size() - 1;
@@ -118,6 +131,7 @@ int TrajectoryHelper::find_close_pose_after_index(
     if (abs(traj.points[prev_idx].accumulated_distance_m -
             traj.points[i].accumulated_distance_m) > search_distance)
       break;
+
     double dist =
         sqrt(pow(curr_pose.position.x - traj.points[i].pose.position.x, 2) +
              pow(curr_pose.position.y - traj.points[i].pose.position.y, 2));
@@ -130,21 +144,58 @@ int TrajectoryHelper::find_close_pose_after_index(
 }
 
 int TrajectoryHelper::next_point_within_dist(int idx, double dist_thr) {
-  if (traj.points.size() > 0 and idx < traj.points.size()) {
-    double close_dis = traj.points[idx].accumulated_distance_m;
-    if (abs(traj.points[idx].accumulated_distance_m -
-            traj.points.back().accumulated_distance_m) <= dist_thr)
-      return traj.points.size() - 1;
-    else {
-      for (int i = idx + 1; i < traj.points.size(); i++) {
-        double path_acc_distance =
-            abs(traj.points[i].accumulated_distance_m - close_dis);
-        if (path_acc_distance > dist_thr)
-          return i;
+  /**
+   * Finds the next index which is dist_thr far from the given index.
+   * Parameters:
+   *     idx (int): The index to start the search from.
+   *     dist_thr (double): The distance threshold.
+   * Returns:
+   *     next_idx (int): The index of the next point that is dist_thr far from
+   * the given index. Raises: std::out_of_range: If the index is invalid or out
+   * of bounds.
+   */
+  // Check if trajectory has points and if the provided index is within bounds
+  if (traj.points.size() > 0 && idx < traj.points.size()) {
+      // Get the accumulated distance of the closest point to the target distance
+      double close_dis = traj.points[idx].accumulated_distance_m;
+      
+      // Check if the difference between the accumulated distance of the closest point
+      // and the accumulated distance of the last point is within the threshold
+      if (std::abs(traj.points[idx].accumulated_distance_m -
+              traj.points.back().accumulated_distance_m) <= dist_thr)
+        // Return the index of the last point if within threshold
+        return traj.points.size() - 1;
+      else {
+        // Iterate through the trajectory points starting from the next point after the provided index
+        for (int i = idx + 1; i < traj.points.size(); i++) {
+          // Calculate the difference between the accumulated distance of the current point and the closest point
+          double path_acc_distance =
+              std::abs(traj.points[i].accumulated_distance_m - close_dis);
+          // If the difference is greater than the threshold, return the index of the current point
+          if (path_acc_distance > dist_thr)
+            return i;
+        }
       }
-    }
-  } else
-    return -1;
+    }else
+      // If trajectory has no points or provided index is out of bounds, return -1
+      return -1;
 }
 
-} // namespace autopilot_utils
+nav_msgs::Path TrajectoryHelper::to_path() {
+  /**
+   * Returns the path of the trajectory.
+   * Returns:
+   *     path_msg (nav_msgs/Path): The path of the trajectory.
+   */
+  nav_msgs::Path path_msg;
+  path_msg.header.frame_id = traj.header.frame_id;
+  for (int i = 0; i < traj_len; i++) {
+    geometry_msgs::PoseStamped pose_stamped;
+    pose_stamped.header.frame_id = traj.header.frame_id;
+    pose_stamped.pose = traj.points[i].pose;
+    path_msg.poses.push_back(pose_stamped);
+  }
+  return path_msg;
+}
+
+} // End of namespace autopilot_utils

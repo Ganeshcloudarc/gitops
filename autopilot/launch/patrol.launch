@@ -6,7 +6,7 @@
     <arg name="mission_file" default="default.json"/>
     <arg name="mission_continue" default="true"/>
     <arg name="mission_trips" default="0" doc="when mission_continue is true, this many number of times a mission repeat works, 0-infinity loops "/>
-    <arg name ='rviz' default = 'true'/>
+    <arg name ='rviz' default = 'false'/>
     <arg name="record" default="false"/>
     <arg name="record_minimal" default ="true"/>
     <arg name="failsafe_enable_cpp" default="true"/>
@@ -21,7 +21,7 @@
     <arg name="enable_zed_obs" default="true"/>
     <arg name="enable_zed_based_v1" default="false"/> <!-- Note: Only effects if enable_zed_obs is true. Lidar Based V1 won't work if zed based v1 is True-->
     <arg name="enable_obs_v1" default="true"/>
-    <arg name="use_pcl_boxes" default="false"/>
+    <arg name="use_pcl_boxes" default="false"/> <!-- @deprecated This parameter will always be false and will be removed in future versions. -->
 
     <!-- Don't enable any two of the sensors at once for now. Enable only one at a time RSLidar/LSLidar along with Itops. -->
     <arg name="enable_rslidar" default="false"/>

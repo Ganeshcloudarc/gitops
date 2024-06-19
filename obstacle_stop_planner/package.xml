@@ -50,11 +50,28 @@
   <!--   <doc_depend>doxygen</doc_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>roscpp</build_depend>
-  <build_depend>rospy</build_depend>
+    <build_depend>zed_interfaces</build_depend>
+    <build_depend>rospy</build_depend>
+    <build_depend>autopilot_msgs</build_depend>
+    <build_depend>autopilot_utils</build_depend>
+    <build_depend>vehicle_common</build_depend>
+
+
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
+  <build_export_depend>zed_interfaces</build_export_depend>
+  <build_export_depend>vehicle_common</build_export_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
+  <exec_depend>vehicle_common</exec_depend>
+  <exec_depend>autopilot_msgs</exec_depend>
+  <exec_depend>autopilot_utils</exec_depend>
+  <exec_depend>vehicle_common</exec_depend>
+  .
+  <exec_depend>zed_interfaces</exec_depend>
+
+
+
   <depend>ira_laser_tools</depend>
 
 

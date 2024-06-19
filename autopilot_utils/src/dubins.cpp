@@ -25,6 +25,7 @@
 #define _USE_MATH_DEFINES // for C++
 #include <assert.h>
 #include <math.h>
+#include <math.h>
 
 #define EPSILON (10e-10)
 

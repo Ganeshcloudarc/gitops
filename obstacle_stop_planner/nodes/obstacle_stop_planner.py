@@ -1009,7 +1009,7 @@ class ObstacleStopPlanner:
         print("marker published")
 
 if __name__ == "__main__":
-    rospy.init_node('obstacle_stop_planner_node')
+    rospy.init_node('obstacle_stop_planner')
     set_rospy_log_lvl(rospy.DEBUG)
     obj = ObstacleStopPlanner()
     rospy.spin()

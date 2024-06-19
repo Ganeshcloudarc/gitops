@@ -1,7 +1,8 @@
 <launch>
     <arg name="mission_continue" default="false"/>
     <arg name="sensor_source" default="1" doc="0: zed_camera, 1: rslidar, 2: rplidar "/>
-    <arg name="use_pcl_boxes" default="true"/>
+    <arg name="use_pcl_boxes" default="false"/>
+    <arg name="obs_cpp" default="true"/>
     
     <!-- SENSORS -->
     <arg name="enable_zed_obs" default="true"/>
@@ -18,7 +19,9 @@
             If you don't want that use the below line.
             <arg name="cloud_in" value="/obstacle_detector/object_cloud"/> -->
     <!-- <arg name="pointcloud_to_laserscan_cloud_in" default="/obstacle_detector/cloud_clusters"/> -->
-    <arg name="pointcloud_to_laserscan_cloud_in" default="/obstacle_detector/object_cloud"/>
+
+    <!-- <arg name="pointcloud_to_laserscan_cloud_in" default="/rslidar_points"/> -->
+    <arg name="pointcloud_to_laserscan_cloud_in" default="/lslidar_point_cloud"/>
     <arg name="cloud_to_scan_config" default="cloud_to_laser_180_params.yaml"/>
     <arg name="cloud_to_scan_config_360" default="cloud_to_laser_360_params.yaml"/>
     <arg name="lidar_obstacle_detector_config" default="rs_lidar_config.yaml"/>
@@ -146,10 +149,14 @@
     
     <param name="/obstacle_stop_planner/use_zed_object_detection" value="$(arg enable_zed_obs)"/>
 
+    <group if="$(eval arg('obs_cpp'))"> 
+        <node pkg="obstacle_stop_planner" type="obstacle_stop_planner_node" name="obstacle_stop_planner_node" output="screen"/>
+    </group> 
 
-    <node pkg="obstacle_stop_planner" type="obstacle_stop_planner.py" name="obstacle_stop_planner_node" output="screen" />
-
-
+    <group unless="$(eval arg('obs_cpp'))">
+        <node pkg="obstacle_stop_planner" type="obstacle_stop_planner.py" name="obstacle_stop_planner_node" output="screen" />
+    </group>
+   
 </launch>
 
 <!-- if="$(eval arg('arg_name') == 'desired_value')"/> -->
