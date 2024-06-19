@@ -346,8 +346,10 @@ class PurePursuitController:
                 # path_percent for the local_gps_trajectory 
                 path_percent = self.path_percentage
 
-                # when robot reached end of local trajectory and lhd is less than min lhd dist     
-                if distance_btw_poses(robot_pose,  self._traj_manager.get_traj_point(self._traj_manager.get_len()-1).pose) < self.min_look_ahead_dis + self.lhd_offset_thr:
+                # when robot reached end of local trajectory and lhd is less than min lhd dist    
+                if distance_btw_poses(robot_pose,  self._traj_manager.get_traj_point(self._traj_manager.get_len()-1).pose) < self.min_look_ahead_dis + self.lhd_offset_thr \
+                    and self._traj_manager.get_traj_point(self._traj_manager.get_len()-1).accumulated_distance_m - self._traj_manager.get_traj_point(self.close_point_index).accumulated_distance_m < self.min_look_ahead_dis: 
+
                     rospy.loginfo("Lhd is less than min_look_ahead distance, reached end of local_traj")
                     diagnostic_msg = ControllerDiagnose() 
                     diagnostic_msg.level = diagnostic_msg.ERROR
