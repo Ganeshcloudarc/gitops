@@ -60,9 +60,15 @@
     </group>
 
     <node name="save_path_bag_record" pkg="rosbag" type="record"
-        args="record -o $(env HOME)/.bags/boson_save_path -a -x /zed2i/(?!(.*)info)(.*)(left|right|rgb|depth|stereo|confidence|point|disparity|temperature)(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud|/itops_f25/(.*)|/cloud_concatenated|/mapper_node/(.*)" if="$(eval record)"/>
+        args="record -o $(env HOME)/.bags/boson_save_path -a -x /zed2i/(?!(.*)info|odom)(.*)(left|right|rgb|depth|stereo|confidence|point|disparity|temperature)(.*)|/carla/(.*)|/obstacle_detector/(.*)|/rslidar_points|/lslidar_point_cloud|/itops_f25/(.*)|/cloud_concatenated|/mapper_node/(.*)" if="$(eval record)"/>
     
-    <include file="$(find autopilot)/launch/minimal_bag_recorder.launch" if="$(eval record_minimal)"/>
+    <!-- <include file="$(find autopilot)/launch/minimal_bag_recorder.launch" if="$(eval record_minimal)"/> -->
+
+    <group if="$(eval arg('record_minimal'))">
+        <include file="$(find autopilot)/launch/minimal_bag_recorder.launch">
+            <arg name="mission_file" default="save_path_$(arg mission_file)"/>
+        </include>
+    </group>
 
     <group if ="$(eval arg('enable_mapping'))">
          <include file="$(find kissicp_planner)/launch/mapper.launch"> 
