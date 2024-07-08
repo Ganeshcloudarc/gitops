@@ -123,6 +123,7 @@ class ObstacleStopPlanner:
         self.velocity_speed_profile_enable = rospy.get_param("obstacle_stop_planner/velocity_speed_profile_enable",True)
         # ros parameters for Obstacle stop planner
         # TODO accept form patrol application if available else take from patrol params.
+        self.debug = rospy.get_param("/patrol/debug",False)
         radial_off_set_to_vehicle_width = rospy.get_param("obstacle_stop_planner/radial_off_set_to_vehicle_width", 0.5)
         self._trajectory_resolution = rospy.get_param("obstacle_stop_planner/trajectory_resolution", 0.5)
         self._lookup_collision_distance = rospy.get_param("obstacle_stop_planner/lookup_collision_distance", 20)
@@ -202,7 +203,7 @@ class ObstacleStopPlanner:
         is_lidar_sensor_healthy = False
         is_zed_sensor_healthy = False
         is_global_path_ok = False 
-        sensor_msg = "waiting for"
+        sensor_msg = "No data from"
         if self._traj_manager.get_len() > 0 and self.robot_pose:
             rospy.loginfo("global path and robot_pose are received") 
             is_global_path_ok = True
@@ -217,13 +218,19 @@ class ObstacleStopPlanner:
                         else: 
                             rospy.logwarn("waiting for bounding boxes")
                             is_lidar_sensor_healthy = False
-                            sensor_msg+=" lidar data"
+                            if self.debug: 
+                                sensor_msg+=" LIDAR data" 
+                            else:
+                                sensor_msg+=" lidar"
                     else:
                         is_lidar_sensor_healthy = True
                 else:
                     rospy.logwarn( f"waiting for data  scan :{self.scan_data_received}") 
-                    is_lidar_sensor_healthy = False
-                    sensor_msg+=" lidar data"
+                    is_lidar_sensor_healthy = False 
+                    if self.debug: 
+                        sensor_msg+=" LIDAR data" 
+                    else:
+                        sensor_msg+=" lidar"
             else:
                 is_lidar_sensor_healthy = True
             if self.use_zed_detections:
@@ -233,14 +240,20 @@ class ObstacleStopPlanner:
                 else:
                     rospy.logwarn("Waiting for zed data")
                     is_zed_sensor_healthy = False 
-                    sensor_msg+=" zed data"
+                    if self.debug:
+                        sensor_msg+=" ZED data" 
+                    else:
+                        sensor_msg+=" camera"
             else:
                 is_zed_sensor_healthy = True
         else:
             rospy.logwarn(
                 f" waiting for global traj: {self._traj_manager.get_len() > 0}, odom: {self.robot_pose}")
-            is_global_path_ok = False
-            sensor_msg+=" global trajectory"
+            is_global_path_ok = False 
+            if self.debug: 
+                sensor_msg+=" global trajectory" 
+            else:
+                sensor_msg+=" Path"
         sensor_status = is_lidar_sensor_healthy and is_zed_sensor_healthy and is_global_path_ok
         return sensor_status,sensor_msg 
 
@@ -277,7 +290,11 @@ class ObstacleStopPlanner:
 
             if loop_start_time - self.odom_data_in_time > self._TIME_OUT_FROM_ODOM: 
                 rospy.logwarn("No update on odom (robot position)")
-                self.diagnostics_publisher.summary(ERROR,"No update on odom (robot position)") 
+                if self.debug: 
+                    self.diagnostics_publisher.summary(ERROR,"No update on odom (robot position)") 
+                else:
+                    self.diagnostics_publisher.summary(ERROR,"No update on gps")  
+                self.diagnostics_publisher.add("message","No update on odom (robot position)")
                 self.diagnostics_publisher.add("Last Odom time",loop_start_time - self.odom_data_in_time) 
                 self.publish(self.diagnostics_publisher)
                 rate.sleep()  
@@ -285,15 +302,21 @@ class ObstacleStopPlanner:
             if self.use_obs_v1 or self.use_pcl_boxes:
                 if loop_start_time - self.laser_data_in_time > self._TIME_OUT_FROM_LASER: 
                     rospy.logwarn(f"No update on laser data from last {loop_start_time - self.laser_data_in_time}")
-                    self.diagnostics_publisher.summary(ERROR,"No update on laser data") 
+                    if self.debug: 
+                        self.diagnostics_publisher.summary(ERROR,"No update on laser data")
+                    else:
+                        self.diagnostics_publisher.summary(ERROR,"No update on lidar") 
                     self.diagnostics_publisher.add("Last laser time",loop_start_time - self.laser_data_in_time)  
                     self.publish(self.diagnostics_publisher) 
                     rate.sleep()  
                     continue
             if self.use_zed_detections:
                 if (loop_start_time - self.zed_data_in_time > self._TIME_OUT_FROM_ZED):
-                    rospy.logwarn(f"No update on ZED data from last {loop_start_time - self.zed_data_in_time}")
-                    self.diagnostics_publisher.summary(ERROR,"No update on ZED data") 
+                    rospy.logwarn(f"No update on ZED data from last {loop_start_time - self.zed_data_in_time}") 
+                    if self.debug: 
+                        self.diagnostics_publisher.summary(ERROR,"No update on ZED data") 
+                    else:
+                        self.diagnostics_publisher.summary(ERROR,"No update on camera") 
                     self.diagnostics_publisher.add("Last ZED time",loop_start_time - self.zed_data_in_time)  
                     self.publish(self.diagnostics_publisher)
                     rate.sleep()
@@ -517,7 +540,11 @@ class ObstacleStopPlanner:
                     self.publish_velocity_marker(trajectory_msg)
                     rospy.logwarn("Obstacle found near Vehicle, Stopping the vehicle")
                     rospy.loginfo("Collision points are published") 
-                    self.diagnostics_publisher.summary(ERROR,"ROBOT LEVEL COLLISION CHECK") 
+                    if self.debug:
+                        self.diagnostics_publisher.summary(ERROR,"ROBOT LEVEL COLLISION CHECK") 
+                    else: 
+                        self.diagnostics_publisher.summary(ERROR,"OBSTACLE FOUND") 
+                    self.diagnostics_publisher.add("message","ROBOT LEVEL COLLISION CHECK")
                     self.diagnostics_publisher.add(f"OBSTACLE FOUND WITHIN {self.length_offset} m",self.length_offset)   
                     if self.use_zed_detections and self.obstacle_found_from_ZED:
                         self.diagnostics_publisher.add("ZED Collision Object",self.obstacle_found_from_ZED) 
@@ -627,7 +654,11 @@ class ObstacleStopPlanner:
                     # TODO apply break directly to pilot
                     horn = 1 # to publish the obstacle found details to collision.py for horn via autopilot auxillary command 
                     rospy.logwarn("obstacle is very close, applying hard breaking")
-                    self.diagnostics_publisher.summary(ERROR,"OBSTACLE FOUND")  
+                    if self.debug:
+                        self.diagnostics_publisher.summary(ERROR,"OBSTACLE IS VERY CLOSE ")   
+                    else: 
+                        self.diagnostics_publisher.summary(ERROR,"OBSTACLE FOUND")
+                    self.diagnostics_publisher.add("message","OBSTACLE IS VERY CLOSE - hard brake")
                     self.diagnostics_publisher.add("Applying Brake",any(obstacle_found)) 
                     self.diagnostics_publisher.add("Obstacle Found At",dis_to_obstacle)                      
                     self.diagnostics_publisher.add("Radius search distance Threshold",self._radius_to_search)
@@ -723,7 +754,11 @@ class ObstacleStopPlanner:
                     else:
                         rospy.logwarn(
                             f'Obs Time limit not crossed. Remaining time: {self.stop_threshold_time_for_obs - (time.time() - self.vehicle_stop_init_time_for_obs)}')
-                        self.diagnostics_publisher.summary(ERROR,"OBSTACLE WAIT TIME")
+                        if self.debug:
+                            self.diagnostics_publisher.summary(ERROR,"OBSTACLE WAIT TIME") 
+                        else:
+                            self.diagnostics_publisher.summary(ERROR,"OBSTACLE FOUND") 
+                        self.diagnostics_publisher.add("message","OBSTACLE WAIT TIME")
                         self.diagnostics_publisher.add("VEHICLE WILL MOVE IN ",(self.stop_threshold_time_for_obs - (time.time() - self.vehicle_stop_init_time_for_obs)))
                         self.publish(self.diagnostics_publisher)
                         for i in range(self._close_idx, collision_index):

@@ -86,6 +86,7 @@ class PurePursuitController:
         self.rqt = rospy.get_param("/pure_pursuit/enable_rqt")
 
         self.is_pp_pid = rospy.get_param("/patrol/pp_with_pid",False)
+        self.debug = rospy.get_param("/patrol/debug",False)
         # ros parameters
         self.enable_auxillary_commands = rospy.get_param("/patrol/enable_auxillary_commands",True)
         self.enable_turning_horn = rospy.get_param("/patrol/enable_turning_horn",True)
@@ -183,12 +184,14 @@ class PurePursuitController:
              
             robot_pose = self.robot_state.pose.pose
             if time.time() - self.updated_odom_time > 1: 
-                rospy.logerr("Time out from Odometry, no update from last %s seconds",
-                                str(time.time() - self.updated_odom_time))
+                rospy.logerr(f"Time out from Odometry, no update from last {str(time.time() - self.updated_odom_time)} seconds")
                 diagnostic_msg = ControllerDiagnose()
-                diagnostic_msg.level = diagnostic_msg.ERROR
-                diagnostic_msg.message = "Time out from Odometry, no update from last %s seconds" + \
-                                            str(time.time() - self.updated_odom_time)
+                if self.debug: 
+                    diagnostic_msg.level = diagnostic_msg.ERROR
+                    diagnostic_msg.message = f"Time out from Odometry, no update from last {str(time.time() - self.updated_odom_time)} seconds" 
+                else:
+                    diagnostic_msg.level = diagnostic_msg.WARN
+                    diagnostic_msg.message = f"Time out from Odometry, no update from last {str(time.time() - self.updated_odom_time)} seconds"
                 diagnostic_msg.stamp = rospy.Time.now()
                 self.controller_diagnose_pub.publish(diagnostic_msg)
                 self.send_ack_msg(0, 0, 0)
@@ -196,7 +199,7 @@ class PurePursuitController:
                 rate.sleep()
                 continue  
             
-            # using updated 
+            # using trajectory_updated 
             if self.trajectory_updated: 
                    self._traj_manager.update(self.trajectory_data) 
                    self.close_point_index = None 
@@ -206,8 +209,11 @@ class PurePursuitController:
             if self._traj_manager.get_len() == 0 :
                 rospy.logerr("Received empty trajectory, Breaking the vehicle") 
                 diagnostic_msg = ControllerDiagnose()
-                diagnostic_msg.level = diagnostic_msg.ERROR
-                diagnostic_msg.message = "Received empty trajectory, Breaking the vehicle"
+                diagnostic_msg.level = diagnostic_msg.ERROR 
+                if self.debug: 
+                    diagnostic_msg.message = "Received empty trajectory, Breaking the vehicle" 
+                else:
+                    diagnostic_msg.message = "No update on path" 
                 diagnostic_msg.stamp = rospy.Time.now()
                 self.controller_diagnose_pub.publish(diagnostic_msg)
                 self.send_ack_msg(0, 0, 1)
@@ -219,10 +225,13 @@ class PurePursuitController:
                 self.mission_continue = rospy.get_param("/mission_continue") 
                 if(time.time()- self.updated_traj_time ) > self.trajectory_time_out:  
                     if self.mission_continue:
-                        rospy.logwarn("No update on the trajectory from last %s seconds ",str(time.time() - self.updated_traj_time))
+                        rospy.logwarn(f"No update on the trajectory from last {str(time.time() - self.updated_traj_time)} seconds ")
                         diagnostic_msg = ControllerDiagnose()
-                        diagnostic_msg.level = diagnostic_msg.ERROR
-                        diagnostic_msg.message = "No update on the trajectory from last %s seconds " + str(time.time() - self.updated_traj_time)
+                        diagnostic_msg.level = diagnostic_msg.ERROR 
+                        if self.debug: 
+                            diagnostic_msg.message =f"No update on the trajectory from last {str(time.time() - self.updated_traj_time)} seconds "
+                        else:
+                            diagnostic_msg.message = "No update on path"
                         diagnostic_msg.stamp = rospy.Time.now()
                         self.controller_diagnose_pub.publish(diagnostic_msg)
                         self.send_ack_msg(0, 0, 0)
@@ -230,10 +239,13 @@ class PurePursuitController:
                         rate.sleep()
                         continue
                     else:
-                        rospy.logwarn("No update on the trajectory from last %s seconds and mission continue is false ",str(time.time() - self.updated_traj_time))
+                        rospy.logwarn(f"No update on the trajectory from last {str(time.time() - self.updated_traj_time)} seconds and mission continue is false ")
                         diagnostic_msg = ControllerDiagnose()
-                        diagnostic_msg.level = diagnostic_msg.WARN
-                        diagnostic_msg.message = "No update on the trajectory and mission continue is false"
+                        diagnostic_msg.level = diagnostic_msg.WARN 
+                        if self.debug:
+                            diagnostic_msg.message = f"No update on the trajectory  from last {str(time.time() - self.updated_traj_time)} and mission continue is {self.mission_continue}" 
+                        else:
+                            diagnostic_msg.message = "No update on the path"
                         diagnostic_msg.stamp = rospy.Time.now()
                         self.controller_diagnose_pub.publish(diagnostic_msg)
                         self.send_ack_msg(0, 0, 0)
@@ -279,10 +291,10 @@ class PurePursuitController:
                 if target_point_ind >= self._traj_manager.get_len() -1:
                     self.count_mission_repeat += 1
                     diagnostic_msg = ControllerDiagnose()
-                    rospy.loginfo(' Mission count %s ', self.count_mission_repeat)
+                    rospy.loginfo(f'Mission count {self.count_mission_repeat}')
                     self.mission_count_pub.publish(self.count_mission_repeat)
                     diagnostic_msg.level = diagnostic_msg.OK
-                    diagnostic_msg.message = 'Mission count  ' + str(self.count_mission_repeat)
+                    diagnostic_msg.message = f'Mission count {self.count_mission_repeat}'
                     self.controller_diagnose_pub.publish(diagnostic_msg)
                 
                     self.mission_continue = rospy.get_param("/mission_continue", False)
@@ -290,20 +302,17 @@ class PurePursuitController:
                         if self.mission_trips == 0:
                             diagnostic_msg = ControllerDiagnose()
                             diagnostic_msg.level = diagnostic_msg.WARN
-                            diagnostic_msg.message = 'Mission completed and restarting the plan ' + str(
-                                self.count_mission_repeat) + " waiting for : " + str(self.wait_time_at_ends) + " secs"
+                            diagnostic_msg.message = f'Mission completed and restarting the plan {str(self.count_mission_repeat)} waiting for: {(self.wait_time_at_ends)}secs'
                             self.controller_diagnose_pub.publish(diagnostic_msg)
-                        
                             self.send_ack_msg(0, 0, 0)
                             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
-                            rospy.logwarn('Mission completed and restarting the plan' + str(
-                                self.count_mission_repeat))
-                            rospy.loginfo("waiting for %s", str(self.wait_time_at_ends))
+                            rospy.logwarn(f'Mission completed and restarting the plan {str(self.count_mission_repeat)}')
+                            rospy.loginfo(f"waiting for {str(self.wait_time_at_ends)}")
                             time.sleep(self.wait_time_at_ends)
                             self.close_point_index = 1
                             rate.sleep()
                             continue
-                        elif self.count_mission_repeat <= self.mission_trips:
+                        elif self.count_mission_repeat < self.mission_trips:
                             diagnostic_msg = ControllerDiagnose()
                             diagnostic_msg.level = diagnostic_msg.WARN
                             diagnostic_msg.message = 'completed mission ' + str(
@@ -312,15 +321,14 @@ class PurePursuitController:
                             self.controller_diagnose_pub.publish(diagnostic_msg)
                             self.send_ack_msg(0, 0, 0)
                             rospy.loginfo("steering angle: %s, speed: %s, break: %s", str(0), str(0), str(0))
-                            rospy.logwarn('completed mission  %s and target is %s', self.count_mission_repeat,
-                                        self.mission_trips)
-                            rospy.loginfo("waiting for %s", str(self.wait_time_at_ends))
+                            rospy.logwarn(f'completed mission {self.count_mission_repeat} and target is {self.mission_trips}')
+                            rospy.loginfo(f"waiting for {str(self.wait_time_at_ends)}")
                             time.sleep(self.wait_time_at_ends)
                             self.close_point_index = 1
                             rate.sleep()
                             continue
                         else:
-                            rospy.logwarn("mission repeats of :" + str(self.mission_trips) + " are completed")
+                            rospy.logwarn(f"mission repeats of :{str(self.mission_trips)} are completed")
                             diagnostic_msg = ControllerDiagnose()
                             diagnostic_msg.level = diagnostic_msg.WARN
                             diagnostic_msg.message = "mission repeats of :" + str(self.mission_trips) + " are completed"
@@ -331,7 +339,7 @@ class PurePursuitController:
                             break   
                         
                     else: 
-                        rospy.logwarn(f"mission continue :{self.mission_continue}, mission_count:{self.count_mission_repeat}")
+                        rospy.logwarn(f"mission continue :{self.mission_continue}, mission_count {self.count_mission_repeat}")
                         diagnostic_msg = ControllerDiagnose()
                         diagnostic_msg.level = diagnostic_msg.ERROR
                         diagnostic_msg.message = "Mission Completed"
@@ -352,8 +360,11 @@ class PurePursuitController:
 
                     rospy.loginfo("Lhd is less than min_look_ahead distance, reached end of local_traj")
                     diagnostic_msg = ControllerDiagnose() 
-                    diagnostic_msg.level = diagnostic_msg.ERROR
-                    diagnostic_msg.message = "Lhd is less than min_look_ahead distance, reached end of local_traj"
+                    diagnostic_msg.level = diagnostic_msg.ERROR 
+                    if self.debug:
+                        diagnostic_msg.message = "Lhd is less than min_look_ahead distance, reached end of local_traj" 
+                    else: 
+                        diagnostic_msg.message = "Reached end of the path"
                     diagnostic_msg.stamp = rospy.Time.now()
                     self.controller_diagnose_pub.publish(diagnostic_msg)
                     self.send_ack_msg(0, 0, 0)
@@ -492,7 +503,7 @@ class PurePursuitController:
                 adjusted_speed = self.adjust_speed_based_on_cte(speed, abs(self.cte),self.kp_speed)
             else:
                 adjusted_speed = speed
-            if stop_on_command:
+            if stop_on_command: 
                 speed = 0
                 log_tracking_message = "allow_reversing flag not set. Stopping the Robot"
                 rospy.logerr_throttle(1, "allow_reversing flag not set. Stopping the Robot")

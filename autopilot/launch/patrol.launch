@@ -10,6 +10,8 @@
     <arg name="record" default="false"/>
     <arg name="record_minimal" default ="true"/>
     <arg name="failsafe_enable_cpp" default="true"/>
+    <arg name="debug" default="false"/> <!-- enabling this could publish detailed ERROR diagnostics in hmi  -->
+
     <!-- DO NOT KEEP BOTH obs_stop_planner and enable_centering TO TRUE AT A TIME -->
     <arg name="obs_stop_planner" default="true"/>
     <arg name="enable_centering" default="false"/>
@@ -52,8 +54,9 @@
     <param name="/pure_pursuit/enable_rqt" value="$(arg enable_rqt)" />
 
     <param name="/patrol/allow_reversing" value="$(arg allow_reversing)"/>
-    <param name = "/patrol/mission_file" value = "$(arg mission_file)"/>
-    <param name="/mission_continue" value ="$(arg mission_continue)"/>
+    <param name="/patrol/mission_file" value = "$(arg mission_file)"/>
+    <param name="/mission_continue" value ="$(arg mission_continue)"/> 
+    <param name="/patrol/debug" value ="$(arg debug)"/>
     <param name="/patrol/mission_trips" value ="$(arg mission_trips)"/>
     <rosparam command="load" file="$(find autopilot)/params/patrol_params.yaml"/>
     <rosparam command="load" file="$(find boson_hmi)/params/modified_hmi_param.yaml"/>

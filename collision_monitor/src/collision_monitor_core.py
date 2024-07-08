@@ -108,7 +108,7 @@ class CollisionMonitor:
     def __init__(self):
         self.observation_details = []
         self.load_params()
-
+        self.debug = rospy.get_param("/patrol/debug",False)
         self.pub_poly = rospy.Publisher("collision_monitor_polygon", PolygonStamped, queue_size=1, latch=True)
         self.diagnostics_pub = rospy.Publisher("/collision_monitor_diagnostics", DiagnosticArray, queue_size=1)
         self.pilot_stop_command_pub = rospy.Publisher("/vehicle/break_command", vehicle_stop_command, queue_size=1) 
@@ -178,7 +178,7 @@ class CollisionMonitor:
                 if rospy.Time.now().secs - source.last_update_time() > self.souce_timeout:
                     time_out_status = True
                     rospy.logwarn(f"No update on sensor source : {source.topic_name}")
-                    self.diagnose.summary(ERROR, "Front lidar error")
+                    self.diagnose.summary(ERROR, "No data from front lidar") 
                     self.diagnose.add("Time out from sensor_source", source.topic_name)
                     self.diagnose.add("Timeout" , rospy.Time.now().secs - source.last_update_time())
                 points = source.get_data()
@@ -191,20 +191,24 @@ class CollisionMonitor:
                 collision_points_count += count
                 self.diagnose.add(source.topic_name+":  collision_points_count ", count)
             rospy.loginfo(f"total : collision_points_count : {collision_points_count}")
-            if collision_points_count > self.min_points or time_out_status: 
-
+            if collision_points_count > self.min_points or time_out_status:  
                 # stopping vehicle_stop_command when bypass dist is non zero
                 self.by_pass_dist = rospy.get_param("/obstacle_stop_planner/by_pass_dist", 0) 
                 if self.by_pass_dist != 0: 
                     vehicle_stop_msg.status = False
-                    vehicle_stop_msg.message =  "Bypassing Collision Found" 
-                    self.diagnose.summary(ERROR, "Collision Found near the vehicle, Bypassing") 
+                    vehicle_stop_msg.message =  "Bypassing Collision Found"  
+                    if self.debug: 
+                        self.diagnose.summary(ERROR, "Collision Found near the vehicle, Bypassing")  
+                    else: 
+                        self.diagnose.summary(ERROR, "BYPASSING COLLISION")
                 else: 
                     vehicle_stop_msg.status = True
                     vehicle_stop_msg.message =  "Collision Found near the vehicle"
-                    self.diagnose.summary(ERROR, "Collision Found near the vehicle, Stopping") 
-                
-                
+                    if self.debug:
+                        self.diagnose.summary(ERROR, "Collision Found near the vehicle, Stopping")
+                    else:
+                        self.diagnose.summary(ERROR, "COLLISION FOUND")
+                self.diagnose.add("message","Collision Found near the vehicle")                
                 self.diagnose.add("total collision_points_count", collision_points_count)
                 rospy.logwarn("Collision Found")
             else:

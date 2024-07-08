@@ -68,6 +68,7 @@ class GlobalGpsPathPub:
         self._traj_manager = TrajectoryManager()
         # parameters for path publisher
         # self.path_res = rospy.get_param("path_publisher/path_resolution",0.1)
+        self.debug = rospy.get_param("/patrol/debug",False)
         self.max_forward_speed = rospy.get_param('/patrol/max_forward_speed', 1.5)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
         self.minimum_data_len = rospy.get_param("path_publisher/minimum_json_length",100) 
@@ -197,7 +198,12 @@ class GlobalGpsPathPub:
 
         except Exception as error:
             rospy.logerr('Error In Reading mission file ' + str(error))
-            self.diagnostics_status.summary(ERROR,"Error in Reading Mission file") 
+            if self.debug:
+                self.diagnostics_status.summary(ERROR,"Error in Reading Mission file") 
+            else: 
+                self.diagnostics_status.summary(ERROR,"Invalid mission file")  
+            self.diagnostics_status.add("message","Error in Reading Mission file")
+            self.diagnostics_status.add("error in reading json",self.mission_file_dir)
             self.diagnostics_status.add("Error Occured",str(error)) 
             self.publisher_diagnostics()  
             return
@@ -215,7 +221,11 @@ class GlobalGpsPathPub:
                 self.publish_path_from_long_lat(long_lat_list) 
             else:
                 rospy.logerr("No points available in mission file")
-                self.diagnostics_status.summary(ERROR,"No points available in mission file") 
+                if self.debug: 
+                    self.diagnostics_status.summary(ERROR,"No points available in mission file")
+                else:
+                    self.diagnostics_status.summary(ERROR,"Invalid mission file") 
+                self.diagnostics_status.add("message","No points available in mission file")
                 self.diagnostics_status.add("Coordinates Length ",len(long_lat_list)) 
                 self.publisher_diagnostics()  
                 return
@@ -226,7 +236,11 @@ class GlobalGpsPathPub:
                 rospy.loginfo("type matched to LineString")  
             else: 
                 rospy.logerr(f"geometry does not match, Required LineString, given :{feature['geometry']['type']}") 
-                self.diagnostics_status.summary(ERROR,"Geometry does not match")  
+                if self.debug: 
+                    self.diagnostics_status.summary(ERROR,"Geometry does not match")
+                else:
+                    self.diagnostics_status.summary(ERROR,"Invalid mission file")   
+                self.diagnostics_status.add("message","Geometry does not match")
                 self.diagnostics_status.add("LineString",feature['geometry']['type']) 
                 self.publisher_diagnostics()  
                 return
@@ -235,15 +249,23 @@ class GlobalGpsPathPub:
                 self.publish_path_from_long_lat(long_lat_list) 
             else:
                 rospy.logerr("No points available in mission file")
-                self.diagnostics_status.summary(ERROR,"No points available in mission file") 
-                self.diagnostics_status.add(" Mission_data_Length ",len(long_lat_list))
+                if self.debug:
+                    self.diagnostics_status.summary(ERROR,"No points available in mission file") 
+                else:
+                    self.diagnostics_status.summary(ERROR,"Invalid mission file")  
+                self.diagnostics_status.add("message","No points available in mission file")
+                self.diagnostics_status.add("Mission_data_Length ",len(long_lat_list))
                 self.publisher_diagnostics() 
                 return
         else:
             rospy.logerr("could not found proper fields in mission file")
-            self.diagnostics_status.summary(ERROR,f"could not find proper field {coord_key},{odom_key} in mission file") 
-            self.diagnostics_status.add(" coord status", coord_key in data.keys()) 
-            self.diagnostics_status.add(" odom status",odom_key in data.keys() )
+            if self.debug: 
+                self.diagnostics_status.summary(ERROR,f"could not find proper field {coord_key},{odom_key} in mission file") 
+            else:
+                self.diagnostics_status.summary(ERROR,"Invalid mission file")  
+            self.diagnostics_status.add("message",f"could not find proper field {coord_key},{odom_key} in mission file")
+            self.diagnostics_status.add("coord_key status", coord_key in data.keys()) 
+            self.diagnostics_status.add("odom_key status",odom_key in data.keys() )
             self.publisher_diagnostics()  
             return
 
@@ -254,7 +276,12 @@ class GlobalGpsPathPub:
                 doc = geo_fence.read().encode('utf-8') 
         except Exception as error:
             rospy.logerr('Error In Reading mission file ' + str(error))
-            self.diagnostics_status.summary(ERROR,"Error in reading Mission file") 
+            if self.debug: 
+                self.diagnostics_status.summary(ERROR,"Error in reading Mission file") 
+            else:
+                self.diagnostics_status.summary(ERROR,"Invalid mission file")  
+            self.diagnostics_status.add("message","Error in reading Mission file")
+            self.diagnostics_status.add("error in reading kml",self.mission_file_dir)
             self.diagnostics_status.add("Error Ocurred ",str(error))
             self.publisher_diagnostics() 
             return
@@ -279,14 +306,22 @@ class GlobalGpsPathPub:
 
             else:
                 rospy.logerr("No points available in mission file")
-                self.diagnostics_status.summary(ERROR,f"only {len(long_lat_list)} points available in mission file") 
+                if self.debug:
+                    self.diagnostics_status.summary(ERROR,f"only {len(long_lat_list)} points available in mission file") 
+                else: 
+                    self.diagnostics_status.summary(ERROR,"Invalid mission file") 
+                self.diagnostics_status.add("message",f"only {len(long_lat_list)} points available in mission file")
                 self.diagnostics_status.add("Length ",len(long_lat_list))
                 self.publisher_diagnostics()  
                 return
 
         except Exception as error: 
-            rospy.logerr(f"KML file format is not LineString")
-            self.diagnostics_status.summary(ERROR,"KML not in LineString Format") 
+            rospy.logerr(f"KML file format is not LineString") 
+            if self.debug: 
+                self.diagnostics_status.summary(ERROR,"KML not in LineString Format") 
+            else:
+                self.diagnostics_status.summary(ERROR,"Invalid mission file")  
+            self.diagnostics_status.add("message","KML not in LineString Format")
             self.diagnostics_status.add("Error Ocurred",str(error))
             self.publisher_diagnostics() 
             return
@@ -413,11 +448,14 @@ class GlobalGpsPathPub:
         if gps_key_name in data_keys and odom_key_name in data_keys:
             rospy.loginfo("gps coordinates and Odometry fields are  in  mission file")
         else:
-            rospy.logwarn("No gps coordinates and Odometry fields are  in  mission file")
-            self.diagnostics_status.summary(ERROR,f"No field {odom_key_name} {gps_key_name} {gps_coord_key_name} in mission file") 
+            rospy.logwarn("No gps coordinates and Odometry fields are  in  mission file") 
+            if self.debug:
+                self.diagnostics_status.summary(ERROR,f"No field {odom_key_name} {gps_key_name} in mission file") 
+            else: 
+                self.diagnostics_status.summary(ERROR,"Invalid mission file") 
+            self.diagnostics_status.add("message",f"No field {odom_key_name} {gps_key_name} in mission file")
             self.diagnostics_status.add("odometry field ",gps_key_name in data_keys) 
             self.diagnostics_status.add("coordinates field ",odom_key_name in data_keys) 
-            self.diagnostics_status.add("gps coordinates fiels",gps_coord_key_name in data_keys )
             self.publisher_diagnostics() 
             return 
 
@@ -446,7 +484,11 @@ class GlobalGpsPathPub:
 
         if data_len < self.minimum_data_len: 
             rospy.logerr(f"less than minimum_waypoints {data_len}")
-            self.diagnostics_status.summary(ERROR,f"CAUTION - {data_len} Number of Waypoints") 
+            if self.debug:
+                self.diagnostics_status.summary(ERROR,f"CAUTION - {data_len} Number of Waypoints") 
+            else: 
+                self.diagnostics_status.summary(ERROR,"Invalid mission file") 
+            self.diagnostics_status.add("message",f"CAUTION - {data_len} Number of Waypoints") 
             self.diagnostics_status.add("LEN-WAYPOINTS",data_len)
             self.publisher_diagnostics() 
             return
@@ -535,7 +577,6 @@ class GlobalGpsPathPub:
                     rospy.logerr_once(f"Points missing at turnings, Distance between points: {dis_btw_2_pose}, cannot interpolate")  
                     self.turn_distance = dis_btw_2_pose
                     self.turn_interpolate = True
-                   
             
             accumulated_distance = accumulated_distance + dis_btw_2_pose        
             prev_pose = odom_pose 

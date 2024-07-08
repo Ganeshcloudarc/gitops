@@ -260,7 +260,7 @@ class PurePursuitController:
                 diagnostic_msg.message = 'Mission count  ' + str(self.count_mission_repeat)
                 self.controller_diagnose_pub.publish(diagnostic_msg)
                 
-                self.mission_continue = rospy.get_param("/patrol/mission_continue", False)
+                self.mission_continue = rospy.get_param("/mission_continue", False)
                 if self.mission_continue:
                     if self.mission_trips == 0:
                         diagnostic_msg = ControllerDiagnose()
@@ -278,7 +278,7 @@ class PurePursuitController:
                         self.index_old = 1
                         rate.sleep()
                         continue
-                    elif self.count_mission_repeat <= self.mission_trips:
+                    elif self.count_mission_repeat < self.mission_trips:
                         diagnostic_msg = ControllerDiagnose()
                         diagnostic_msg.level = diagnostic_msg.WARN
                         diagnostic_msg.message = 'completed mission ' + str(
