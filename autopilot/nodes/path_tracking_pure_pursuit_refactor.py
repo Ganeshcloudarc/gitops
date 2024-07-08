@@ -725,7 +725,7 @@ class PurePursuitController:
         
         if speed == 0 or abs(cte) < self.allowable_cte_for_adjustable_speed:
             return speed
-        adjusted_speed = speed - kp_speed * cte
+        adjusted_speed = speed - kp_speed * cte * math.exp(-cte)
         
         return abs(adjusted_speed)
 
