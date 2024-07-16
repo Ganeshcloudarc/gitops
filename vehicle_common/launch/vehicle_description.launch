@@ -4,6 +4,10 @@
     <arg name="odom_pub" default="true"/>
     <arg name="gps_pub" default="true"/>
     <arg name="anello_gps" default="false"/>
+    <arg name="enable_standalone_gps" default="false"/>
+    
+    <param name="standalone_gps" value="false"/> 
+
     <arg name="enable_2d_mode" default="true"/>
 
     <param name ="/base_frame" value ="base_link"/>
@@ -22,6 +26,20 @@
       <param name ='/odometry_in' value ="/anello_ins/global_position/local" />
       <param name="/gps_in" value ="/anello_ins/global_position/global"/>
     </group>
+
+    <group if="$(eval enable_standalone_gps)">
+      <!-- Launch UM982 Driver -->
+
+      <include file="$(find gps_driver_um982)/launch/launch_um982.launch"> </include>
+
+      <!-- GPS Transform Node -->
+      <node pkg = "vehicle_common" type = "standalone_gps_transform_node.py" name="standalone_gps_transform_node"  output="screen" />
+      <param name ='/odometry_in' value ="/gps/global_position/local" />
+      <param name="/gps_in" value ="/gps/global_position/global"/>
+      <param name="standalone_gps" value="true"/> 
+    </group>
+    
+
     <param name="enable_2d_mode" value="$(arg enable_2d_mode)"/>
 
     <group if="$(eval vehicle_type == 'half_cabin')">
