@@ -122,6 +122,7 @@ private:
   string scan_topic;
   string odom_topic;
   string bbox_topic;
+  string zed_found_object;
   string _robot_base_frame;
   string local_traj_in_topic;
   string global_traj_topic;
@@ -129,6 +130,7 @@ private:
   string reason_sensor_msg;
   string obs_found_sensor;
   string obstacle_found_sensor_main_logic;
+  string zed_obstacle_found_main_logic;
 
   // Integer Initialization
   int sigma;
@@ -141,12 +143,20 @@ private:
   int collision_index;
   int _traj_end_index;
   int _close_idx = -1;
-  std_msgs::Int32 count_mission_repeat;
-  int _TIME_OUT_FROM_ODOM = 2;
+  int close_obj_zed_idx;
+  int prev_processed_ind;
+  // int _TIME_OUT_FROM_ODOM = 2;
+  int zed_obs_dis_data_min;
   int _TIME_OUT_FROM_ZED = 2;
   int _TIME_OUT_FROM_LASER = 2; // In Seconds
   int time_to_wait_at_ends;
   int stop_threshold_time_for_obs;
+  ros::Time odom_data_in_time;
+  ros::Time odom_loop_start_time;
+  ros::Duration odom_time_difference;
+  std_msgs::Int32 count_mission_repeat;
+  ros::Duration _TIME_OUT_FROM_ODOM =
+      ros::Duration(2.0); // Timeout duration in seconds
 
   // Float Initialization
   float slow_line_buffer;
@@ -167,20 +177,21 @@ private:
   double width_offset;
   double length_offset;
   double _base_to_front;
+  double loop_start_time;
   double zed_data_in_time;
-  double odom_data_in_time;
+  double distance_cal_zed;
   double laser_data_in_time;
-  double close_obj_from_zed;
   double prev_by_pass_dist;
   double path_acc_distance;
   double _radius_to_search;
+  double close_obj_from_zed;
   double radius_to_search_near_robot;
-  double loop_start_time;
   double vehicle_stop_init_time_for_obs = -1;
 
   // Boolean Initialization
   bool use_obs_v1;
   bool to_polygon;
+  bool debug_enable;
   bool use_pcl_boxes;
   bool obstacle_found;
   bool mission_continue;
@@ -213,7 +224,7 @@ private:
 public:
   ObstacleStopPlanner(ros::NodeHandle *nh1)
       : t_cloud(new pcl::PointCloud<pcl::PointXYZ>), tf2_buffer(),
-        tf2_listener(tf2_buffer), odom_data_in_time(ros::Time::now().toSec()) {
+        tf2_listener(tf2_buffer), odom_data_in_time(ros::Time::now()) {
     nh = nh1;
 
     // Parameters
@@ -230,13 +241,12 @@ public:
     // ROS_ERROR("The SCAN TOPIC %s",scan_topic.c_str());
     // ROS_ERROR("The ODOM TOPIC %s",odom_topic.c_str());
     // ROS_ERROR("The GLOBAL TRAJ TOPIC %s",global_traj_topic.c_str());
-    scan_subscriber = nh->subscribe(scan_topic, 1,
-                                    &ObstacleStopPlanner::scan_callback, this);
-    odom_subscriber = nh->subscribe(odom_topic, 1,
-                                    &ObstacleStopPlanner::odom_callback, this);
-    global_traj_subscriber =
-        nh->subscribe(global_traj_topic, 1,
-                      &ObstacleStopPlanner::global_traj_callback, this);
+    scan_subscriber =
+        nh->subscribe(scan_topic, 1, &ObstacleStopPlanner::scan_callback, this);
+    odom_subscriber =
+        nh->subscribe(odom_topic, 1, &ObstacleStopPlanner::odom_callback, this);
+    global_traj_subscriber = nh->subscribe(
+        global_traj_topic, 1, &ObstacleStopPlanner::global_traj_callback, this);
 
     // Publishers
     laser_np_2d_pub =
@@ -293,6 +303,7 @@ public:
   void loadParams() {
 
     ROS_INFO("Parameter Function Called!! ");
+    nh->param("/patrol/debug", debug_enable, false);
     nh->param("/gaussian_velocity_filter/sigma", sigma, 1);
     nh->param("/gaussian_velocity_filter/kernal_size", kernal_size, 11);
     nh->param("patrol/wait_time_on_mission_complete", time_to_wait_at_ends, 2);
@@ -375,15 +386,41 @@ public:
       laser_geo_obj.transformLaserScanToPointCloud("map", *data, laser_np_2d,
                                                    tf2_buffer);
 
+      // Convert sensor_msgs::PointCloud2 to pcl::PointCloud
+      pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+      pcl::fromROSMsg(laser_np_2d, pcl_cloud);
+
+      // Check if the point cloud is empty
+      if (pcl_cloud.empty()) {
+        ROS_WARN("PointCloud is empty. Adding default points.");
+
+        // Create a new pcl::PointCloud and add the desired points
+        pcl::PointCloud<pcl::PointXYZ> new_cloud;
+        new_cloud.push_back(pcl::PointXYZ(100, 100, 0));
+        new_cloud.push_back(pcl::PointXYZ(100, 100, 0));
+
+        // Convert the new pcl::PointCloud to sensor_msgs::PointCloud2
+        pcl::toROSMsg(new_cloud, laser_np_2d);
+        laser_np_2d.header.frame_id = "map"; // Set the frame ID appropriately
+        laser_np_2d.header.stamp =
+            ros::Time::now(); // Set the timestamp appropriately
+      }
+      // else {
+      //     // Log the number of points if the point cloud is not empty
+      //     size_t num_points = pcl_cloud.size();
+      //     ROS_INFO("Number of points in laser_np_2d: %zu", num_points);
+      // }
+
     } catch (tf2::TransformException &ex) {
       // Handle exception
-      ROS_ERROR("The error in scan_callback %s", ex.what());
+      ROS_ERROR("The error in scan_callback: %s", ex.what());
     }
+
     scan_data_received = true;
     laser_np_2d_pub.publish(laser_np_2d);
 
     // Print the time taken for the laser scan callback
-    ROS_DEBUG_STREAM("time taken for laser scan callback: "
+    ROS_DEBUG_STREAM("Time taken for laser scan callback: "
                      << (ros::Time::now() - start).toSec());
   }
 
@@ -397,8 +434,8 @@ public:
     // odom_data_in_time = ros::Time::now().toSec();
 
     // Use the timestamp from the odom message
-    odom_data_in_time = data->header.stamp.toSec();
-    ROS_INFO("Updated odom_data_in_time: %f", odom_data_in_time);
+    odom_data_in_time = ros::Time::now(); // data->header.stamp.toSec();
+    ROS_INFO("Updated odom_data_in_time: %f", odom_data_in_time.toSec());
 
     // Calculate pose heading
     double pose_heading = get_yaw((data->pose.pose.orientation));
@@ -412,8 +449,9 @@ public:
     robot_head_pose.orientation = data->pose.pose.orientation;
   }
 
-  double find_close_object_zed(zed_interfaces::ObjectsStamped::ConstPtr objects,
-                               vector<double> point);
+  pair<float, int>
+  find_close_object_zed(zed_interfaces::ObjectsStamped::ConstPtr objects,
+                        std::vector<double> point);
   void pcl_bboxes_callback(jsk_recognition_msgs::BoundingBoxArray data) {
     if (data.header.frame_id.compare("map") == 0) {
       bboxes = data;

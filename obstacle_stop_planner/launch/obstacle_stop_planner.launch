@@ -150,7 +150,7 @@
     <param name="/obstacle_stop_planner/use_zed_object_detection" value="$(arg enable_zed_obs)"/>
 
     <group if="$(eval arg('obs_cpp'))"> 
-        <node pkg="obstacle_stop_planner" type="obstacle_stop_planner_node" name="obstacle_stop_planner_node" output="screen"/>
+        <node pkg="obstacle_stop_planner" type="obstacle_stop_planner_node" name="obstacle_stop_planner_node" output="screen" respawn="true" respawn_delay="5"/>
     </group> 
 
     <group unless="$(eval arg('obs_cpp'))">
