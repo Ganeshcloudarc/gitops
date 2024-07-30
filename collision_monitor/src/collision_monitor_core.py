@@ -217,6 +217,13 @@ class CollisionMonitor:
                 vehicle_stop_msg.message =  "No collision points Found"
                 self.diagnose.add("total collision_points_count", collision_points_count)
                 rospy.loginfo("No collision")
+                
+                # #501 Fix Autobypass when obs stop planner is false. 
+                # Set bypass to false when obs stop planner is not running and if no obstacle
+                # If obs planner is runnig, it will take care of bypass reset. 
+                is_obs_planner = rospy.get_param("/patrol/is_obs_stop_planner",False)
+                if not is_obs_planner:
+                    rospy.set_param("/obstacle_stop_planner/by_pass_dist",0)
 
             self.diagnostics_arr.status = []
             self.diagnostics_arr.status.append(self.diagnose)
