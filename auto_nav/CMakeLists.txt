@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   costmap_2d
   autopilot_msgs
   autopilot_utils
-  
+  zed_interfaces
 )
 
 ## System dependencies are found with CMake's conventions

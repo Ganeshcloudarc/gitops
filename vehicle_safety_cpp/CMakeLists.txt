@@ -11,9 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   
   autopilot_msgs
   message_generation
-
-  # vehicle_stop_command
-  # pilot
+  pilot_msgs
 )
 # add_message_files(
 #   FILES

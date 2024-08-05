@@ -14,9 +14,11 @@ rospy
 std_msgs
 zed_interfaces
 autopilot_msgs
+pilot_msgs
 autopilot_utils
 vehicle_common
 pcl_ros
+laser_geometry
 )
 
 find_package(PCL REQUIRED)
