@@ -29,6 +29,7 @@ patrol:
   min_forward_speed : 0.8
   max_backward_speed : -1.0 # you can give positive/negative value. Both have same effect.
   min_backward_speed : -0.3
+  max_waypoint_speed : 2.5 # This parameter is for the waypoint operation speed feature
   enable_cte_based_speed_control : True
 
 pure_pursuit:

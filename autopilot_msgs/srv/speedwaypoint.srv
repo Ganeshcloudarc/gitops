@@ -1,0 +1,4 @@
+float64 speed_value
+---
+bool status
+string result

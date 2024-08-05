@@ -29,6 +29,8 @@ try :
     import geometry_msgs.msg as gmsg
     from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray, KeyValue
     from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper
+    
+    from autopilot_msgs.srv import speedwaypoint, speedwaypointRequest, speedwaypointResponse
 
 
 
@@ -66,8 +68,8 @@ class GlobalGpsPathPub:
         self.opposite_closest_pt_dis_Thr = rospy.get_param("path_publisher/opposite_closest_pt_dis_Thr",1)
         self.curve_angle = rospy.get_param("path_publisher/rdp_angle",0.09)
         self._traj_manager = TrajectoryManager()
-        # parameters for path publisher
-        # self.path_res = rospy.get_param("path_publisher/path_resolution",0.1)
+        self.trajectory_msg = Trajectory()
+        self.trajectory_msg.header.frame_id = "map"
         self.debug = rospy.get_param("/patrol/debug",False)
         self.max_forward_speed = rospy.get_param('/patrol/max_forward_speed', 1.5)
         self.min_forward_speed = rospy.get_param("/patrol/min_forward_speed", 0.3)
@@ -105,12 +107,80 @@ class GlobalGpsPathPub:
                                            queue_size=1, latch=True)
         self.polygon_xy_filled_pub = rospy.Publisher('/polygon_xy_filled_', PolygonStamped,
                                            queue_size=1, latch=True)
+        
+        rospy.Service('speed_waypoint', speedwaypoint, self.speed_waypoint_func)
 
     def publisher_diagnostics(self): 
         self.diagnostics_array.status = [] 
         self.diagnostics_array.status.append(self.diagnostics_status)
         self.diagnostics_array.header.stamp = rospy.Time.now()
         self.path_pub_diagnostics.publish(self.diagnostics_array)
+        
+    def speed_waypoint_func(self, req):
+        try:
+            # Set the requested speed
+            self.waypoint_speed = req.speed_value
+            rospy.loginfo("The requested speed by the user %f", self.waypoint_speed)
+            self.max_forward_speed = self.waypoint_speed
+            
+            traj_length = len(self.trajectory_msg.points)
+
+            # Update the speed for each trajectory point based on the lookahead distance and steering angle
+            for i, traj_point in enumerate(self.trajectory_msg.points):
+                for lhd_index in range(i, traj_length):
+                    path_acc_distance = self.trajectory_msg.points[lhd_index].accumulated_distance_m - \
+                                        traj_point.accumulated_distance_m
+                    if path_acc_distance > self.avg_lhd:
+                        break
+                look_ahead = path_acc_distance
+                slope = angle_btw_poses(self.trajectory_msg.points[lhd_index].pose, traj_point.pose)
+                alpha = slope - get_yaw(traj_point.pose.orientation)
+                delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), look_ahead)
+                delta_degrees = -math.degrees(delta)
+                if abs(delta_degrees) <= self.steering_limits_to_slow_down:
+                    self.trajectory_msg.points[i].longitudinal_velocity_mps = self.max_forward_speed
+                else:
+                    self.trajectory_msg.points[i].longitudinal_velocity_mps = max(
+                        self.speed_reduce_factor * np.interp(abs(delta_degrees),
+                                                            [self.steering_limits_to_slow_down,
+                                                            vehicle_data.motion_limits.max_steering_angle],
+                                                            [self.max_forward_speed,
+                                                            self.min_forward_speed]), self.min_forward_speed)
+            
+            # Slow down at the end of the trajectory
+            for slow_end_index in range(traj_length - 1, 0, -1):
+                slow_end_acc_distance = self.trajectory_msg.points[traj_length-1].accumulated_distance_m - self.trajectory_msg.points[slow_end_index].accumulated_distance_m
+                if (slow_end_acc_distance) > self.distance_to_slowdown_on_ends:
+                    break 
+            
+            # Find slow start index at the start of the trajectory
+            for slow_start_index in range(0, traj_length - 1):
+                slow_start_acc_distance = self.trajectory_msg.points[slow_start_index].accumulated_distance_m - self.trajectory_msg.points[0].accumulated_distance_m
+                if (slow_start_acc_distance) > self.distance_to_slowstart_on_start:
+                    break 
+            
+            # Gradually decrease the speed to minimum at the end of the trajectory
+            for i in range(traj_length-1, slow_end_index, -1):
+                tmp_dist = abs(self.trajectory_msg.points[traj_length-1].accumulated_distance_m - self.trajectory_msg.points[i].accumulated_distance_m)
+                self.trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist, [0, self.distance_to_slowdown_on_ends], [self.min_forward_speed, self.max_forward_speed])
+            
+            # Gradually increase the speed to maximum at the start of the trajectory
+            for i in range(0, slow_start_index):
+                tmp_dist = abs(self.trajectory_msg.points[slow_start_index].accumulated_distance_m - self.trajectory_msg.points[i].accumulated_distance_m)
+                self.trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist, [0, self.distance_to_slowstart_on_start], [self.max_forward_speed, self.min_forward_speed])
+            
+            # Publish the updated trajectory
+            self.global_trajectory_pub.publish(self.trajectory_msg)
+            self._traj_manager.update(self.trajectory_msg)
+            self.gps_path_pub.publish(self._traj_manager.to_path())
+            self.trajectory_velocity_marker_pub.publish(trajectory_to_marker(self.trajectory_msg, self.max_forward_speed))
+            rospy.loginfo("Publishing the Global Trajectory")
+            return speedwaypointResponse(status=True, result=str(self.waypoint_speed))
+
+        except Exception as e:
+            rospy.logerr(f"An error occurred: {e}")
+            return speedwaypointResponse(status=False, result=str(e))
+            
 
 
     def to_polygon(self, xy_list):
@@ -429,10 +499,10 @@ class GlobalGpsPathPub:
                                                           vehicle_data.motion_limits.max_steering_angle],
                                                          [self.max_forward_speed,
                                                           self.min_forward_speed]), self.min_forward_speed)
-            # print("speed",traj_msg.points[i].longitudinal_velocity_mps )
 
         self.global_trajectory_pub.publish(traj_msg)
         self._traj_manager.update(traj_msg)
+        self.trajectory_msg = traj_msg
         self.gps_path_pub.publish(self._traj_manager.to_path())
         self.trajectory_velocity_marker_pub.publish(trajectory_to_marker(traj_msg, self.max_forward_speed))
         rospy.loginfo("PUBLISHED GLOBAL GPS PATH")
@@ -468,12 +538,12 @@ class GlobalGpsPathPub:
         time.sleep(0.5)
 
         # Ros messages
-        trajectory_msg = Trajectory()
-        trajectory_msg.header.frame_id = "map"
-        trajectory_msg.header.stamp = rospy.Time.now()
-        trajectory_msg.home_position.position = home_position
+        self.trajectory_msg = Trajectory()
+        self.trajectory_msg.header.frame_id = "map"
+        self.trajectory_msg.header.stamp = rospy.Time.now()
+        self.trajectory_msg.home_position.position = home_position
 
-        # Filling the Trajectory_msg  
+        # Filling the self.trajectory_msg  
         closest_opp_coord_index = 0
         accumulated_distance = 0
         prev_pose = Pose()             
@@ -545,8 +615,8 @@ class GlobalGpsPathPub:
                         prev_pose_ = prev_pose
                         for j in range(0, int(n_points)-1):
                             # odom path
-                            px = trajectory_msg.points[-1].pose.position.x
-                            py = trajectory_msg.points[-1].pose.position.y
+                            px = self.trajectory_msg.points[-1].pose.position.x
+                            py = self.trajectory_msg.points[-1].pose.position.y
                             px_updated = px + self.path_resolution * math.cos(angle)
                             py_updated = py + self.path_resolution * math.sin(angle)
                             odom_pose_ = Pose()
@@ -569,7 +639,7 @@ class GlobalGpsPathPub:
                             traj_pt_msg.index = last_index
                             last_index = last_index + 1
                             traj_pt_msg.accumulated_distance_m = accumulated_distance
-                            trajectory_msg.points.append(traj_pt_msg)
+                            self.trajectory_msg.points.append(traj_pt_msg)
                                                     
                     else:
                         rospy.logwarn_once(f"RTK_status- {rtk_status}, Interpolate_with_rtk- {self.interpolate_with_rtk}, Interpolate_without_rtk- {self.interpolate_without_rtk} ")
@@ -589,15 +659,15 @@ class GlobalGpsPathPub:
             traj_pt_msg.index = last_index 
             last_index = last_index+1
             traj_pt_msg.accumulated_distance_m = accumulated_distance
-            trajectory_msg.points.append(traj_pt_msg)    
+            self.trajectory_msg.points.append(traj_pt_msg)    
 
         # connecting the first and last way points 
         if self.mission_continue: 
-            distance_btw_2end_pts = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[0].pose) 
+            distance_btw_2end_pts = distance_btw_poses(self.trajectory_msg.points[-1].pose, self.trajectory_msg.points[0].pose) 
             rospy.loginfo("distance between first and last way point %s", str(distance_btw_2end_pts)) 
             
             # trajectory pose of last index
-            traj_last = trajectory_msg.points[-1]
+            traj_last = self.trajectory_msg.points[-1]
             traj_last_pose = Pose()
             traj_last_pose.orientation = Quaternion(traj_last.pose.orientation.x, traj_last.pose.orientation.y, traj_last.pose.orientation.z,
                                                     traj_last.pose.orientation.w) 
@@ -605,7 +675,7 @@ class GlobalGpsPathPub:
             traj_last_yaw = get_yaw(traj_last_pose.orientation)
 
             # trajectory pose of first index  
-            traj_first = trajectory_msg.points[0]
+            traj_first = self.trajectory_msg.points[0]
             traj_first_pose = Pose()
             traj_first_pose.orientation = Quaternion(traj_first.pose.orientation.x, traj_first.pose.orientation.y, traj_first.pose.orientation.z,
                                                     traj_first.pose.orientation.w) 
@@ -621,8 +691,8 @@ class GlobalGpsPathPub:
 
             # checking whether the last point has crossed the starting point
             v1 = get_tie(traj_first_yaw)
-            v2 = np.array([trajectory_msg.points[-1].pose.position.x - trajectory_msg.points[0].pose.position.x,
-            trajectory_msg.points[-1].pose.position.y - trajectory_msg.points[0].pose.position.y])
+            v2 = np.array([self.trajectory_msg.points[-1].pose.position.x - self.trajectory_msg.points[0].pose.position.x,
+            self.trajectory_msg.points[-1].pose.position.y - self.trajectory_msg.points[0].pose.position.y])
             dot_pro = np.dot(v1,v2) 
             last_pt_ahead_start_pt = False
 
@@ -643,11 +713,11 @@ class GlobalGpsPathPub:
             
                 if last_pt_ahead_start_pt == False :
                     n_points = distance_btw_2end_pts // self.path_resolution
-                    angle = angle_btw_poses(trajectory_msg.points[0].pose, trajectory_msg.points[-1].pose)
+                    angle = angle_btw_poses(self.trajectory_msg.points[0].pose, self.trajectory_msg.points[-1].pose)
                     for j in range(0, int(n_points)):
                         # odom path
-                        px = trajectory_msg.points[-1].pose.position.x
-                        py = trajectory_msg.points[-1].pose.position.y
+                        px = self.trajectory_msg.points[-1].pose.position.x
+                        py = self.trajectory_msg.points[-1].pose.position.y
                         px_updated = px + self.path_resolution * math.cos(angle)
                         py_updated = py + self.path_resolution * math.sin(angle)
                         odom_pose = Pose()
@@ -670,7 +740,7 @@ class GlobalGpsPathPub:
                         traj_pt_msg.index = last_index
                         last_index = last_index +1
                         traj_pt_msg.accumulated_distance_m = accumulated_distance
-                        trajectory_msg.points.append(traj_pt_msg) 
+                        self.trajectory_msg.points.append(traj_pt_msg) 
 
             
                 
@@ -692,13 +762,13 @@ class GlobalGpsPathPub:
 
 
         else: 
-            distance = distance_btw_poses(trajectory_msg.points[-1].pose, trajectory_msg.points[0].pose)
+            distance = distance_btw_poses(self.trajectory_msg.points[-1].pose, self.trajectory_msg.points[0].pose)
             rospy.logdebug("distance between first and last way point %s", str(distance))
             rospy.logdebug("Mission continue not selected")
 
             # opposite_path with forward motion is true and mission continue to false  
             # reference pose is considered as last point
-            odom_prev = trajectory_msg.points[-1]
+            odom_prev = self.trajectory_msg.points[-1]
             last_reference_pose = Pose()
             last_reference_pose.position.x, last_reference_pose.position.y, last_reference_pose.position.z =  odom_prev.pose.position.x, odom_prev.pose.position.y, \
                                                                             self.rear_axle_center_height_from_ground
@@ -711,8 +781,8 @@ class GlobalGpsPathPub:
                 rospy.loginfo("Opposite Path forward motion is enabled")  
 
                 # to find the opposite oriented closest point from reverse loops with respect to last trajectory point 
-                for i in range(len(trajectory_msg.points),0,-1): 
-                    odom_now = trajectory_msg.points[i-1] 
+                for i in range(len(self.trajectory_msg.points),0,-1): 
+                    odom_now = self.trajectory_msg.points[i-1] 
                     current_odom_pose = Pose()
                     current_odom_pose.position.x, current_odom_pose.position.y, current_odom_pose.position.z = odom_now.pose.position.x, odom_now.pose.position.y, \
                                                                                     self.rear_axle_center_height_from_ground
@@ -733,13 +803,13 @@ class GlobalGpsPathPub:
                     if closest_distance <= self.opposite_closest_pt_dis_Thr:
                         # appending the trajectory from closest_opposite_index to start of the path
                         for i in range(closest_opp_coord_index,0,-1): 
-                            odom_then = trajectory_msg.points[i] 
+                            odom_then = self.trajectory_msg.points[i] 
                             odom_pose1 = Pose()
                             odom_pose1.position.x, odom_pose1.position.y, odom_pose1.position.z = odom_then.pose.position.x, odom_then.pose.position.y, \
                                                                                             self.rear_axle_center_height_from_ground
                             odom_pose1.orientation = Quaternion(odom_then.pose.orientation.x, odom_then.pose.orientation.y, odom_then.pose.orientation.z,
                                                             odom_now.pose.orientation.w) 
-                            odom_now = trajectory_msg.points[i-1] 
+                            odom_now = self.trajectory_msg.points[i-1] 
                             odom_pose2 = Pose()
                             odom_pose2.position.x, odom_pose2.position.y, odom_pose2.position.z = odom_now.pose.position.x, odom_now.pose.position.y, \
                                                                                             self.rear_axle_center_height_from_ground
@@ -753,11 +823,11 @@ class GlobalGpsPathPub:
                             updated_orientation = yaw_to_quaternion(updated_yaw)
                             close_pt_msg.pose.orientation = updated_orientation
                             close_pt_msg.longitudinal_velocity_mps = self.max_forward_speed
-                            close_pt_msg.index = len(trajectory_msg.points)+1
+                            close_pt_msg.index = len(self.trajectory_msg.points)+1
                             dis = distance_btw_poses(odom_pose1, odom_pose2)
                             accumulated_distance = accumulated_distance + dis
                             close_pt_msg.accumulated_distance_m = accumulated_distance
-                            trajectory_msg.points.append(close_pt_msg)
+                            self.trajectory_msg.points.append(close_pt_msg)
 
                         # path_publisher_diagnostics publishing true it opposite path forward motion is set true
                         self.diagnostics_status.summary(OK,f"Activating Opposite Path forward motion : {self.opposite_path}") 
@@ -785,61 +855,56 @@ class GlobalGpsPathPub:
 
 
 
-        traj_length = len(trajectory_msg.points)
+        traj_length = len(self.trajectory_msg.points)
         # velocity profile
-        for i, traj_point in enumerate(trajectory_msg.points):
+        for i, traj_point in enumerate(self.trajectory_msg.points):
 
             for lhd_index in range(i, traj_length):
-                path_acc_distance = trajectory_msg.points[lhd_index].accumulated_distance_m - \
+                path_acc_distance = self.trajectory_msg.points[lhd_index].accumulated_distance_m - \
                                     traj_point.accumulated_distance_m
                 if path_acc_distance > self.avg_lhd:
                     break
             look_ahead = path_acc_distance
-            slope = angle_btw_poses(trajectory_msg.points[lhd_index].pose, traj_point.pose)
+            slope = angle_btw_poses(self.trajectory_msg.points[lhd_index].pose, traj_point.pose)
             alpha = slope - get_yaw(traj_point.pose.orientation)
             delta = math.atan2(2.0 * vehicle_data.dimensions.wheel_base * math.sin(alpha), look_ahead)
             delta_degrees = -math.degrees(delta)
             if abs(delta_degrees) <= self.steering_limits_to_slow_down:
-                trajectory_msg.points[i].longitudinal_velocity_mps = self.max_forward_speed
+                self.trajectory_msg.points[i].longitudinal_velocity_mps = self.max_forward_speed
             else:
-                trajectory_msg.points[i].longitudinal_velocity_mps = max(
+                self.trajectory_msg.points[i].longitudinal_velocity_mps = max(
                     self.speed_reduce_factor * np.interp(abs(delta_degrees),
                                                         [self.steering_limits_to_slow_down,
                                                         vehicle_data.motion_limits.max_steering_angle],
                                                         [self.max_forward_speed,
                                                         self.min_forward_speed]), self.min_forward_speed)
-                # trajectory_msg.points[i].longitudinal_velocity_mps =  np.interp(abs(delta_degrees),
-                #                                                     [self.steering_limits_to_slow_down,
-                #                                                     vehicle_data.motion_limits.max_steering_angle],
-                #                                                     [self.max_forward_speed,
-                #                                                     self.min_forward_speed])  
         
         # slowing down at end of trajectory
         for slow_end_index in range(traj_length - 1, 0, -1):
-            slow_end_acc_distance =  trajectory_msg.points[traj_length-1].accumulated_distance_m - trajectory_msg.points[slow_end_index].accumulated_distance_m
+            slow_end_acc_distance =  self.trajectory_msg.points[traj_length-1].accumulated_distance_m - self.trajectory_msg.points[slow_end_index].accumulated_distance_m
             if (slow_end_acc_distance) > self.distance_to_slowdown_on_ends:   
                 break 
         # to find slow start index  at start of trajectory
         for slow_start_index in range(0,traj_length - 1): 
-            slow_start_acc_distance =  trajectory_msg.points[slow_start_index].accumulated_distance_m - trajectory_msg.points[0].accumulated_distance_m 
+            slow_start_acc_distance =  self.trajectory_msg.points[slow_start_index].accumulated_distance_m - self.trajectory_msg.points[0].accumulated_distance_m 
             if (slow_start_acc_distance) > self.distance_to_slowstart_on_start:   
                 break 
         #gradually decrease the speed to min at end of traj
         for i in range(traj_length-1,slow_end_index,-1):  
-            tmp_dist = abs(trajectory_msg.points[traj_length-1].accumulated_distance_m -
-                                            trajectory_msg.points[i].accumulated_distance_m) 
-            trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist,[0,self.distance_to_slowdown_on_ends],[self.min_forward_speed,self.max_forward_speed])  
+            tmp_dist = abs(self.trajectory_msg.points[traj_length-1].accumulated_distance_m -
+                                            self.trajectory_msg.points[i].accumulated_distance_m) 
+            self.trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist,[0,self.distance_to_slowdown_on_ends],[self.min_forward_speed,self.max_forward_speed])  
         #gradually increase the speed to max at start of traj
         for i in range(0,slow_start_index):  
-            tmp_dist = abs(trajectory_msg.points[slow_start_index].accumulated_distance_m -
-                                            trajectory_msg.points[i].accumulated_distance_m) 
-            trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist,[0,self.distance_to_slowstart_on_start],[self.max_forward_speed,self.min_forward_speed])  
+            tmp_dist = abs(self.trajectory_msg.points[slow_start_index].accumulated_distance_m -
+                                            self.trajectory_msg.points[i].accumulated_distance_m) 
+            self.trajectory_msg.points[i].longitudinal_velocity_mps = np.interp(tmp_dist,[0,self.distance_to_slowstart_on_start],[self.max_forward_speed,self.min_forward_speed])  
 
-        marker_arr = trajectory_to_marker(trajectory_msg, self.max_forward_speed)
+        marker_arr = trajectory_to_marker(self.trajectory_msg, self.max_forward_speed)
         self.trajectory_velocity_marker_pub.publish(marker_arr)
-        path = trajectory_to_path(trajectory_msg)  
+        path = trajectory_to_path(self.trajectory_msg)  
         self.gps_path_pub.publish(path) 
-        self.global_trajectory_pub.publish(trajectory_msg) 
+        self.global_trajectory_pub.publish(self.trajectory_msg) 
         rospy.loginfo("global_trajectory_published") 
         if self.turn_interpolate == True: 
             self.diagnostics_status.summary(ERROR,f"Points missing at turnings, Distance between turn_points: {self.turn_distance}, cautious to interpolate {rospy.get_name()}")  

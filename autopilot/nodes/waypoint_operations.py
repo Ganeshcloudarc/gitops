@@ -5,6 +5,7 @@ This script implements waypoint operations for a route planner.
 import rospy
 import rospkg
 import json
+import time
 from std_msgs.msg import String
 from sensor_msgs.msg import NavSatFix
 from geographiclib.geodesic import Geodesic
@@ -13,6 +14,8 @@ import traceback
 
 from diagnostic_updater._diagnostic_status_wrapper import DiagnosticStatusWrapper
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
+
+from autopilot_msgs.srv import speedwaypoint, speedwaypointRequest, speedwaypointResponse
 
 # Diagnostic Constants
 OK = DiagnosticStatus.OK
@@ -76,6 +79,13 @@ class WayPointOperation:
         mission_file_path = self.mission_file_dir + self.mission_file
         
         try:
+            self.speed_waypoint_max_value = rospy.get_param("/patrol/max_waypoint_speed",1.5)
+            rospy.loginfo("The Max speed for waypoint operation is: %s", str(self.speed_waypoint_max_value))
+           
+        except KeyError:
+            rospy.logwarn("Parameter '/patrol/max_waypoint_speed' not found")
+        
+        try:
             with open(mission_file_path, 'r', encoding='utf-8') as file:
                 # Load GeoJSON data with full precision
                 self.mission_data = json.load(file, parse_float=lambda x: round(float(x), 15))
@@ -92,6 +102,7 @@ class WayPointOperation:
                     rospy.signal_shutdown("No Waypoint Operations selected, Shutting down node gracefully.")
                     
                 rospy.loginfo("File Reading Success")
+                rospy.loginfo("The Waypoint Operations: %s",str(self.target_coordinates_list))
                 rospy.loginfo("Waiting for /vehicle/gps data")
                 print()
         except FileNotFoundError:
@@ -176,7 +187,52 @@ class WayPointOperation:
         Args:
             speed_value (float): Speed value to apply.
         """
+        # current_value = None
+        updated_current_speed = None
         rospy.loginfo("The speed is applied %s", speed_value)
+
+        # try:
+            # current_value = rospy.get_param("/patrol/max_forward_speed")
+            # rospy.loginfo("The Current Speed Value is: %s", str(current_value))
+        # except KeyError:
+            # rospy.logwarn("Parameter 'patrol/max_forward_speed' not found")
+            # current_value = 3.5
+
+        if speed_value > self.speed_waypoint_max_value:
+            rospy.loginfo("The Speed is above the limit so setting it to the system max speed, which is {}".format(self.speed_waypoint_max_value))
+            updated_current_speed = self.speed_waypoint_max_value
+        elif speed_value > 0 and speed_value <= self.speed_waypoint_max_value:
+            updated_current_speed = speed_value
+        else:
+            rospy.loginfo("Cannot handle the speed value %s", str(speed_value))
+            return
+
+        try:
+            speed_service = rospy.ServiceProxy('speed_waypoint', speedwaypoint)
+            output = speed_service(speed_value)
+            rospy.loginfo("The Speed Service Status: %s", output.status)
+            
+            # Convert the result back to float for logging
+            result_speed = float(output.result)
+            rospy.loginfo("The Speed Service Value: %f", result_speed)
+            
+        except rospy.ServiceException as e:
+            rospy.loginfo("Speed Service call failed: %s", str(e))
+
+        # Update the parameter with the new speed value
+        self.diagnostic_msg.summary(ERROR, "User Specified Action")
+        self.diagnostic_msg.add("Waypoint Operations", str(self.properties_to_show_on_hmi))
+        self.diagnostic_pub.publish(self.publish_diagnostic_msg())
+        
+        time.sleep(3)
+        
+        self.diagnostic_msg.summary(OK, "User Specified Action")
+        self.diagnostic_msg.add("Waypoint Operations", str(self.properties_to_show_on_hmi))
+        self.diagnostic_pub.publish(self.publish_diagnostic_msg())
+        
+        # rospy.set_param("patrol/max_forward_speed", updated_current_speed)
+        rospy.loginfo("The Updated Speed Value is: %s", str(updated_current_speed))
+            
         
     def tipperbed_at_point(self, tipperbed_value):
         """
@@ -251,19 +307,31 @@ class WayPointOperation:
                                     rospy.loginfo("Found Close co-ordinates: Current: %s, Target: %s", self.current_coordinates, target_coordinates_value)
                                     rospy.loginfo("Waypoint Action: %s", properties)
                                     self.properties_to_show_on_hmi = properties
-                                    
+                                
+                                    if ('pause' in properties) and ('speed' in properties):
+                                        rospy.loginfo("Speed & Pause Feature")
+                                        pause_time_value = properties['pause']
+                                        self.pause_at_point(pause_time_value)
+                                        speed_value = properties['speed']
+                                        self.speed_at_point(speed_value)
+                                        
                                     # Access properties and values here
-                                    if 'speed' in properties:
+                                    elif 'speed' in properties:
+                                        rospy.loginfo("Speed Feature")
                                         speed_value = properties['speed']
                                         self.speed_at_point(speed_value)
                     
-                                    if 'pause' in properties:
+                                    elif 'pause' in properties:
+                                        rospy.loginfo("Pause Feature")
                                         pause_time_value = properties['pause']
                                         self.pause_at_point(pause_time_value)
                                         
-                                    if 'tipperbed' in properties:
+                                    elif 'tipperbed' in properties:
+                                        rospy.loginfo("Tipperbed Feature")
                                         tipperbed_value = properties['tipperbed']
-                                        self.tipperbed_at_point(tipperbed_value)          
+                                        self.tipperbed_at_point(tipperbed_value)
+                                    else:
+                                        rospy.loginfo("Invalid Selection Made!")          
                                 else:
                                     rospy.loginfo_throttle(10,"No Close Points Found for Waypoint Actions")
             except Exception as e:

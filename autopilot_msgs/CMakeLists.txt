@@ -19,6 +19,13 @@ add_message_files(
   TrajectoryPoint.msg
   Trajectory.msg
  )
+
+ ## Generate services in the 'srv' folder
+add_service_files(
+  FILES
+  speedwaypoint.srv
+ )
+ 
  generate_messages(
   DEPENDENCIES
   std_msgs
