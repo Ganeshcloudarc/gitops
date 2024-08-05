@@ -76,7 +76,7 @@ class VehicleSafety {
   int curr_compass;
   int error_counter_for_tracking_controller{0};
   int error_counter_for_tracking_controller_th{2};
-  int CTE_THR;
+  float CTE_THR;
   // Todo : Keep default values if param not available
   int battery_soc{-1};
   int store_batt_level{-1};
@@ -85,9 +85,9 @@ class VehicleSafety {
   int current_steering_angle{0};
   bool is_steering_stuck;
   int BATT_SOC_TH = nh.param("/vehicle_safety/BATT_TH", BATT_SOC_TH);
-  int CTE_THR_AT_STRAIGHT =
+  float CTE_THR_AT_STRAIGHT =
       nh.param("/vehicle_safety/CTE_THR", CTE_THR_AT_STRAIGHT);
-  int CTE_THR_AT_CURVE =
+  float CTE_THR_AT_CURVE =
       nh.param("/vehicle_safety/CTE_THR_AT_CURVE", CTE_THR_AT_CURVE);
   bool emergency_stop = false;
   int TRACKING_CONTROLLER_TIMEOUT = 1;

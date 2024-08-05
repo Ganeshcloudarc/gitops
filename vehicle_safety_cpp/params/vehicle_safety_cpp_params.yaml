@@ -1,6 +1,6 @@
 vehicle_safety:
-  CTE_THR : 0.5 # cte threshold in meters
-  CTE_THR_AT_CURVE : 3.5 # CTE Threshold at curve
+  CTE_THR : 0.3 # cte threshold in meters
+  CTE_THR_AT_CURVE : 2 # CTE Threshold at curve
   HEAD_THR : 10 # Heading Threshold in degrees(+/-)
   GPS_FIX_THR : 1.0 #GPS FIX Threshold time in seconds
   GPS1_FIX_TH: [6] # GPS1 fix type threshold. TYPE : RTK FIXTYPE, GPSRAW.msg
