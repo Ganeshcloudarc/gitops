@@ -4,6 +4,7 @@
     <arg name="odom_pub" default="true"/>
     <arg name="gps_pub" default="true"/>
     <arg name="anello_gps" default="false"/>
+    <arg name="polynav_gps" default="false"/>
     <arg name="enable_standalone_gps" default="false"/>
     
     <param name="standalone_gps" value="false"/> 
@@ -25,6 +26,18 @@
       <node pkg = "vehicle_common" type = "anello_gps_transform_node.py" name="anello_gps_transform_node" />
       <param name ='/odometry_in' value ="/anello_ins/global_position/local" />
       <param name="/gps_in" value ="/anello_ins/global_position/global"/>
+    </group>
+
+    <group if="$(eval polynav_gps)">
+
+      <include file="$(find polyx_nodea)/launch/launch_polynav.launch"> </include>
+
+      <node pkg = "vehicle_common" type = "polynav_gps_transform_node.py" name="polynav_gps_transform_node" />
+      <param name ='/odometry_in' value ="/polynav/global_position/local" />
+      <param name="/gps_in" value ="/polynav/global_position/global"/>
+      <remap from="/polynav/gpsstatus/gps1/raw" to="/mavros/gpsstatus/gps1/raw"/> <!-- For the sake of Vehicle safety -->
+      <remap from="/polynav/gpsstatus/gps2/raw" to="/mavros/gpsstatus/gps2/raw"/>
+
     </group>
 
     <group if="$(eval enable_standalone_gps)">
