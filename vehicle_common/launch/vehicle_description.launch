@@ -7,8 +7,6 @@
     <arg name="polynav_gps" default="false"/>
     <arg name="enable_standalone_gps" default="false"/>
     
-    <param name="standalone_gps" value="false"/> 
-
     <arg name="enable_2d_mode" default="true"/>
 
     <param name ="/base_frame" value ="base_link"/>
@@ -21,14 +19,22 @@
     <param name="/gps_out" value="/vehicle/gps"/>
     <param name="/footprint_out" value="/vehicle/foot_print" />
     <param name="vehicle_type" value="$(arg vehicle_type)"/>
+    <param name="/gps_system" value="ardusimple_pixhawk"/>
+    <param name="standalone_gps" value="$(arg enable_standalone_gps)"/> 
+
+
 
     <group if="$(eval anello_gps)">
+      <param name="/gps_system" value="anello"/>
+
       <node pkg = "vehicle_common" type = "anello_gps_transform_node.py" name="anello_gps_transform_node" />
       <param name ='/odometry_in' value ="/anello_ins/global_position/local" />
       <param name="/gps_in" value ="/anello_ins/global_position/global"/>
     </group>
 
     <group if="$(eval polynav_gps)">
+
+      <param name="/gps_system" value="polynav"/>
 
       <include file="$(find polyx_nodea)/launch/launch_polynav.launch"> </include>
 
@@ -41,6 +47,9 @@
     </group>
 
     <group if="$(eval enable_standalone_gps)">
+
+      <param name="/gps_system" value="um982"/>
+
       <!-- Launch UM982 Driver -->
 
       <include file="$(find gps_driver_um982)/launch/launch_um982.launch"> </include>

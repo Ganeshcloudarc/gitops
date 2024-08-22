@@ -14,6 +14,7 @@ try:
     from pyproj import Geod
     from sensor_msgs.msg import NavSatFix
     from autopilot_utils.pose_helper import yaw_to_quaternion
+    from std_msgs.msg import String
 except ImportError as error:
     print("No module named:", error)
 
@@ -158,6 +159,10 @@ if __name__ == '__main__':
         foot_prin_pub = rospy.Publisher(send_footprint_topic_name, PolygonStamped, queue_size=2)
     if send_gps:
         gps_publisher = rospy.Publisher(send_gps_topic_name, NavSatFix, queue_size=2)
+    if rospy.has_param("/gps_system"):
+        gps_system_publisher = rospy.Publisher("/gps_system", String, queue_size=2, latch=True)
+        gps_system = rospy.get_param("/gps_system")
+        gps_system_publisher.publish(gps_system)    
     rospy.Subscriber(odom_in_topic, Odometry, odom_callback)
     rospy.Subscriber(gps_in_topic, NavSatFix, gps_callback)
 
