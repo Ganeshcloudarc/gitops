@@ -14,7 +14,7 @@
         <node name="$(anon rviz_kitti)" pkg="rviz" type="rviz" args="-d $(find patchwork)/rviz/patchwork_own_data.rviz" if="$(eval arg('rviz'))"/>
     </group>
 
-    <node name="$(anon ros_kitti)" pkg="patchwork" type="ros_kitti" output="screen">
+    <node name="$(anon ros_kitti)" pkg="patchwork" type="ros_kitti">
         <remap from="/patchwork/cloud" to="$(arg points_in)"/>
     </node>
 

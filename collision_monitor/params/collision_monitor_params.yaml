@@ -5,7 +5,7 @@ collision_monitor:
   min_points: 5 # Minimum points inside the polygon to not consider as collision.
   points : [[-0.8, 1], [-0.8, -1],[4.45, -1], [4.45, 1]] # Foot_print points representing the vehicle wrt base_link
           #  [[-0.8, 1], [-0.8, -1],[4.45, -1], [4.45, 1]] # vehicle lenght 2.
-  steering_angle_based_collision_check: False # check collision with respect to steering angles
+  steering_angle_based_collision_check: True # check collision with respect to steering angles
   observation_sources: [ "rslidar_scan"] # ["zed_scan"]
   rslidar_scan:
     type: "scan"

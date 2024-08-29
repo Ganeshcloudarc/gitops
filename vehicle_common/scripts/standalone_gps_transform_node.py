@@ -179,9 +179,11 @@ class standaloneGPSConverter:
             odom_msg.twist.twist.angular.x = self.standalone_angular_vel_x #self.deg_to_rad(self.angular_x)
             odom_msg.twist.twist.angular.y = self.standalone_angular_vel_y  #self.deg_to_rad(self.angular_y)
             odom_msg.twist.twist.angular.z = self.standalone_angular_vel_z # self.deg_to_rad(self.angular_z)
-
-        self.standalone_local_odom_publisher.publish(odom_msg)
-        rospy.logdebug("Odom sent")
+        try:
+            self.standalone_local_odom_publisher.publish(odom_msg)
+            rospy.logdebug("Odom sent")
+        except Exception as e:
+            rospy.logerr_throttle(10,{e})
 
     
     def deg_to_rad(self,deg):

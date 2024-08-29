@@ -8,8 +8,8 @@
     <arg name="record" default="false"/> <!--bag file record-->
     <arg name="record_minimal" default ="true"/>
     <arg name="record_waypoints_on_rtk_loss" default="false"/>
-    <arg name="use_save_path_v2" default="false"/>
-    <arg name="enable_mapping" default="true"/>
+    <arg name="use_save_path_v2" default="true"/>
+    <arg name="enable_mapping" default="false"/>
     <arg name="enable_anello_gps" default="false"/>
 
     <param name="/save_path/save_on_rtkloss" value="$(arg record_waypoints_on_rtk_loss)"/>
