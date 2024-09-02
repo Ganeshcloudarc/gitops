@@ -96,7 +96,10 @@ class VehicleSafety {
   float curr_coordinates_lat = 0, curr_coordinates_long = 0;
   double gps_accuracy = -1, sensor_accuracy_value, GPS_ACC_IDEAL, GPS_ACC_THR;
   int calc_heading = 0;
-  int gps1_fix, gps2_fix, gps1_h_acc_data, gps1_h_acc_th_mm;
+  int gps1_fix{-1};
+  int gps2_fix{-1};
+  int gps1_h_acc_data{0};
+  int gps1_h_acc_th_mm{100};
   float position_covariance;
   long start_time_gps, start_time;
   long gps_lost_time, gps_start_time;

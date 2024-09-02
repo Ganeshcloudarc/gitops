@@ -70,6 +70,7 @@
   <exec_depend>python3-fastkml</exec_depend>
   <exec_depend>python3-geographiclib</exec_depend>
   <exec_depend>python3-json-stream-pip</exec_depend>
+  <exec_depend>python3-geopy</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
