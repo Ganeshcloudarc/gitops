@@ -69,15 +69,7 @@ def odom_callback(data):
          data.pose.pose.orientation.z, data.pose.pose.orientation.w]
     )
     x_pos = data.pose.pose.position.x - fcu_offset_vehicle * math.cos(yaw)  # transom sensor location to rear axle in x
-    y_pos = data.pose.pose.position.y - fcu_offset_vehicle * math.sin(yaw)  # transom sensor location to rear axle in y
-    
-    if standalone_gps:
-        # Transform XY by 0.8625 meters when standalone GPS because standalone gps will give coordinates from Main(Left) antenna.
-        
-        # y_pos = y_pos - 0.8625
-        y_pos = y_pos - 0.8765 * math.cos(yaw)
-        x_pos = x_pos + 0.8765 * math.sin(yaw)
-        
+    y_pos = data.pose.pose.position.y - fcu_offset_vehicle * math.sin(yaw)  # transom sensor location to rear axle in y    
 
     tf_msg.header.stamp = rospy.Time.now()
     tf_msg.header.frame_id = 'odom'                            #data.header.frame_id
@@ -110,22 +102,13 @@ def odom_callback(data):
         foot_prin_pub.publish(polygon_msg)
         rospy.logdebug("footprint sent")
 
-
 def gps_callback(data):
     if yaw:
         # heading to Azumuth 
         deg = 360 - math.degrees(yaw ) + 90
         lon, lat,_ = geod.fwd(lons=data.longitude, lats=data.latitude, az=deg, dist=-fcu_offset_vehicle)
-        if standalone_gps:
-            # lon, lat,_ = geod.fwd(lons=data.longitude, lats=data.latitude, az=deg+90, dist=0.5)
-            # shift main antenna coordinates to center by distance. vehicle width/2 because main antenna is to the left of the vehicle.
-            # deg+90 := shift to right side with 0.8625 at 90 degree right angle. Fwd is zero degree.
-            lon2, lat2, _ = geod.fwd(lons=lon, lats=lat, az=deg+90, dist=0.8625) 
-            data.longitude = lon2
-            data.latitude = lat2
-        else:
-            data.longitude = lon
-            data.latitude = lat
+        data.longitude = lon
+        data.latitude = lat
         gps_publisher.publish(data)
         rospy.logdebug("gps published")
         

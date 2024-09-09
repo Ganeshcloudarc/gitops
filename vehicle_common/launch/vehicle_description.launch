@@ -57,7 +57,7 @@
       <!-- GPS Transform Node -->
       <node pkg = "vehicle_common" type = "standalone_gps_transform_node.py" name="standalone_gps_transform_node"  output="screen" />
       <param name ='/odometry_in' value ="/gps/global_position/local" />
-      <param name="/gps_in" value ="/gps/global_position/global"/>
+      <param name="/gps_in" value ="/gps/global_position/global_center"/>
       <param name="standalone_gps" value="true"/> 
     </group>
     
