@@ -10,6 +10,7 @@ try :
     from nav_msgs.msg import Path, Odometry 
     from geographic_msgs.msg import GeoPointStamped, GeoPose
     from mavros_msgs.msg import HomePosition
+    from mavros_msgs.srv import CommandHome
     from geometry_msgs.msg import Pose, PoseStamped, Quaternion, PolygonStamped
     from std_msgs.msg import Float32MultiArray, Int32MultiArray, Bool, Int16, String, Int8, UInt16
     from visualization_msgs.msg import Marker, MarkerArray
@@ -395,7 +396,32 @@ class GlobalGpsPathPub:
             self.diagnostics_status.add("Error Ocurred",str(error))
             self.publisher_diagnostics() 
             return
-        
+
+    def call_home_position(self,home_lat, home_long, home_alt=-60):
+        # fix bug from mavros - #524
+        rospy.wait_for_service('/mavros/cmd/set_home')
+        try:
+            # Create a service proxy
+            set_home_service = rospy.ServiceProxy('/mavros/cmd/set_home', CommandHome)
+
+            # Call the service with the desired parameters
+            response = set_home_service(
+                current_gps=False,
+                yaw=0.0,
+                latitude=home_lat,
+                longitude=home_long,
+                altitude=home_alt
+            )
+
+            # Check response
+            if response.success:
+                rospy.loginfo("Home position set successfully")
+            else:
+                rospy.logwarn(f'Failed to set home position {home_lat}, {home_long}, {home_alt}')
+
+        except rospy.ServiceException as e:
+            rospy.logerr("Service call failed: %s" % e)    
+
     def set_home_position(self, home_lat, home_long, home_alt=-60):
         geo_point = GeoPointStamped()
         geo_point.position.latitude = home_lat
@@ -405,6 +431,7 @@ class GlobalGpsPathPub:
         home_position_msg.geo = geo_point.position
         self.starting_point_pub.publish(geo_point)
         self.home_position_pub.publish(home_position_msg)
+        self.call_home_position(home_lat, home_long, home_alt)
         return geo_point.position
 
     def publish_path_from_long_lat(self, long_lat_list):
