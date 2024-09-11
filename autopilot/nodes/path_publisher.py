@@ -399,8 +399,8 @@ class GlobalGpsPathPub:
 
     def call_home_position(self,home_lat, home_long, home_alt=-60):
         # fix bug from mavros - #524
-        rospy.wait_for_service('/mavros/cmd/set_home')
         try:
+            rospy.wait_for_service('/mavros/cmd/set_home',3)
             # Create a service proxy
             set_home_service = rospy.ServiceProxy('/mavros/cmd/set_home', CommandHome)
 
@@ -419,7 +419,7 @@ class GlobalGpsPathPub:
             else:
                 rospy.logwarn(f'Failed to set home position {home_lat}, {home_long}, {home_alt}')
 
-        except rospy.ServiceException as e:
+        except Exception as e:
             rospy.logerr("Service call failed: %s" % e)    
 
     def set_home_position(self, home_lat, home_long, home_alt=-60):
