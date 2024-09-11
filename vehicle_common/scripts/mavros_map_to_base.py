@@ -49,6 +49,7 @@ standalone_gps = rospy.get_param("standalone_gps", True)
 
 tf_broad_caster = tf2_ros.TransformBroadcaster()
 tf_msg = TransformStamped()
+
 fcu_offset_vehicle = (wheel_base + front_axle_to_fcu_position[0])
 
 foot_print_specs = [

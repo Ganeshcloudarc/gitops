@@ -6,6 +6,7 @@
     <arg name="anello_gps" default="false"/>
     <arg name="polynav_gps" default="false"/>
     <arg name="enable_standalone_gps" default="false"/>
+    <arg name="enable_vision_rtk" default="false"/>
     
     <arg name="enable_2d_mode" default="true"/>
 
@@ -45,7 +46,23 @@
       <remap from="/polynav/gpsstatus/gps2/raw" to="/mavros/gpsstatus/gps2/raw"/>
 
     </group>
+      <group if="$(eval enable_vision_rtk)">
+      <arg name = "fixposition_enu_mode" default = "false"/>
+      <param name="/gps_system" value="vision_rtk"/>
+      <include file="$(find fixposition_driver_ros1)/launch/tcp.launch"> </include>
 
+      <node pkg = "vehicle_common" type = "fixposition.py" name="fixposition_transform_node">
+      <remap from="fixposition/gpsstatus/gps1/raw" to="/mavros/gpsstatus/gps1/raw"/>
+      <remap from="fixposition/gpsstatus/gps2/raw" to="/mavros/gpsstatus/gps2/raw"/>
+      <remap from="/fixposition/global_position/compass_hdg" to="/mavros/global_position/compass_hdg"/>
+      </node>
+      <param name="odometry_in" value="/fixposition/odometry"/>
+      <param name="gps_in" value="/fixposition/global_position/global"/>
+      <param name="vision-rtk" value="true"/>
+      <param name="fixposition_enu_mode" value="$(arg fixposition_enu_mode)"/>
+      
+    </group>
+ 
     <group if="$(eval enable_standalone_gps)">
 
       <param name="/gps_system" value="um982"/>
